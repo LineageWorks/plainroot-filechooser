@@ -49,6 +49,7 @@ struct PortalRequest {
   std::string app_id;
   std::string parent_window;
   std::string title;
+  std::string accept_label;
   std::string start_path;
   bool multiple = false;
   bool directory = false;
@@ -121,6 +122,12 @@ bool parse_options(sd_bus_message *message, PortalRequest &request) {
       int value = 0;
       result = sd_bus_message_read(message, "b", &value);
       request.directory = value != 0;
+    } else if (std::strcmp(key, "accept_label") == 0 &&
+               std::strcmp(contents, "s") == 0) {
+      const char *value = nullptr;
+      result = sd_bus_message_read(message, "s", &value);
+      if (result >= 0 && value != nullptr)
+        request.accept_label = value;
     } else if (std::strcmp(key, "current_folder") == 0 &&
                std::strcmp(contents, "ay") == 0) {
       const void *bytes = nullptr;
@@ -298,9 +305,14 @@ public:
     if (!parse_options(message, *request))
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
                          "Malformed FileChooser.OpenFile options");
-    if (request->multiple || request->directory)
+    if (request->multiple)
       return reply_error(message, SD_BUS_ERROR_NOT_SUPPORTED,
-                         "This backend currently supports single-file OpenFile requests");
+                         "This backend does not support multiple-file OpenFile requests");
+    if (request->title.empty()) {
+      const char *fallback = plainroot_i18n_gettext_v1(
+          kDomain, request->directory ? "Choose a folder" : "Choose a file");
+      request->title = fallback == nullptr ? "Choose a file" : fallback;
+    }
     if (request->start_path.empty()) {
       const char *home = g_get_home_dir();
       request->start_path = home != nullptr && home[0] == '/' ? home : "/";
@@ -448,6 +460,8 @@ private:
     request.controller = std::make_unique<BrowserController>(
         application_, request.context, browser_completed, &request);
     request.controller->set_title(request.title);
+    request.controller->set_select_directory(request.directory);
+    request.controller->set_accept_label(request.accept_label);
     if (!request.controller->ready() || !request.controller->create_ui()) {
       finish(request, kResponseError, nullptr, false);
       return;

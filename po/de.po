@@ -13,6 +13,15 @@ msgstr ""
 msgid "Choose a file"
 msgstr "Datei auswählen"
 
+msgid "Choose a folder"
+msgstr "Ordner auswählen"
+
+msgid "Select folder"
+msgstr "Ordner wählen"
+
+msgid "The current folder will be returned."
+msgstr "Der aktuelle Ordner wird zurückgegeben."
+
 msgid "Up"
 msgstr "Nach oben"
 

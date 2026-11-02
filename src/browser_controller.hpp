@@ -26,6 +26,8 @@ public:
   bool create_ui();
   void set_window(plainroot_toolkit_window *window);
   void set_title(std::string title);
+  void set_select_directory(bool select_directory);
+  void set_accept_label(std::string label);
   void navigate(std::string path);
   void cancel();
 

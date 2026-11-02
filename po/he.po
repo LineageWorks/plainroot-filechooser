@@ -13,6 +13,15 @@ msgstr ""
 msgid "Choose a file"
 msgstr "בחירת קובץ"
 
+msgid "Choose a folder"
+msgstr "בחירת תיקייה"
+
+msgid "Select folder"
+msgstr "בחירת תיקייה"
+
+msgid "The current folder will be returned."
+msgstr "התיקייה הנוכחית תוחזר."
+
 msgid "Up"
 msgstr "למעלה"
 

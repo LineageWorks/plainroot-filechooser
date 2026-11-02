@@ -100,8 +100,10 @@ public:
         context_, kPagePadding, kPagePadding, kPagePadding, kPagePadding, 1.0F);
     auto *page = plainroot_ui_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, kContentSpacing, 1.0F);
-    const std::string title_text =
-        requested_title_.empty() ? tr("Choose a file") : requested_title_;
+    const std::string title_text = requested_title_.empty()
+                                       ? tr(select_directory_ ? "Choose a folder"
+                                                             : "Choose a file")
+                                       : requested_title_;
     auto *title = plainroot_ui_label_create_v1(
         context_, title_text.c_str(), static_cast<uint32_t>(title_text.size()),
         PLAINROOT_UI_COLOR_ON_SURFACE_V3, 0.0F);
@@ -164,11 +166,18 @@ public:
     auto *footer = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
         kExpandedControlsWidth, 12.0F, 0.0F);
-    selected_label_ = make_label("No file selected", 1.0F);
+    selected_label_ = make_label(
+        select_directory_ ? "The current folder will be returned."
+                          : "No file selected",
+        1.0F);
     if (selected_label_ != nullptr)
       (void)plainroot_ui_widget_set_text_direction_v1(selected_label_,
                                                       PLAINROOT_UI_TEXT_LTR);
-    auto *select = make_button("Open", &Impl::accept_activated);
+    auto *select = make_action_button(
+        accept_label_.empty()
+            ? tr(select_directory_ ? "Select folder" : "Open")
+            : accept_label_,
+        &Impl::accept_activated);
     if (select != nullptr)
       (void)plainroot_ui_button_set_style_v1(select,
                                              PLAINROOT_UI_BUTTON_STYLE_FILLED);
@@ -222,6 +231,12 @@ public:
 
   void set_title(std::string title) { requested_title_ = std::move(title); }
 
+  void set_select_directory(bool select_directory) {
+    select_directory_ = select_directory;
+  }
+
+  void set_accept_label(std::string label) { accept_label_ = std::move(label); }
+
   void cancel() {
     if (!finished_ && completion_ != nullptr) {
       finished_ = true;
@@ -238,7 +253,9 @@ public:
     selected_path_.clear();
     ++generation_;
     set_label(path_label_, display_path(current_path_));
-    set_label(selected_label_, tr("No file selected"));
+    set_label(selected_label_, tr(select_directory_
+                                     ? "The current folder will be returned."
+                                     : "No file selected"));
     set_status(tr("Loading folder…"));
     loader_.request(current_path_, generation_);
     schedule_render();
@@ -267,6 +284,13 @@ private:
     return plainroot_ui_button_create_v1(context_, text.c_str(),
                                          static_cast<uint32_t>(text.size()),
                                          0.0F, callback, this);
+  }
+
+  plainroot_ui_widget *make_action_button(const std::string &label,
+                                         ButtonCallback callback) {
+    return plainroot_ui_button_create_v1(
+        context_, label.c_str(), static_cast<uint32_t>(label.size()), 0.0F,
+        callback, this);
   }
 
   static void up_activated(void *user_data, plainroot_ui_widget *) {
@@ -308,6 +332,12 @@ private:
       action.controller->navigate(action.path);
       return;
     }
+    if (action.controller->select_directory_) {
+      action.controller->set_status(
+          tr("Choose the current folder with Select folder."));
+      action.controller->request_redraw();
+      return;
+    }
     action.controller->selected_path_ = action.path;
     set_label(action.controller->selected_label_, display_path(action.path));
     action.controller->set_status(
@@ -317,20 +347,21 @@ private:
 
   static void accept_activated(void *user_data, plainroot_ui_widget *) {
     auto &self = *static_cast<Impl *>(user_data);
-    if (self.selected_path_.empty()) {
+    if (!self.select_directory_ && self.selected_path_.empty()) {
       self.set_status(tr("Select a file first."));
       self.request_redraw();
       return;
     }
+    const std::string &selected_path =
+        self.select_directory_ ? self.current_path_ : self.selected_path_;
     if (self.completion_ != nullptr) {
       if (!self.finished_) {
         self.finished_ = true;
         self.completion_(self.completion_user_data_, true,
-                         self.selected_path_.c_str());
+                         selected_path.c_str());
       }
     } else {
-      (void)std::fwrite(self.selected_path_.data(), 1,
-                        self.selected_path_.size(), stdout);
+      (void)std::fwrite(selected_path.data(), 1, selected_path.size(), stdout);
       (void)std::fputc('\n', stdout);
       (void)std::fflush(stdout);
       plainroot_toolkit_application_quit(self.application_);
@@ -756,12 +787,14 @@ private:
   CompletionFn completion_ = nullptr;
   void *completion_user_data_ = nullptr;
   std::string requested_title_;
+  std::string accept_label_;
   detail::DirectoryLoader loader_;
   std::unique_ptr<detail::StorageLocationsView> storage_view_;
   bool storage_catalog_complete_ = false;
   bool storage_operation_pending_ = false;
   std::unique_ptr<detail::StorageBridge> storage_bridge_;
   bool ui_ready_ = false;
+  bool select_directory_ = false;
   bool finished_ = false;
   bool show_hidden_ = false;
   uint64_t generation_ = 0;
@@ -807,6 +840,16 @@ void BrowserController::set_window(plainroot_toolkit_window *window) {
 void BrowserController::set_title(std::string title) {
   if (impl_)
     impl_->set_title(std::move(title));
+}
+
+void BrowserController::set_select_directory(bool select_directory) {
+  if (impl_)
+    impl_->set_select_directory(select_directory);
+}
+
+void BrowserController::set_accept_label(std::string label) {
+  if (impl_)
+    impl_->set_accept_label(std::move(label));
 }
 
 void BrowserController::navigate(std::string path) {
