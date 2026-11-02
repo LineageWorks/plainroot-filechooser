@@ -322,3 +322,18 @@ msgstr "Имя (по возрастанию)"
 
 msgid "Name (descending)"
 msgstr "Имя (по убыванию)"
+
+msgid "Enter a file name or select a file."
+msgstr "Введите имя файла или выберите файл."
+
+msgid "This file name cannot be represented on this system."
+msgstr "Это имя файла нельзя представить в этой системе."
+
+msgid "No file with that name exists in this folder."
+msgstr "В этой папке нет файла с таким именем."
+
+msgid "Unable to check the selected file."
+msgstr "Не удалось проверить выбранный файл."
+
+msgid "File name entered. Choose Open to check it."
+msgstr "Имя файла введено. Нажмите «Открыть», чтобы проверить его."

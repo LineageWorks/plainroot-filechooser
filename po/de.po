@@ -321,3 +321,18 @@ msgstr "Name (aufsteigend)"
 
 msgid "Name (descending)"
 msgstr "Name (absteigend)"
+
+msgid "Enter a file name or select a file."
+msgstr "Geben Sie einen Dateinamen ein oder wählen Sie eine Datei aus."
+
+msgid "This file name cannot be represented on this system."
+msgstr "Dieser Dateiname kann auf diesem System nicht dargestellt werden."
+
+msgid "No file with that name exists in this folder."
+msgstr "Eine Datei mit diesem Namen ist in diesem Ordner nicht vorhanden."
+
+msgid "Unable to check the selected file."
+msgstr "Die ausgewählte Datei kann nicht überprüft werden."
+
+msgid "File name entered. Choose Open to check it."
+msgstr "Dateiname eingegeben. Wählen Sie Öffnen, um ihn zu prüfen."

@@ -27,6 +27,7 @@ browser_sources = [
   'src/browser_controller.cpp',
   'src/directory_sort.cpp',
   'src/directory_loader.cpp',
+  'src/open_filename.cpp',
   'src/storage_bridge.cpp',
   'src/storage_locations_view.cpp',
   'src/ui_context_factory.cpp',
@@ -86,6 +87,17 @@ directory_sort_test = executable(
   install: false,
 )
 test('FileChooser directory sorting', directory_sort_test)
+
+open_filename_test = executable(
+  'filechooser-open-filename-test',
+  [
+    'tests/open_filename_test.cpp',
+    'src/open_filename.cpp',
+  ],
+  dependencies: [glib_dep],
+  install: false,
+)
+test('FileChooser typed open filename', open_filename_test)
 
 # The portal target is deliberately not registered by default. Its request
 # lifecycle and FileChooser parity must be validated before a portals.conf

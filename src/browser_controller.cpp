@@ -2,6 +2,7 @@
 
 #include "directory_loader.hpp"
 #include "directory_sort.hpp"
+#include "open_filename.hpp"
 #include "storage_bridge.hpp"
 #include "storage_locations_view.hpp"
 
@@ -87,6 +88,10 @@ public:
 
   bool ready() const { return loader_.ready(); }
 
+  bool uses_filename_field() const {
+    return save_file_ || (!select_directory_ && !allow_multiple_);
+  }
+
   void shutdown() {
     if (storage_bridge_ != nullptr)
       storage_bridge_->stop();
@@ -157,12 +162,15 @@ public:
     auto *controls = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
         kExpandedControlsWidth, 12.0F, 0.0F);
-    auto *filename_row = save_file_ ? plainroot_ui_adaptive_box_create_v1(
-                                          context_, PLAINROOT_UI_AXIS_VERTICAL,
-                                          PLAINROOT_UI_AXIS_HORIZONTAL,
-                                          kExpandedControlsWidth, 8.0F, 0.0F)
-                                    : nullptr;
-    auto *filename_label = save_file_ ? make_label("File name", 0.0F) : nullptr;
+    const bool show_filename_entry = uses_filename_field();
+    auto *filename_row = show_filename_entry
+                             ? plainroot_ui_adaptive_box_create_v1(
+                                   context_, PLAINROOT_UI_AXIS_VERTICAL,
+                                   PLAINROOT_UI_AXIS_HORIZONTAL,
+                                   kExpandedControlsWidth, 8.0F, 0.0F)
+                             : nullptr;
+    auto *filename_label =
+        show_filename_entry ? make_label("File name", 0.0F) : nullptr;
     const std::string empty;
     const std::string search_hint = tr("Search files");
     search_field_ = plainroot_ui_search_field_create_v1(
@@ -185,7 +193,7 @@ public:
     sort_dropdown_ = plainroot_ui_dropdown_create_v1(
         context_, sort_hint.c_str(), static_cast<uint32_t>(sort_hint.size()),
         0.0F, &Impl::sort_changed, this);
-    if (save_file_) {
+    if (show_filename_entry) {
       const std::string hint = tr("File name");
       filename_field_ = plainroot_ui_text_field_create_v1(
           context_, initial_filename_.data(),
@@ -239,8 +247,9 @@ public:
         list_scroll_ == nullptr || entries_list_ == nullptr ||
         status_label_ == nullptr || footer == nullptr ||
         selected_label_ == nullptr || select == nullptr ||
-        (save_file_ && (filename_row == nullptr || filename_label == nullptr ||
-                        filename_field_ == nullptr)))
+        (show_filename_entry &&
+         (filename_row == nullptr || filename_label == nullptr ||
+          filename_field_ == nullptr)))
       return false;
 
     if (filter_dropdown_ != nullptr) {
@@ -282,7 +291,7 @@ public:
     if (!add(outer, padding) || !add(padding, page) || !add(page, title) ||
         !add(page, location_row) || !add(location_row, location_actions) ||
         !add(location_actions, up) || !add(location_actions, home) ||
-        (save_file_ &&
+        (show_filename_entry &&
          (!add(page, filename_row) || !add(filename_row, filename_label) ||
           !add(filename_row, filename_field_))) ||
         !add(location_row, path_label_) || !add(page, controls) ||
@@ -369,6 +378,10 @@ public:
     current_path_ = std::move(path);
     selected_path_.clear();
     selected_paths_.clear();
+    if (!save_file_ && filename_field_ != nullptr) {
+      initial_filename_.clear();
+      set_label(filename_field_, initial_filename_);
+    }
     ++generation_;
     set_label(path_label_, display_path(current_path_));
     if (allow_multiple_) {
@@ -491,6 +504,19 @@ private:
         (value == nullptr && length != 0U))
       return;
     self.initial_filename_.assign(value == nullptr ? "" : value, length);
+    if (!self.save_file_ && self.uses_filename_field()) {
+      self.selected_path_.clear();
+      if (self.initial_filename_.empty()) {
+        set_label(self.selected_label_, tr("No file selected"));
+        self.set_status("");
+      } else {
+        set_label(self.selected_label_,
+                  join_path(display_path(self.current_path_),
+                            self.initial_filename_));
+        self.set_status(tr("File name entered. Choose Open to check it."));
+      }
+      self.request_redraw();
+    }
   }
 
   static void entry_activated(void *user_data, plainroot_ui_widget *) {
@@ -518,6 +544,15 @@ private:
     }
     if (action.controller->allow_multiple_)
       return;
+    if (action.controller->filename_field_ != nullptr) {
+      const std::string filename =
+          parent_path(action.path) == "/"
+              ? action.path.substr(1)
+              : action.path.substr(action.path.find_last_of('/') + 1U);
+      action.controller->initial_filename_ = display_path(filename);
+      set_label(action.controller->filename_field_,
+                action.controller->initial_filename_);
+    }
     action.controller->selected_path_ = action.path;
     set_label(action.controller->selected_label_, display_path(action.path));
     action.controller->set_status(
@@ -560,14 +595,11 @@ private:
       self.complete_selection(self.selected_paths_);
       return;
     }
-    if (!self.select_directory_ && self.selected_path_.empty()) {
-      self.set_status(tr("Select a file first."));
-      self.request_redraw();
+    if (!self.select_directory_) {
+      self.accept_open_file();
       return;
     }
-    const std::string &selected_path =
-        self.select_directory_ ? self.current_path_ : self.selected_path_;
-    self.complete_selection({selected_path});
+    self.complete_selection({self.current_path_});
   }
 
   static void overwrite_primary(void *user_data,
@@ -630,6 +662,43 @@ private:
       return;
     }
     show_overwrite_confirmation(path);
+  }
+
+  void accept_open_file() {
+    if (!selected_path_.empty()) {
+      complete_selection({selected_path_});
+      return;
+    }
+
+    const auto resolution =
+        detail::resolve_open_filename(current_path_, initial_filename_);
+    switch (resolution.status) {
+    case detail::OpenFilenameStatus::valid:
+      complete_selection({resolution.path});
+      return;
+    case detail::OpenFilenameStatus::directory:
+      navigate(resolution.path);
+      return;
+    case detail::OpenFilenameStatus::empty:
+      set_status(tr("Enter a file name or select a file."));
+      break;
+    case detail::OpenFilenameStatus::invalid_component:
+      set_status(tr("Enter a file name without a folder path."));
+      break;
+    case detail::OpenFilenameStatus::too_long:
+      set_status(tr("The file name is too long."));
+      break;
+    case detail::OpenFilenameStatus::invalid_encoding:
+      set_status(tr("This file name cannot be represented on this system."));
+      break;
+    case detail::OpenFilenameStatus::not_found:
+      set_status(tr("No file with that name exists in this folder."));
+      break;
+    case detail::OpenFilenameStatus::io_error:
+      set_status(tr("Unable to check the selected file."));
+      break;
+    }
+    request_redraw();
   }
 
   void show_overwrite_confirmation(const std::string &path) {

@@ -321,3 +321,18 @@ msgstr "שם (בסדר עולה)"
 
 msgid "Name (descending)"
 msgstr "שם (בסדר יורד)"
+
+msgid "Enter a file name or select a file."
+msgstr "הזינו שם קובץ או בחרו קובץ."
+
+msgid "This file name cannot be represented on this system."
+msgstr "לא ניתן לייצג את שם הקובץ הזה במערכת."
+
+msgid "No file with that name exists in this folder."
+msgstr "אין קובץ בשם הזה בתיקייה."
+
+msgid "Unable to check the selected file."
+msgstr "לא ניתן לבדוק את הקובץ שנבחר."
+
+msgid "File name entered. Choose Open to check it."
+msgstr "הוזן שם קובץ. בחרו בפתיחה כדי לבדוק אותו."

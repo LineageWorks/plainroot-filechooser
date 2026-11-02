@@ -322,3 +322,18 @@ msgstr "الاسم (تصاعديًا)"
 
 msgid "Name (descending)"
 msgstr "الاسم (تنازليًا)"
+
+msgid "Enter a file name or select a file."
+msgstr "أدخل اسم ملف أو اختر ملفًا."
+
+msgid "This file name cannot be represented on this system."
+msgstr "لا يمكن تمثيل اسم الملف هذا على هذا النظام."
+
+msgid "No file with that name exists in this folder."
+msgstr "لا يوجد ملف بهذا الاسم في هذا المجلد."
+
+msgid "Unable to check the selected file."
+msgstr "تعذّر التحقق من الملف المحدد."
+
+msgid "File name entered. Choose Open to check it."
+msgstr "تم إدخال اسم الملف. اختر فتح للتحقق منه."

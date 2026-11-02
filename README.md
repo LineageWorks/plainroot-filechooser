@@ -13,8 +13,10 @@ the local browser UI. It uses `plainroot-toolkit` for its window and widgets and
 `plainroot-core` asynchronous filesystem listing for directory navigation.
 Search is applied to the displayed listing, hidden entries can be shown, and
 the listing supports locale-aware, natural filename ordering in either
-direction while keeping directories first. File selection returns the native
-path on stdout. It consumes
+direction while keeping directories first. Single-file open and save modes
+provide an editable filename field; open requests validate a typed name in the
+current folder and navigate when that name identifies a folder. File selection
+returns the native path on stdout. It consumes
 `plainroot-storage-client` snapshots to list removable volumes and mounted
 network locations. Local volume mount and confirmed unmount requests go through
 `plainroot-storaged`. SFTP locations can be connected through the asynchronous
