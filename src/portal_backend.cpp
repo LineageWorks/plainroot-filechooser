@@ -51,8 +51,11 @@ struct PortalRequest {
   std::string title;
   std::string accept_label;
   std::string start_path;
+  std::string current_name;
+  std::string current_file_path;
   bool multiple = false;
   bool directory = false;
+  bool save_file = false;
   bool cancel_requested = false;
   bool finished = false;
   plainroot_ui_context *context = nullptr;
@@ -69,6 +72,8 @@ struct PortalBusSource {
 
 int open_file_method(sd_bus_message *message, void *user_data,
                      sd_bus_error *ret_error);
+int save_file_method(sd_bus_message *message, void *user_data,
+                     sd_bus_error *ret_error);
 int unsupported_method(sd_bus_message *message, void *, sd_bus_error *);
 int close_request_method(sd_bus_message *message, void *user_data,
                          sd_bus_error *ret_error);
@@ -77,7 +82,7 @@ const sd_bus_vtable kChooserVtable[] = {
     SD_BUS_VTABLE_START(0),
     SD_BUS_METHOD("OpenFile", "osssa{sv}", "ua{sv}", open_file_method,
                   SD_BUS_VTABLE_UNPRIVILEGED),
-    SD_BUS_METHOD("SaveFile", "osssa{sv}", "ua{sv}", unsupported_method,
+    SD_BUS_METHOD("SaveFile", "osssa{sv}", "ua{sv}", save_file_method,
                   SD_BUS_VTABLE_UNPRIVILEGED),
     SD_BUS_METHOD("SaveFiles", "osssa{sv}", "ua{sv}", unsupported_method,
                   SD_BUS_VTABLE_UNPRIVILEGED),
@@ -128,6 +133,12 @@ bool parse_options(sd_bus_message *message, PortalRequest &request) {
       result = sd_bus_message_read(message, "s", &value);
       if (result >= 0 && value != nullptr)
         request.accept_label = value;
+    } else if (std::strcmp(key, "current_name") == 0 &&
+               std::strcmp(contents, "s") == 0) {
+      const char *value = nullptr;
+      result = sd_bus_message_read(message, "s", &value);
+      if (result >= 0 && value != nullptr)
+        request.current_name = value;
     } else if (std::strcmp(key, "current_folder") == 0 &&
                std::strcmp(contents, "ay") == 0) {
       const void *bytes = nullptr;
@@ -140,6 +151,19 @@ bool parse_options(sd_bus_message *message, PortalRequest &request) {
             std::memchr(path, '\0', size - 1U) != nullptr)
           return false;
         request.start_path.assign(path, size - 1U);
+      }
+    } else if (std::strcmp(key, "current_file") == 0 &&
+               std::strcmp(contents, "ay") == 0) {
+      const void *bytes = nullptr;
+      size_t size = 0;
+      result = sd_bus_message_read_array(message, SD_BUS_TYPE_BYTE, &bytes,
+                                         &size);
+      if (result >= 0 && size > 0U && bytes != nullptr) {
+        const auto *path = static_cast<const char *>(bytes);
+        if (path[size - 1U] != '\0' || path[0] != '/' ||
+            std::memchr(path, '\0', size - 1U) != nullptr)
+          return false;
+        request.current_file_path.assign(path, size - 1U);
       }
     } else {
       result = sd_bus_message_skip(message, contents);
@@ -275,6 +299,14 @@ public:
   }
 
   int open_file(sd_bus_message *message) {
+    return begin_file_request(message, false);
+  }
+
+  int save_file(sd_bus_message *message) {
+    return begin_file_request(message, true);
+  }
+
+  int begin_file_request(sd_bus_message *message, bool save_file_request) {
     const char *handle = nullptr;
     const char *app_id = nullptr;
     const char *parent_window = nullptr;
@@ -284,7 +316,9 @@ public:
     if (result < 0 || handle == nullptr || app_id == nullptr ||
         parent_window == nullptr || title == nullptr)
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
-                         "Malformed FileChooser.OpenFile request");
+                         save_file_request
+                             ? "Malformed FileChooser.SaveFile request"
+                             : "Malformed FileChooser.OpenFile request");
     if (!sd_bus_object_path_is_valid(handle) ||
         std::string_view(handle).rfind(kRequestPrefix, 0) != 0)
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
@@ -298,20 +332,48 @@ public:
       request->app_id = app_id;
       request->parent_window = parent_window;
       request->title = title;
+      request->save_file = save_file_request;
     } catch (const std::bad_alloc &) {
       return reply_error(message, SD_BUS_ERROR_NO_MEMORY,
                          "Unable to allocate chooser request");
     }
     if (!parse_options(message, *request))
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
-                         "Malformed FileChooser.OpenFile options");
+                         save_file_request
+                             ? "Malformed FileChooser.SaveFile options"
+                             : "Malformed FileChooser.OpenFile options");
     if (request->multiple)
       return reply_error(message, SD_BUS_ERROR_NOT_SUPPORTED,
-                         "This backend does not support multiple-file OpenFile requests");
+                         "This backend does not support multiple-file selection");
+    if (save_file_request && request->directory)
+      return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
+                         "SaveFile does not support directory selection");
+    if (save_file_request && !request->current_file_path.empty()) {
+      gchar *folder = g_path_get_dirname(request->current_file_path.c_str());
+      gchar *name = g_path_get_basename(request->current_file_path.c_str());
+      if (folder == nullptr || name == nullptr) {
+        g_free(folder);
+        g_free(name);
+        return reply_error(message, SD_BUS_ERROR_NO_MEMORY,
+                           "Unable to read the suggested file path");
+      }
+      request->start_path = folder;
+      if (request->current_name.empty() && g_utf8_validate(name, -1, nullptr))
+        request->current_name = name;
+      g_free(folder);
+      g_free(name);
+    }
     if (request->title.empty()) {
       const char *fallback = plainroot_i18n_gettext_v1(
-          kDomain, request->directory ? "Choose a folder" : "Choose a file");
-      request->title = fallback == nullptr ? "Choose a file" : fallback;
+          kDomain, save_file_request
+                       ? "Save file"
+                       : (request->directory ? "Choose a folder"
+                                             : "Choose a file"));
+      const char *english_fallback =
+          save_file_request ? "Save file"
+                            : (request->directory ? "Choose a folder"
+                                                  : "Choose a file");
+      request->title = fallback == nullptr ? english_fallback : fallback;
     }
     if (request->start_path.empty()) {
       const char *home = g_get_home_dir();
@@ -461,6 +523,8 @@ private:
         application_, request.context, browser_completed, &request);
     request.controller->set_title(request.title);
     request.controller->set_select_directory(request.directory);
+    request.controller->set_save_file(request.save_file);
+    request.controller->set_initial_filename(request.current_name);
     request.controller->set_accept_label(request.accept_label);
     if (!request.controller->ready() || !request.controller->create_ui()) {
       finish(request, kResponseError, nullptr, false);
@@ -469,7 +533,9 @@ private:
 
     plainroot_toolkit_window_options_v1 options{};
     options.struct_size = sizeof(options);
-    options.title = request.title.empty() ? "Choose a file" : request.title.c_str();
+    options.title = request.title.empty()
+                        ? (request.save_file ? "Save file" : "Choose a file")
+                        : request.title.c_str();
     options.app_id = "org.plainroot.FileChooser";
     options.initial_width = 1000;
     options.initial_height = 720;
@@ -625,6 +691,10 @@ private:
 
 int open_file_method(sd_bus_message *message, void *user_data, sd_bus_error *) {
   return static_cast<PortalBackend *>(user_data)->open_file(message);
+}
+
+int save_file_method(sd_bus_message *message, void *user_data, sd_bus_error *) {
+  return static_cast<PortalBackend *>(user_data)->save_file(message);
 }
 
 int unsupported_method(sd_bus_message *message, void *, sd_bus_error *) {

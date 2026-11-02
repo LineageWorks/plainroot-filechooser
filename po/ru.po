@@ -23,6 +23,51 @@ msgstr "Выбрать папку"
 msgid "The current folder will be returned."
 msgstr "Будет возвращена текущая папка."
 
+msgid "Save file"
+msgstr "Сохранить файл"
+
+msgid "Save"
+msgstr "Сохранить"
+
+msgid "File name"
+msgstr "Имя файла"
+
+msgid "Enter a name for the file to save."
+msgstr "Введите имя файла для сохранения."
+
+msgid "File name copied from the selection."
+msgstr "Имя файла взято из выбранного элемента."
+
+msgid "Enter a file name."
+msgstr "Введите имя файла."
+
+msgid "Enter a file name without a folder path."
+msgstr "Введите имя файла без пути к папке."
+
+msgid "The file name is too long."
+msgstr "Имя файла слишком длинное."
+
+msgid "Unable to check the target file: %s"
+msgstr "Не удалось проверить целевой файл: %s"
+
+msgid "Unable to check the target file."
+msgstr "Не удалось проверить целевой файл."
+
+msgid "A folder with this name already exists."
+msgstr "Папка с таким именем уже существует."
+
+msgid "A file named “%s” already exists. Replace it?"
+msgstr "Файл «%s» уже существует. Заменить его?"
+
+msgid "Replace existing file?"
+msgstr "Заменить существующий файл?"
+
+msgid "Replace"
+msgstr "Заменить"
+
+msgid "Unable to show the overwrite confirmation."
+msgstr "Не удалось показать подтверждение перезаписи."
+
 msgid "Up"
 msgstr "Вверх"
 

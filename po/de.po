@@ -22,6 +22,51 @@ msgstr "Ordner wählen"
 msgid "The current folder will be returned."
 msgstr "Der aktuelle Ordner wird zurückgegeben."
 
+msgid "Save file"
+msgstr "Datei speichern"
+
+msgid "Save"
+msgstr "Speichern"
+
+msgid "File name"
+msgstr "Dateiname"
+
+msgid "Enter a name for the file to save."
+msgstr "Geben Sie einen Namen für die zu speichernde Datei ein."
+
+msgid "File name copied from the selection."
+msgstr "Dateiname aus der Auswahl übernommen."
+
+msgid "Enter a file name."
+msgstr "Geben Sie einen Dateinamen ein."
+
+msgid "Enter a file name without a folder path."
+msgstr "Geben Sie einen Dateinamen ohne Ordnerpfad ein."
+
+msgid "The file name is too long."
+msgstr "Der Dateiname ist zu lang."
+
+msgid "Unable to check the target file: %s"
+msgstr "Die Zieldatei kann nicht überprüft werden: %s"
+
+msgid "Unable to check the target file."
+msgstr "Die Zieldatei kann nicht überprüft werden."
+
+msgid "A folder with this name already exists."
+msgstr "Ein Ordner mit diesem Namen ist bereits vorhanden."
+
+msgid "A file named “%s” already exists. Replace it?"
+msgstr "Eine Datei namens „%s“ ist bereits vorhanden. Ersetzen?"
+
+msgid "Replace existing file?"
+msgstr "Vorhandene Datei ersetzen?"
+
+msgid "Replace"
+msgstr "Ersetzen"
+
+msgid "Unable to show the overwrite confirmation."
+msgstr "Die Bestätigung zum Überschreiben kann nicht angezeigt werden."
+
 msgid "Up"
 msgstr "Nach oben"
 

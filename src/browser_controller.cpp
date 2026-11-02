@@ -9,10 +9,14 @@
 #include <glib.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <limits.h>
 #include <memory>
+#include <cstring>
+#include <sys/stat.h>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -101,8 +105,10 @@ public:
     auto *page = plainroot_ui_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, kContentSpacing, 1.0F);
     const std::string title_text = requested_title_.empty()
-                                       ? tr(select_directory_ ? "Choose a folder"
-                                                             : "Choose a file")
+                                       ? tr(select_directory_
+                                                ? "Choose a folder"
+                                                : (save_file_ ? "Save file"
+                                                              : "Choose a file"))
                                        : requested_title_;
     auto *title = plainroot_ui_label_create_v1(
         context_, title_text.c_str(), static_cast<uint32_t>(title_text.size()),
@@ -147,6 +153,12 @@ public:
     auto *controls = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
         kExpandedControlsWidth, 12.0F, 0.0F);
+    auto *filename_row = save_file_ ? plainroot_ui_adaptive_box_create_v1(
+                                          context_, PLAINROOT_UI_AXIS_VERTICAL,
+                                          PLAINROOT_UI_AXIS_HORIZONTAL,
+                                          kExpandedControlsWidth, 8.0F, 0.0F)
+                                    : nullptr;
+    auto *filename_label = save_file_ ? make_label("File name", 0.0F) : nullptr;
     const std::string empty;
     const std::string search_hint = tr("Search files");
     search_field_ = plainroot_ui_search_field_create_v1(
@@ -158,6 +170,17 @@ public:
         context_, hidden_label.c_str(),
         static_cast<uint32_t>(hidden_label.size()), 0, 0.0F,
         &Impl::hidden_changed, this);
+    if (save_file_) {
+      const std::string hint = tr("File name");
+      filename_field_ = plainroot_ui_text_field_create_v1(
+          context_, initial_filename_.data(),
+          static_cast<uint32_t>(initial_filename_.size()), hint.c_str(),
+          static_cast<uint32_t>(hint.size()), NAME_MAX, 1.0F,
+          &Impl::filename_changed, this);
+      if (filename_field_ != nullptr)
+        (void)plainroot_ui_widget_set_text_direction_v1(
+            filename_field_, PLAINROOT_UI_TEXT_LTR);
+    }
 
     list_scroll_ =
         plainroot_ui_vertical_scroll_area_create_v1(context_, 0, 0, 1.0F);
@@ -168,14 +191,16 @@ public:
         kExpandedControlsWidth, 12.0F, 0.0F);
     selected_label_ = make_label(
         select_directory_ ? "The current folder will be returned."
-                          : "No file selected",
+                          : (save_file_ ? "Enter a name for the file to save."
+                                        : "No file selected"),
         1.0F);
     if (selected_label_ != nullptr)
       (void)plainroot_ui_widget_set_text_direction_v1(selected_label_,
                                                       PLAINROOT_UI_TEXT_LTR);
     auto *select = make_action_button(
         accept_label_.empty()
-            ? tr(select_directory_ ? "Select folder" : "Open")
+            ? tr(select_directory_ ? "Select folder"
+                                   : (save_file_ ? "Save" : "Open"))
             : accept_label_,
         &Impl::accept_activated);
     if (select != nullptr)
@@ -189,12 +214,17 @@ public:
         controls == nullptr || search_field_ == nullptr ||
         hidden_switch_ == nullptr || list_scroll_ == nullptr ||
         entries_list_ == nullptr || status_label_ == nullptr ||
-        footer == nullptr || selected_label_ == nullptr || select == nullptr)
+        footer == nullptr || selected_label_ == nullptr || select == nullptr ||
+        (save_file_ && (filename_row == nullptr || filename_label == nullptr ||
+                        filename_field_ == nullptr)))
       return false;
 
     if (!add(outer, padding) || !add(padding, page) || !add(page, title) ||
         !add(page, location_row) || !add(location_row, location_actions) ||
         !add(location_actions, up) || !add(location_actions, home) ||
+        (save_file_ &&
+         (!add(page, filename_row) || !add(filename_row, filename_label) ||
+          !add(filename_row, filename_field_))) ||
         !add(location_row, path_label_) || !add(page, controls) ||
         !add(controls, search_field_) || !add(controls, hidden_switch_) ||
         !add(page, storage_view_widget) || !add(page, list_scroll_) ||
@@ -235,6 +265,14 @@ public:
     select_directory_ = select_directory;
   }
 
+  void set_save_file(bool save_file) { save_file_ = save_file; }
+
+  void set_initial_filename(std::string filename) {
+    initial_filename_ = std::move(filename);
+    if (filename_field_ != nullptr)
+      set_label(filename_field_, initial_filename_);
+  }
+
   void set_accept_label(std::string label) { accept_label_ = std::move(label); }
 
   void cancel() {
@@ -253,9 +291,11 @@ public:
     selected_path_.clear();
     ++generation_;
     set_label(path_label_, display_path(current_path_));
-    set_label(selected_label_, tr(select_directory_
-                                     ? "The current folder will be returned."
-                                     : "No file selected"));
+    set_label(selected_label_,
+              tr(select_directory_
+                     ? "The current folder will be returned."
+                     : (save_file_ ? "Enter a name for the file to save."
+                                   : "No file selected")));
     set_status(tr("Loading folder…"));
     loader_.request(current_path_, generation_);
     schedule_render();
@@ -326,6 +366,17 @@ private:
     self.schedule_render();
   }
 
+  static void filename_changed(void *user_data, plainroot_ui_widget *widget) {
+    auto &self = *static_cast<Impl *>(user_data);
+    const char *value = nullptr;
+    uint32_t length = 0;
+    if (plainroot_ui_text_field_get_text_v1(widget, &value, &length) !=
+            PLAINROOT_UI_RESULT_OK ||
+        (value == nullptr && length != 0U))
+      return;
+    self.initial_filename_.assign(value == nullptr ? "" : value, length);
+  }
+
   static void entry_activated(void *user_data, plainroot_ui_widget *) {
     auto &action = *static_cast<EntryAction *>(user_data);
     if (action.kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY) {
@@ -338,6 +389,17 @@ private:
       action.controller->request_redraw();
       return;
     }
+    if (action.controller->save_file_) {
+      const std::string filename = parent_path(action.path) == "/"
+                                       ? action.path.substr(1)
+                                       : action.path.substr(
+                                             action.path.find_last_of('/') + 1U);
+      set_label(action.controller->filename_field_, filename);
+      action.controller->initial_filename_ = filename;
+      action.controller->set_status(tr("File name copied from the selection."));
+      action.controller->request_redraw();
+      return;
+    }
     action.controller->selected_path_ = action.path;
     set_label(action.controller->selected_label_, display_path(action.path));
     action.controller->set_status(
@@ -347,6 +409,10 @@ private:
 
   static void accept_activated(void *user_data, plainroot_ui_widget *) {
     auto &self = *static_cast<Impl *>(user_data);
+    if (self.save_file_) {
+      self.accept_save_file();
+      return;
+    }
     if (!self.select_directory_ && self.selected_path_.empty()) {
       self.set_status(tr("Select a file first."));
       self.request_redraw();
@@ -354,18 +420,135 @@ private:
     }
     const std::string &selected_path =
         self.select_directory_ ? self.current_path_ : self.selected_path_;
-    if (self.completion_ != nullptr) {
-      if (!self.finished_) {
-        self.finished_ = true;
-        self.completion_(self.completion_user_data_, true,
-                         selected_path.c_str());
-      }
-    } else {
-      (void)std::fwrite(selected_path.data(), 1, selected_path.size(), stdout);
-      (void)std::fputc('\n', stdout);
-      (void)std::fflush(stdout);
-      plainroot_toolkit_application_quit(self.application_);
+    self.complete_selection(selected_path);
+  }
+
+  static void overwrite_primary(void *user_data,
+                                plainroot_toolkit_window *) {
+    static_cast<Impl *>(user_data)->overwrite_confirmed_ = true;
+  }
+
+  static void overwrite_secondary(void *, plainroot_toolkit_window *) {}
+
+  static void overwrite_dismissed(
+      void *user_data, plainroot_toolkit_window *,
+      plainroot_toolkit_dialog_dismiss_reason_v1) {
+    auto &self = *static_cast<Impl *>(user_data);
+    self.overwrite_dialog_open_ = false;
+    const bool confirmed = self.overwrite_confirmed_;
+    self.overwrite_confirmed_ = false;
+    const std::string path = std::move(self.pending_save_path_);
+    self.pending_save_path_.clear();
+    if (confirmed)
+      self.complete_selection(path);
+  }
+
+  void accept_save_file() {
+    if (initial_filename_.empty()) {
+      set_status(tr("Enter a file name."));
+      request_redraw();
+      return;
     }
+    if (initial_filename_ == "." || initial_filename_ == ".." ||
+        initial_filename_.find('/') != std::string::npos) {
+      set_status(tr("Enter a file name without a folder path."));
+      request_redraw();
+      return;
+    }
+    if (initial_filename_.size() > NAME_MAX) {
+      set_status(tr("The file name is too long."));
+      request_redraw();
+      return;
+    }
+
+    const std::string path = join_path(current_path_, initial_filename_);
+    struct stat info {};
+    if (lstat(path.c_str(), &info) != 0) {
+      if (errno == ENOENT) {
+        complete_selection(path);
+        return;
+      }
+      gchar *detail = g_strdup_printf(
+          tr("Unable to check the target file: %s").c_str(),
+          g_strerror(errno));
+      set_status(detail == nullptr ? tr("Unable to check the target file.")
+                                   : detail);
+      g_free(detail);
+      request_redraw();
+      return;
+    }
+    if (S_ISDIR(info.st_mode)) {
+      set_status(tr("A folder with this name already exists."));
+      request_redraw();
+      return;
+    }
+    show_overwrite_confirmation(path);
+  }
+
+  void show_overwrite_confirmation(const std::string &path) {
+    if (window_ == nullptr || overwrite_dialog_open_)
+      return;
+    pending_save_path_ = path;
+    overwrite_confirmed_ = false;
+    overwrite_dialog_open_ = true;
+
+    gchar *message = g_strdup_printf(
+        tr("A file named “%s” already exists. Replace it?").c_str(),
+        display_path(initial_filename_).c_str());
+    if (message == nullptr) {
+      overwrite_dialog_open_ = false;
+      set_status(tr("Unable to show the overwrite confirmation."));
+      request_redraw();
+      return;
+    }
+    const std::string title = tr("Replace existing file?");
+    const std::string replace = tr("Replace");
+    const std::string cancel = tr("Cancel");
+    plainroot_toolkit_dialog_options_v1 options{};
+    options.struct_size = sizeof(options);
+    options.title_utf8 = title.c_str();
+    options.title_length = static_cast<uint32_t>(title.size());
+    options.message_utf8 = message;
+    options.message_length = static_cast<uint32_t>(std::strlen(message));
+    options.primary_action_utf8 = replace.c_str();
+    options.primary_action_length = static_cast<uint32_t>(replace.size());
+    options.secondary_action_utf8 = cancel.c_str();
+    options.secondary_action_length = static_cast<uint32_t>(cancel.size());
+    options.text_direction =
+        plainroot_i18n_get_layout_direction_v1() ==
+                PLAINROOT_I18N_LAYOUT_DIRECTION_RTL
+            ? PLAINROOT_UI_TEXT_RTL
+            : PLAINROOT_UI_TEXT_LTR;
+    options.dismiss_on_escape = 1;
+    options.dismiss_on_backdrop = 1;
+    options.width = 440.0F;
+    options.primary_action = overwrite_primary;
+    options.secondary_action = overwrite_secondary;
+    options.dismissed = overwrite_dismissed;
+    options.user_data = this;
+    const auto result =
+        plainroot_toolkit_window_show_confirmation_dialog_v1(window_, &options);
+    g_free(message);
+    if (result != PLAINROOT_TOOLKIT_RESULT_OK) {
+      overwrite_dialog_open_ = false;
+      pending_save_path_.clear();
+      set_status(tr("Unable to show the overwrite confirmation."));
+      request_redraw();
+    }
+  }
+
+  void complete_selection(const std::string &path) {
+    if (finished_)
+      return;
+    finished_ = true;
+    if (completion_ != nullptr) {
+      completion_(completion_user_data_, true, path.c_str());
+      return;
+    }
+    (void)std::fwrite(path.data(), 1, path.size(), stdout);
+    (void)std::fputc('\n', stdout);
+    (void)std::fflush(stdout);
+    plainroot_toolkit_application_quit(application_);
   }
 
   static void render_task(void *user_data) {
@@ -795,17 +978,23 @@ private:
   std::unique_ptr<detail::StorageBridge> storage_bridge_;
   bool ui_ready_ = false;
   bool select_directory_ = false;
+  bool save_file_ = false;
   bool finished_ = false;
   bool show_hidden_ = false;
+  bool overwrite_dialog_open_ = false;
+  bool overwrite_confirmed_ = false;
   uint64_t generation_ = 0;
   std::string current_path_;
   std::string search_query_;
+  std::string initial_filename_;
+  std::string pending_save_path_;
   std::string selected_path_;
   std::string status_error_;
   std::vector<detail::DirectoryEntry> entries_;
   std::vector<plainroot_ui_widget *> rows_;
   std::vector<std::unique_ptr<EntryAction>> actions_;
   plainroot_ui_widget *path_label_ = nullptr;
+  plainroot_ui_widget *filename_field_ = nullptr;
   plainroot_ui_widget *search_field_ = nullptr;
   plainroot_ui_widget *hidden_switch_ = nullptr;
   plainroot_ui_widget *list_scroll_ = nullptr;
@@ -845,6 +1034,16 @@ void BrowserController::set_title(std::string title) {
 void BrowserController::set_select_directory(bool select_directory) {
   if (impl_)
     impl_->set_select_directory(select_directory);
+}
+
+void BrowserController::set_save_file(bool save_file) {
+  if (impl_)
+    impl_->set_save_file(save_file);
+}
+
+void BrowserController::set_initial_filename(std::string filename) {
+  if (impl_)
+    impl_->set_initial_filename(std::move(filename));
 }
 
 void BrowserController::set_accept_label(std::string label) {

@@ -27,6 +27,8 @@ public:
   void set_window(plainroot_toolkit_window *window);
   void set_title(std::string title);
   void set_select_directory(bool select_directory);
+  void set_save_file(bool save_file);
+  void set_initial_filename(std::string filename);
   void set_accept_label(std::string label);
   void navigate(std::string path);
   void cancel();

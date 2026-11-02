@@ -23,6 +23,51 @@ msgstr "اختيار المجلد"
 msgid "The current folder will be returned."
 msgstr "سيتم إرجاع المجلد الحالي."
 
+msgid "Save file"
+msgstr "حفظ الملف"
+
+msgid "Save"
+msgstr "حفظ"
+
+msgid "File name"
+msgstr "اسم الملف"
+
+msgid "Enter a name for the file to save."
+msgstr "أدخل اسمًا للملف المراد حفظه."
+
+msgid "File name copied from the selection."
+msgstr "تم نسخ اسم الملف من العنصر المحدد."
+
+msgid "Enter a file name."
+msgstr "أدخل اسم الملف."
+
+msgid "Enter a file name without a folder path."
+msgstr "أدخل اسم الملف دون مسار مجلد."
+
+msgid "The file name is too long."
+msgstr "اسم الملف طويل جدًا."
+
+msgid "Unable to check the target file: %s"
+msgstr "تعذر التحقق من الملف الهدف: %s"
+
+msgid "Unable to check the target file."
+msgstr "تعذر التحقق من الملف الهدف."
+
+msgid "A folder with this name already exists."
+msgstr "يوجد مجلد بهذا الاسم بالفعل."
+
+msgid "A file named “%s” already exists. Replace it?"
+msgstr "يوجد ملف باسم «%s» بالفعل. هل تريد استبداله؟"
+
+msgid "Replace existing file?"
+msgstr "استبدال الملف الموجود؟"
+
+msgid "Replace"
+msgstr "استبدال"
+
+msgid "Unable to show the overwrite confirmation."
+msgstr "تعذر عرض تأكيد الاستبدال."
+
 msgid "Up"
 msgstr "أعلى"
 

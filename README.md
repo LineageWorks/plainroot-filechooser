@@ -27,9 +27,10 @@ The window follows the active Plainroot appearance theme through the toolkit.
 
 The build also includes an unregistered `plainroot-filechooser-portal`
 prototype. It exports the portal FileChooser and Request interfaces through
-`sd-bus`, supports single-file and directory `OpenFile` requests, returns a
-`file://` URI, and handles request closure and user cancellation. It is not
-advertised to the portal broker yet. Save requests, multiple selection,
+`sd-bus`, supports single-file and directory `OpenFile` requests, and supports
+`SaveFile` requests with suggested names and overwrite confirmation. Successful
+requests return a `file://` URI; request closure and user cancellation are
+handled. It is not advertised to the portal broker yet. Multiple selection,
 filters, choices, parent-window modality, and live portal acceptance remain
 unimplemented. Keep GTK selected as the fallback until those capabilities and
 request lifecycle are validated.

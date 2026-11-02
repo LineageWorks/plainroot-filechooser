@@ -22,6 +22,51 @@ msgstr "בחירת תיקייה"
 msgid "The current folder will be returned."
 msgstr "התיקייה הנוכחית תוחזר."
 
+msgid "Save file"
+msgstr "שמירת קובץ"
+
+msgid "Save"
+msgstr "שמירה"
+
+msgid "File name"
+msgstr "שם הקובץ"
+
+msgid "Enter a name for the file to save."
+msgstr "יש להזין שם לקובץ לשמירה."
+
+msgid "File name copied from the selection."
+msgstr "שם הקובץ הועתק מהבחירה."
+
+msgid "Enter a file name."
+msgstr "יש להזין שם קובץ."
+
+msgid "Enter a file name without a folder path."
+msgstr "יש להזין שם קובץ ללא נתיב תיקייה."
+
+msgid "The file name is too long."
+msgstr "שם הקובץ ארוך מדי."
+
+msgid "Unable to check the target file: %s"
+msgstr "לא ניתן לבדוק את קובץ היעד: %s"
+
+msgid "Unable to check the target file."
+msgstr "לא ניתן לבדוק את קובץ היעד."
+
+msgid "A folder with this name already exists."
+msgstr "כבר קיימת תיקייה בשם הזה."
+
+msgid "A file named “%s” already exists. Replace it?"
+msgstr "כבר קיים קובץ בשם „%s”. להחליף אותו?"
+
+msgid "Replace existing file?"
+msgstr "להחליף את הקובץ הקיים?"
+
+msgid "Replace"
+msgstr "החלפה"
+
+msgid "Unable to show the overwrite confirmation."
+msgstr "לא ניתן להציג אישור להחלפה."
+
 msgid "Up"
 msgstr "למעלה"
 
