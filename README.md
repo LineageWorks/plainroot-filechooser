@@ -31,10 +31,12 @@ prototype. It exports the portal FileChooser and Request interfaces through
 requests, and supports `SaveFile` requests with suggested names and overwrite
 confirmation. Multiple selection uses checkboxes and returns every selected
 file as a `file://` URI. Successful requests, request closure, and user
-cancellation are handled. It is not advertised to the portal broker yet.
-Filters, choices, parent-window modality, and live multiple-file portal
-acceptance remain open. Keep GTK selected as the fallback until those
-capabilities and request lifecycle are validated.
+cancellation are handled. Glob filters can select the visible file set, and
+the selected `current_filter` is returned with successful responses. MIME
+filters are parsed and round-tripped but are not applied yet. It is not
+advertised to the portal broker; choices, parent-window modality, and live
+multiple-file/filter portal acceptance remain open. Keep GTK selected as the
+fallback until those capabilities and request lifecycle are validated.
 
 Live removable-volume mount and SSHFS connect/disconnect acceptance are still
 pending; the current host does not have the `sshfs` executable installed.

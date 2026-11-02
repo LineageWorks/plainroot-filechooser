@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <fnmatch.h>
 #include <limits.h>
 #include <memory>
 #include <cstring>
@@ -172,6 +173,13 @@ public:
         context_, hidden_label.c_str(),
         static_cast<uint32_t>(hidden_label.size()), 0, 0.0F,
         &Impl::hidden_changed, this);
+    if (filters_.size() > 1U) {
+      const std::string filter_hint = tr("Filter files");
+      filter_dropdown_ = plainroot_ui_dropdown_create_v1(
+          context_, filter_hint.c_str(),
+          static_cast<uint32_t>(filter_hint.size()), 1.0F,
+          &Impl::filter_changed, this);
+    }
     if (save_file_) {
       const std::string hint = tr("File name");
       filename_field_ = plainroot_ui_text_field_create_v1(
@@ -221,12 +229,32 @@ public:
         location_actions == nullptr || up == nullptr || home == nullptr ||
         storage_view_widget == nullptr || path_label_ == nullptr ||
         controls == nullptr || search_field_ == nullptr ||
-        hidden_switch_ == nullptr || list_scroll_ == nullptr ||
+        hidden_switch_ == nullptr ||
+        (filters_.size() > 1U && filter_dropdown_ == nullptr) ||
+        list_scroll_ == nullptr ||
         entries_list_ == nullptr || status_label_ == nullptr ||
         footer == nullptr || selected_label_ == nullptr || select == nullptr ||
         (save_file_ && (filename_row == nullptr || filename_label == nullptr ||
                         filename_field_ == nullptr)))
       return false;
+
+    if (filter_dropdown_ != nullptr) {
+      for (size_t index = 0; index < filters_.size(); ++index) {
+        const BrowserFilter &filter = filters_[index];
+        auto *option = plainroot_ui_list_box_option_create_v1(
+            context_, filter.name.c_str(),
+            static_cast<uint32_t>(filter.name.size()),
+            static_cast<int32_t>(index), 0.0F);
+        if (!add(filter_dropdown_, option))
+          return false;
+      }
+      initializing_filter_dropdown_ = true;
+      const auto result = plainroot_ui_dropdown_set_value_v1(
+          filter_dropdown_, selected_filter_index_);
+      initializing_filter_dropdown_ = false;
+      if (result != PLAINROOT_UI_RESULT_OK)
+        return false;
+    }
 
     if (!add(outer, padding) || !add(padding, page) || !add(page, title) ||
         !add(page, location_row) || !add(location_row, location_actions) ||
@@ -236,6 +264,7 @@ public:
           !add(filename_row, filename_field_))) ||
         !add(location_row, path_label_) || !add(page, controls) ||
         !add(controls, search_field_) || !add(controls, hidden_switch_) ||
+        (filter_dropdown_ != nullptr && !add(controls, filter_dropdown_)) ||
         !add(page, storage_view_widget) || !add(page, list_scroll_) ||
         !add(list_scroll_, entries_list_) || !add(page, status_label_) ||
         !add(page, footer) || !add(footer, selected_label_) ||
@@ -278,6 +307,19 @@ public:
     allow_multiple_ = allow_multiple;
   }
 
+  void set_filters(std::vector<BrowserFilter> filters,
+                   int32_t selected_filter) {
+    filters_ = std::move(filters);
+    if (filters_.empty()) {
+      selected_filter_index_ = -1;
+    } else if (selected_filter >= 0 &&
+               static_cast<size_t>(selected_filter) < filters_.size()) {
+      selected_filter_index_ = selected_filter;
+    } else {
+      selected_filter_index_ = 0;
+    }
+  }
+
   void set_save_file(bool save_file) { save_file_ = save_file; }
 
   void set_initial_filename(std::string filename) {
@@ -291,7 +333,7 @@ public:
   void cancel() {
     if (!finished_ && completion_ != nullptr) {
       finished_ = true;
-      completion_(completion_user_data_, false, {});
+      completion_(completion_user_data_, false, {}, nullptr);
     }
   }
 
@@ -382,6 +424,22 @@ private:
       return;
     self.show_hidden_ = checked != 0;
     self.schedule_render();
+  }
+
+  static void filter_changed(void *user_data, plainroot_ui_widget *widget) {
+    auto &self = *static_cast<Impl *>(user_data);
+    if (self.initializing_filter_dropdown_)
+      return;
+    int32_t selected = -1;
+    uint32_t has_value = 0;
+    if (plainroot_ui_dropdown_get_value_v1(widget, &selected, &has_value) !=
+            PLAINROOT_UI_RESULT_OK ||
+        has_value == 0 || selected < 0 ||
+        static_cast<size_t>(selected) >= self.filters_.size())
+      return;
+    self.selected_filter_index_ = selected;
+    self.schedule_render();
+    self.request_redraw();
   }
 
   static void filename_changed(void *user_data, plainroot_ui_widget *widget) {
@@ -620,7 +678,12 @@ private:
       return;
     finished_ = true;
     if (completion_ != nullptr) {
-      completion_(completion_user_data_, true, paths);
+      const BrowserFilter *current_filter =
+          selected_filter_index_ >= 0 &&
+                  static_cast<size_t>(selected_filter_index_) < filters_.size()
+              ? &filters_[static_cast<size_t>(selected_filter_index_)]
+              : nullptr;
+      completion_(completion_user_data_, true, paths, current_filter);
       return;
     }
     for (const std::string &path : paths) {
@@ -972,6 +1035,8 @@ private:
     for (const detail::DirectoryEntry &entry : entries_) {
       if (!show_hidden_ && !entry.name.empty() && entry.name.front() == '.')
         continue;
+      if (!matches_selected_filter(entry))
+        continue;
       if (!folded_query.empty()) {
         const std::string shown = display_path(entry.name);
         gchar *folded = g_utf8_casefold(shown.c_str(), -1);
@@ -1029,13 +1094,53 @@ private:
       actions_.push_back(std::move(action));
     }
 
-    if (visible.empty() && status_error_.empty()) {
+    if (status_error_.empty() && selected_filter_has_unhandled_mime()) {
+      set_status(tr("MIME type filters are not applied yet."));
+    } else if (visible.empty() && status_error_.empty()) {
       set_status(search_query_.empty() ? tr("This folder is empty.")
                                        : tr("No matching files."));
     } else if (!visible.empty() && status_error_.empty()) {
       set_status("");
     }
     request_redraw();
+  }
+
+  bool matches_selected_filter(
+      const detail::DirectoryEntry &entry) const {
+    if (entry.kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY ||
+        selected_filter_index_ < 0 ||
+        static_cast<size_t>(selected_filter_index_) >= filters_.size())
+      return true;
+
+    const BrowserFilter &filter =
+        filters_[static_cast<size_t>(selected_filter_index_)];
+    bool has_glob = false;
+    bool has_unhandled_mime = false;
+    for (const BrowserFilterPattern &pattern : filter.patterns) {
+      if (pattern.type == 0U) {
+        has_glob = true;
+        if (fnmatch(pattern.pattern.c_str(), entry.name.c_str(), 0) == 0)
+          return true;
+      } else if (pattern.type == 1U) {
+        has_unhandled_mime = true;
+      }
+    }
+
+    // Keep MIME patterns permissive until the chooser has a MIME database
+    // implementation. The status message makes this limitation visible.
+    return has_unhandled_mime || !has_glob;
+  }
+
+  bool selected_filter_has_unhandled_mime() const {
+    if (selected_filter_index_ < 0 ||
+        static_cast<size_t>(selected_filter_index_) >= filters_.size())
+      return false;
+    const BrowserFilter &filter =
+        filters_[static_cast<size_t>(selected_filter_index_)];
+    return std::any_of(filter.patterns.begin(), filter.patterns.end(),
+                       [](const BrowserFilterPattern &pattern) {
+                         return pattern.type == 1U;
+                       });
   }
 
   static void set_label(plainroot_ui_widget *widget, const std::string &value) {
@@ -1075,8 +1180,10 @@ private:
   bool save_file_ = false;
   bool finished_ = false;
   bool show_hidden_ = false;
+  bool initializing_filter_dropdown_ = false;
   bool overwrite_dialog_open_ = false;
   bool overwrite_confirmed_ = false;
+  int32_t selected_filter_index_ = -1;
   uint64_t generation_ = 0;
   std::string current_path_;
   std::string search_query_;
@@ -1084,6 +1191,7 @@ private:
   std::string pending_save_path_;
   std::string selected_path_;
   std::vector<std::string> selected_paths_;
+  std::vector<BrowserFilter> filters_;
   std::string status_error_;
   std::vector<detail::DirectoryEntry> entries_;
   std::vector<plainroot_ui_widget *> rows_;
@@ -1092,6 +1200,7 @@ private:
   plainroot_ui_widget *filename_field_ = nullptr;
   plainroot_ui_widget *search_field_ = nullptr;
   plainroot_ui_widget *hidden_switch_ = nullptr;
+  plainroot_ui_widget *filter_dropdown_ = nullptr;
   plainroot_ui_widget *list_scroll_ = nullptr;
   plainroot_ui_widget *entries_list_ = nullptr;
   plainroot_ui_widget *status_label_ = nullptr;
@@ -1134,6 +1243,12 @@ void BrowserController::set_select_directory(bool select_directory) {
 void BrowserController::set_allow_multiple(bool allow_multiple) {
   if (impl_)
     impl_->set_allow_multiple(allow_multiple);
+}
+
+void BrowserController::set_filters(std::vector<BrowserFilter> filters,
+                                    int32_t selected_filter) {
+  if (impl_)
+    impl_->set_filters(std::move(filters), selected_filter);
 }
 
 void BrowserController::set_save_file(bool save_file) {

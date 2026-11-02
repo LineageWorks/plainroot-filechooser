@@ -91,6 +91,12 @@ msgstr "התיקייה נטענת…"
 msgid "Search files"
 msgstr "חיפוש קבצים"
 
+msgid "Filter files"
+msgstr "סינון קבצים"
+
+msgid "MIME type filters are not applied yet."
+msgstr "מסנני MIME עדיין לא מוחלים."
+
 msgid "Show hidden files"
 msgstr "הצגת קבצים מוסתרים"
 

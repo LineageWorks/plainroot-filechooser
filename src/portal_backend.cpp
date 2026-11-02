@@ -39,6 +39,9 @@ constexpr char kRequestPrefix[] = "/org/freedesktop/portal/desktop/request/";
 constexpr uint32_t kResponseSuccess = 0;
 constexpr uint32_t kResponseCancelled = 1;
 constexpr uint32_t kResponseError = 2;
+constexpr size_t kMaximumFilters = 64U;
+constexpr size_t kMaximumPatternsPerFilter = 256U;
+constexpr size_t kMaximumPatternLength = 4096U;
 
 class PortalBackend;
 
@@ -54,6 +57,10 @@ struct PortalRequest {
   std::string start_path;
   std::string current_name;
   std::string current_file_path;
+  std::vector<BrowserFilter> filters;
+  BrowserFilter current_filter;
+  int32_t selected_filter_index = -1;
+  bool has_current_filter = false;
   bool multiple = false;
   bool directory = false;
   bool save_file = false;
@@ -96,6 +103,150 @@ const sd_bus_vtable kRequestVtable[] = {
                   SD_BUS_VTABLE_UNPRIVILEGED),
     SD_BUS_VTABLE_END,
 };
+
+bool parse_filter_patterns(sd_bus_message *message,
+                           std::vector<BrowserFilterPattern> &patterns) {
+  int result = sd_bus_message_enter_container(message, SD_BUS_TYPE_ARRAY,
+                                               "(us)");
+  if (result < 0)
+    return false;
+
+  while ((result = sd_bus_message_enter_container(
+              message, SD_BUS_TYPE_STRUCT, "us")) > 0) {
+    uint32_t type = 0;
+    const char *pattern = nullptr;
+    result = sd_bus_message_read(message, "us", &type, &pattern);
+    if (result < 0 || pattern == nullptr || (type != 0U && type != 1U) ||
+        std::strlen(pattern) > kMaximumPatternLength ||
+        patterns.size() >= kMaximumPatternsPerFilter ||
+        sd_bus_message_exit_container(message) < 0)
+      return false;
+    patterns.push_back({type, pattern});
+  }
+  return result >= 0 && sd_bus_message_exit_container(message) >= 0;
+}
+
+bool parse_filter(sd_bus_message *message, BrowserFilter &filter) {
+  int result = sd_bus_message_enter_container(message, SD_BUS_TYPE_STRUCT,
+                                               "sa(us)");
+  if (result <= 0)
+    return false;
+
+  const char *name = nullptr;
+  result = sd_bus_message_read(message, "s", &name);
+  if (result < 0 || name == nullptr ||
+      !parse_filter_patterns(message, filter.patterns) ||
+      sd_bus_message_exit_container(message) < 0)
+    return false;
+  filter.name = name;
+  return true;
+}
+
+bool parse_filter_list(sd_bus_message *message,
+                       std::vector<BrowserFilter> &filters) {
+  int result = sd_bus_message_enter_container(message, SD_BUS_TYPE_ARRAY,
+                                               "(sa(us))");
+  if (result < 0)
+    return false;
+
+  while (true) {
+    BrowserFilter filter;
+    char type = 0;
+    const char *contents = nullptr;
+    result = sd_bus_message_peek_type(message, &type, &contents);
+    if (result == 0)
+      break;
+    if (result < 0 || type != SD_BUS_TYPE_STRUCT || contents == nullptr ||
+        std::strcmp(contents, "sa(us)") != 0 ||
+        filters.size() >= kMaximumFilters || !parse_filter(message, filter))
+      return false;
+    filters.push_back(std::move(filter));
+  }
+  return sd_bus_message_exit_container(message) >= 0;
+}
+
+bool parse_current_filter(sd_bus_message *message, BrowserFilter &filter) {
+  return parse_filter(message, filter);
+}
+
+bool filters_equal(const BrowserFilter &left, const BrowserFilter &right) {
+  if (left.name != right.name || left.patterns.size() != right.patterns.size())
+    return false;
+  for (size_t index = 0; index < left.patterns.size(); ++index) {
+    if (left.patterns[index].type != right.patterns[index].type ||
+        left.patterns[index].pattern != right.patterns[index].pattern)
+      return false;
+  }
+  return true;
+}
+
+bool select_initial_filter(PortalRequest &request) {
+  if (!request.has_current_filter) {
+    request.selected_filter_index = request.filters.empty() ? -1 : 0;
+    return true;
+  }
+  for (size_t index = 0; index < request.filters.size(); ++index) {
+    if (filters_equal(request.filters[index], request.current_filter)) {
+      request.selected_filter_index = static_cast<int32_t>(index);
+      return true;
+    }
+  }
+  if (request.filters.size() >= kMaximumFilters)
+    return false;
+  request.filters.push_back(request.current_filter);
+  request.selected_filter_index =
+      static_cast<int32_t>(request.filters.size() - 1U);
+  return true;
+}
+
+bool append_filter_option(sd_bus_message *reply,
+                          const BrowserFilter &filter) {
+  int result = sd_bus_message_open_container(reply, SD_BUS_TYPE_DICT_ENTRY,
+                                              "sv");
+  if (result >= 0)
+    result = sd_bus_message_append(reply, "s", "current_filter");
+  if (result >= 0)
+    result = sd_bus_message_open_container(reply, SD_BUS_TYPE_VARIANT,
+                                            "(sa(us))");
+  if (result >= 0)
+    result = sd_bus_message_open_container(reply, SD_BUS_TYPE_STRUCT,
+                                            "sa(us)");
+  if (result >= 0)
+    result = sd_bus_message_append(reply, "s", filter.name.c_str());
+  if (result >= 0)
+    result = sd_bus_message_open_container(reply, SD_BUS_TYPE_ARRAY, "(us)");
+  for (const BrowserFilterPattern &pattern : filter.patterns) {
+    if (result >= 0)
+      result = sd_bus_message_open_container(reply, SD_BUS_TYPE_STRUCT, "us");
+    if (result >= 0)
+      result = sd_bus_message_append(reply, "us", pattern.type,
+                                     pattern.pattern.c_str());
+    if (result >= 0)
+      result = sd_bus_message_close_container(reply);
+  }
+  if (result >= 0)
+    result = sd_bus_message_close_container(reply);
+  if (result >= 0)
+    result = sd_bus_message_close_container(reply);
+  if (result >= 0)
+    result = sd_bus_message_close_container(reply);
+  if (result >= 0)
+    result = sd_bus_message_close_container(reply);
+  return result >= 0;
+}
+
+std::string native_path_to_uri(const std::string &path) {
+  if (path.empty() || path.front() != '/')
+    return {};
+  const auto *bytes = reinterpret_cast<const guint8 *>(path.data());
+  gchar *escaped = g_uri_escape_bytes(bytes, path.size(), "/");
+  if (escaped == nullptr)
+    return {};
+  std::string uri = "file://";
+  uri += escaped;
+  g_free(escaped);
+  return uri;
+}
 
 bool parse_options(sd_bus_message *message, PortalRequest &request) {
   int result = sd_bus_message_enter_container(message, SD_BUS_TYPE_ARRAY,
@@ -166,6 +317,14 @@ bool parse_options(sd_bus_message *message, PortalRequest &request) {
           return false;
         request.current_file_path.assign(path, size - 1U);
       }
+    } else if (std::strcmp(key, "filters") == 0 &&
+               std::strcmp(contents, "a(sa(us))") == 0) {
+      result = parse_filter_list(message, request.filters) ? 1 : -EINVAL;
+    } else if (std::strcmp(key, "current_filter") == 0 &&
+               std::strcmp(contents, "(sa(us))") == 0) {
+      request.has_current_filter =
+          parse_current_filter(message, request.current_filter);
+      result = request.has_current_filter ? 1 : -EINVAL;
     } else {
       result = sd_bus_message_skip(message, contents);
     }
@@ -345,6 +504,9 @@ public:
                          save_file_request
                              ? "Malformed FileChooser.SaveFile options"
                              : "Malformed FileChooser.OpenFile options");
+    if (!select_initial_filter(*request))
+      return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
+                         "Too many file filters in request");
     if (request->multiple && (save_file_request || request->directory))
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
                          "Multiple selection cannot be combined with save or folder selection");
@@ -416,7 +578,8 @@ public:
 
   void finish(PortalRequest &request, uint32_t response,
               const std::vector<std::string> &native_paths,
-              bool close_window) {
+              bool close_window,
+              const BrowserFilter *current_filter = nullptr) {
     if (request.finished)
       return;
     if (response == kResponseSuccess) {
@@ -428,17 +591,12 @@ public:
         if (response == kResponseSuccess) {
           uris.reserve(native_paths.size());
           for (const std::string &native_path : native_paths) {
-            GError *error = nullptr;
-            gchar *uri =
-                g_filename_to_uri(native_path.c_str(), nullptr, &error);
-            if (uri == nullptr) {
-              if (error != nullptr)
-                g_error_free(error);
+            std::string uri = native_path_to_uri(native_path);
+            if (uri.empty()) {
               response = kResponseError;
               break;
             }
-            uris.emplace_back(uri);
-            g_free(uri);
+            uris.push_back(std::move(uri));
           }
         }
       } catch (const std::bad_alloc &) {
@@ -446,7 +604,7 @@ public:
       }
       if (response == kResponseSuccess &&
           uris.size() == native_paths.size() && !uris.empty()) {
-        send_reply(request, response, uris);
+        send_reply(request, response, uris, current_filter);
         request.finished = true;
         unregister_request(request);
         if (close_window && request.window != nullptr)
@@ -454,7 +612,7 @@ public:
         return;
       }
     }
-    send_reply(request, response, {});
+    send_reply(request, response, {}, nullptr);
     request.finished = true;
     unregister_request(request);
     if (close_window && request.window != nullptr)
@@ -550,6 +708,8 @@ private:
     request.controller->set_title(request.title);
     request.controller->set_select_directory(request.directory);
     request.controller->set_allow_multiple(request.multiple);
+    request.controller->set_filters(request.filters,
+                                    request.selected_filter_index);
     request.controller->set_save_file(request.save_file);
     request.controller->set_initial_filename(request.current_name);
     request.controller->set_accept_label(request.accept_label);
@@ -598,11 +758,13 @@ private:
 
   static void browser_completed(
       void *user_data, bool accepted,
-      const std::vector<std::string> &native_paths) {
+      const std::vector<std::string> &native_paths,
+      const BrowserFilter *current_filter) {
     auto &request = *static_cast<PortalRequest *>(user_data);
     request.backend->finish(request,
                             accepted ? kResponseSuccess : kResponseCancelled,
-                            native_paths, true);
+                            native_paths, true,
+                            accepted ? current_filter : nullptr);
   }
 
   static int window_close_requested(void *user_data,
@@ -613,7 +775,8 @@ private:
   }
 
   void send_reply(PortalRequest &request, uint32_t response,
-                  const std::vector<std::string> &uris) {
+                  const std::vector<std::string> &uris,
+                  const BrowserFilter *current_filter) {
     if (request.call == nullptr)
       return;
     sd_bus_message *reply = nullptr;
@@ -623,6 +786,10 @@ private:
     if (result >= 0)
       result = sd_bus_message_open_container(reply, SD_BUS_TYPE_ARRAY, "{sv}");
     if (result >= 0 && !uris.empty() && !append_uris(reply, uris))
+      result = -EINVAL;
+    if (result >= 0 && response == kResponseSuccess &&
+        current_filter != nullptr &&
+        !append_filter_option(reply, *current_filter))
       result = -EINVAL;
     if (result >= 0)
       result = sd_bus_message_close_container(reply);

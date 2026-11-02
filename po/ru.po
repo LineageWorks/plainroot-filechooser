@@ -92,6 +92,12 @@ msgstr "Загрузка папки…"
 msgid "Search files"
 msgstr "Поиск файлов"
 
+msgid "Filter files"
+msgstr "Фильтр файлов"
+
+msgid "MIME type filters are not applied yet."
+msgstr "Фильтры по типу MIME пока не применяются."
+
 msgid "Show hidden files"
 msgstr "Показывать скрытые файлы"
 

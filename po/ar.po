@@ -92,6 +92,12 @@ msgstr "جارٍ تحميل المجلد…"
 msgid "Search files"
 msgstr "البحث في الملفات"
 
+msgid "Filter files"
+msgstr "تصفية الملفات"
+
+msgid "MIME type filters are not applied yet."
+msgstr "لم تُطبّق فلاتر نوع MIME بعد."
+
 msgid "Show hidden files"
 msgstr "إظهار الملفات المخفية"
 
