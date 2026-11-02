@@ -313,3 +313,12 @@ msgstr "Порт"
 
 msgid "Enter a valid port from 1 to 65535."
 msgstr "Введите допустимый номер порта от 1 до 65535."
+
+msgid "Sort by name"
+msgstr "Сортировать по имени"
+
+msgid "Name (ascending)"
+msgstr "Имя (по возрастанию)"
+
+msgid "Name (descending)"
+msgstr "Имя (по убыванию)"

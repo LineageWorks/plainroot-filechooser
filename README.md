@@ -12,7 +12,9 @@ The `plainroot-filechooser-browser` executable is an integration prototype for
 the local browser UI. It uses `plainroot-toolkit` for its window and widgets and
 `plainroot-core` asynchronous filesystem listing for directory navigation.
 Search is applied to the displayed listing, hidden entries can be shown, and
-file selection returns the native path on stdout. It consumes
+the listing supports locale-aware, natural filename ordering in either
+direction while keeping directories first. File selection returns the native
+path on stdout. It consumes
 `plainroot-storage-client` snapshots to list removable volumes and mounted
 network locations. Local volume mount and confirmed unmount requests go through
 `plainroot-storaged`. SFTP locations can be connected through the asynchronous

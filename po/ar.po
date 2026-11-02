@@ -313,3 +313,12 @@ msgstr "المنفذ"
 
 msgid "Enter a valid port from 1 to 65535."
 msgstr "أدخل رقم منفذ صالحًا من 1 إلى 65535."
+
+msgid "Sort by name"
+msgstr "ترتيب حسب الاسم"
+
+msgid "Name (ascending)"
+msgstr "الاسم (تصاعديًا)"
+
+msgid "Name (descending)"
+msgstr "الاسم (تنازليًا)"

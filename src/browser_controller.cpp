@@ -1,6 +1,7 @@
 #include "browser_controller.hpp"
 
 #include "directory_loader.hpp"
+#include "directory_sort.hpp"
 #include "storage_bridge.hpp"
 #include "storage_locations_view.hpp"
 
@@ -180,6 +181,10 @@ public:
           static_cast<uint32_t>(filter_hint.size()), 1.0F,
           &Impl::filter_changed, this);
     }
+    const std::string sort_hint = tr("Sort by name");
+    sort_dropdown_ = plainroot_ui_dropdown_create_v1(
+        context_, sort_hint.c_str(), static_cast<uint32_t>(sort_hint.size()),
+        0.0F, &Impl::sort_changed, this);
     if (save_file_) {
       const std::string hint = tr("File name");
       filename_field_ = plainroot_ui_text_field_create_v1(
@@ -229,11 +234,11 @@ public:
         location_actions == nullptr || up == nullptr || home == nullptr ||
         storage_view_widget == nullptr || path_label_ == nullptr ||
         controls == nullptr || search_field_ == nullptr ||
-        hidden_switch_ == nullptr ||
+        hidden_switch_ == nullptr || sort_dropdown_ == nullptr ||
         (filters_.size() > 1U && filter_dropdown_ == nullptr) ||
-        list_scroll_ == nullptr ||
-        entries_list_ == nullptr || status_label_ == nullptr ||
-        footer == nullptr || selected_label_ == nullptr || select == nullptr ||
+        list_scroll_ == nullptr || entries_list_ == nullptr ||
+        status_label_ == nullptr || footer == nullptr ||
+        selected_label_ == nullptr || select == nullptr ||
         (save_file_ && (filename_row == nullptr || filename_label == nullptr ||
                         filename_field_ == nullptr)))
       return false;
@@ -256,6 +261,24 @@ public:
         return false;
     }
 
+    const std::string ascending_label = tr("Name (ascending)");
+    auto *ascending_option = plainroot_ui_list_box_option_create_v1(
+        context_, ascending_label.c_str(),
+        static_cast<uint32_t>(ascending_label.size()), 0, 0.0F);
+    const std::string descending_label = tr("Name (descending)");
+    auto *descending_option = plainroot_ui_list_box_option_create_v1(
+        context_, descending_label.c_str(),
+        static_cast<uint32_t>(descending_label.size()), 1, 0.0F);
+    if (!add(sort_dropdown_, ascending_option) ||
+        !add(sort_dropdown_, descending_option))
+      return false;
+    initializing_sort_dropdown_ = true;
+    const auto sort_result =
+        plainroot_ui_dropdown_set_value_v1(sort_dropdown_, 0);
+    initializing_sort_dropdown_ = false;
+    if (sort_result != PLAINROOT_UI_RESULT_OK)
+      return false;
+
     if (!add(outer, padding) || !add(padding, page) || !add(page, title) ||
         !add(page, location_row) || !add(location_row, location_actions) ||
         !add(location_actions, up) || !add(location_actions, home) ||
@@ -264,6 +287,7 @@ public:
           !add(filename_row, filename_field_))) ||
         !add(location_row, path_label_) || !add(page, controls) ||
         !add(controls, search_field_) || !add(controls, hidden_switch_) ||
+        !add(controls, sort_dropdown_) ||
         (filter_dropdown_ != nullptr && !add(controls, filter_dropdown_)) ||
         !add(page, storage_view_widget) || !add(page, list_scroll_) ||
         !add(list_scroll_, entries_list_) || !add(page, status_label_) ||
@@ -440,6 +464,22 @@ private:
     self.selected_filter_index_ = selected;
     self.schedule_render();
     self.request_redraw();
+  }
+
+  static void sort_changed(void *user_data, plainroot_ui_widget *widget) {
+    auto &self = *static_cast<Impl *>(user_data);
+    if (self.initializing_sort_dropdown_)
+      return;
+    int32_t selected = -1;
+    uint32_t has_value = 0;
+    if (plainroot_ui_dropdown_get_value_v1(widget, &selected, &has_value) !=
+            PLAINROOT_UI_RESULT_OK ||
+        has_value == 0 || (selected != 0 && selected != 1))
+      return;
+    self.sort_order_ = selected == 0
+                           ? detail::DirectorySortOrder::name_ascending
+                           : detail::DirectorySortOrder::name_descending;
+    self.schedule_render();
   }
 
   static void filename_changed(void *user_data, plainroot_ui_widget *widget) {
@@ -1049,15 +1089,7 @@ private:
       }
       visible.push_back(&entry);
     }
-    std::stable_sort(visible.begin(), visible.end(),
-                     [](const detail::DirectoryEntry *left,
-                        const detail::DirectoryEntry *right) {
-                       const bool left_directory =
-                           left->kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY;
-                       const bool right_directory =
-                           right->kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY;
-                       return left_directory && !right_directory;
-                     });
+    visible = detail::sort_directory_entries(visible, sort_order_);
 
     for (const detail::DirectoryEntry *entry : visible) {
       std::string label = display_path(entry->name);
@@ -1181,9 +1213,12 @@ private:
   bool finished_ = false;
   bool show_hidden_ = false;
   bool initializing_filter_dropdown_ = false;
+  bool initializing_sort_dropdown_ = false;
   bool overwrite_dialog_open_ = false;
   bool overwrite_confirmed_ = false;
   int32_t selected_filter_index_ = -1;
+  detail::DirectorySortOrder sort_order_ =
+      detail::DirectorySortOrder::name_ascending;
   uint64_t generation_ = 0;
   std::string current_path_;
   std::string search_query_;
@@ -1201,6 +1236,7 @@ private:
   plainroot_ui_widget *search_field_ = nullptr;
   plainroot_ui_widget *hidden_switch_ = nullptr;
   plainroot_ui_widget *filter_dropdown_ = nullptr;
+  plainroot_ui_widget *sort_dropdown_ = nullptr;
   plainroot_ui_widget *list_scroll_ = nullptr;
   plainroot_ui_widget *entries_list_ = nullptr;
   plainroot_ui_widget *status_label_ = nullptr;

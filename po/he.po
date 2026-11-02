@@ -312,3 +312,12 @@ msgstr "פורט"
 
 msgid "Enter a valid port from 1 to 65535."
 msgstr "יש להזין מספר פורט תקין בין 1 ל־65535."
+
+msgid "Sort by name"
+msgstr "מיון לפי שם"
+
+msgid "Name (ascending)"
+msgstr "שם (בסדר עולה)"
+
+msgid "Name (descending)"
+msgstr "שם (בסדר יורד)"

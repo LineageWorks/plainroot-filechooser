@@ -25,6 +25,7 @@ systemd_dep = dependency('libsystemd')
 
 browser_sources = [
   'src/browser_controller.cpp',
+  'src/directory_sort.cpp',
   'src/directory_loader.cpp',
   'src/storage_bridge.cpp',
   'src/storage_locations_view.cpp',
@@ -74,6 +75,17 @@ executable(
   dependencies: common_dependencies + [systemd_dep],
   install: true,
 )
+
+directory_sort_test = executable(
+  'filechooser-directory-sort-test',
+  [
+    'tests/directory_sort_test.cpp',
+    'src/directory_sort.cpp',
+  ],
+  dependencies: [core_dep, toolkit_dep, glib_dep],
+  install: false,
+)
+test('FileChooser directory sorting', directory_sort_test)
 
 # The portal target is deliberately not registered by default. Its request
 # lifecycle and FileChooser parity must be validated before a portals.conf
