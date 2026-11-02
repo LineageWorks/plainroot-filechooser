@@ -14,16 +14,22 @@ the local browser UI. It uses `plainroot-toolkit` for its window and widgets and
 Search is applied to the displayed listing, hidden entries can be shown, and
 file selection returns the native path on stdout. It consumes
 `plainroot-storage-client` snapshots to list removable volumes and mounted
-network locations. Mount and confirmed unmount requests go through
-`plainroot-storaged`; partial snapshots suppress storage operations. Local file
-browsing remains available when the storage service is unavailable. Closing the
-browser never unmounts a volume or network location. The window follows the
-active Plainroot appearance theme through the toolkit.
+network locations. Local volume mount and confirmed unmount requests go through
+`plainroot-storaged`. SFTP locations can be connected through the asynchronous
+`plainroot-storage-network-client`, which talks to the unprivileged user-session
+`plainroot-networkd` service. The connection form accepts a server address,
+optional username and remote folder, and a port defaulting to 22. The chooser
+offers disconnect only for network mounts owned by
+`plainroot-networkd`. Partial local snapshots suppress local volume operations.
+Local file browsing remains available when either storage service is
+unavailable. Closing the browser never unmounts a volume or network location.
+The window follows the active Plainroot appearance theme through the toolkit.
 
 The browser is not yet registered as an XDG portal backend. Portal request
 handling, filters, save flows, broader GTK parity, and backend registration
-remain on the roadmap. Interactive mount and unmount acceptance is also still
-pending.
+remain on the roadmap. Live removable-volume mount and SSHFS connect/disconnect
+acceptance are still pending; the current host does not have the `sshfs`
+executable installed.
 
 The browser accepts an optional absolute starting directory. Directory names
 remain native byte paths for navigation and selection; names that are not valid
@@ -47,8 +53,9 @@ workspace's `run-localized.sh` helper with the generated `po` directory.
 
 ## Design constraints
 
-- Use `plainroot-core` for filesystem access and `plainroot-storage-client` for
-  device and mount discovery or lifecycle.
+- Use `plainroot-core` for filesystem access, `plainroot-storage-client` for
+  removable-device discovery and local mount lifecycle, and
+  `plainroot-storage-network-client` for managed SFTP locations.
 - Keep privileged mount policy in `plainroot-storaged`.
 - Implement the portal backend with `sd-bus`; do not route it through the
   toolkit's portal client.

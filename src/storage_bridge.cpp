@@ -84,9 +84,11 @@ StorageCatalog copy_catalog(const plainroot_storage_client_snapshot *snapshot) {
                      copy_bytes(mount.target),
                      copy_bytes(mount.filesystem_type)};
     if ((copied.flags & PLAINROOT_STORAGE_MOUNT_NETWORK) != 0 &&
-        !copied.id.empty() && !copied.target.empty())
-      output.network_mounts.push_back(
-          {copied.id, copied.target, copied.filesystem_type});
+        !copied.id.empty() && !copied.target.empty()) {
+      output.network_mounts.push_back({copied.id, copied.target,
+                                       copied.filesystem_type, {}, {}, {},
+                                       false});
+    }
     mounts.push_back(std::move(copied));
   }
 
@@ -134,14 +136,21 @@ StorageCatalog copy_catalog(const plainroot_storage_client_snapshot *snapshot) {
 struct SharedState {
   plainroot_toolkit_application *application = nullptr;
   plainroot_storage_client *client = nullptr;
+  plainroot_storage_network_client *network_client = nullptr;
   int stop_fd = -1;
   int client_fd = -1;
+  int network_client_fd = -1;
   std::thread poller;
   std::atomic<bool> stopping{false};
   std::atomic<bool> dispatch_posted{false};
   StorageBridge::CatalogHandler catalog_handler;
   StorageBridge::OperationHandler operation_handler;
+  StorageBridge::NetworkOperationHandler network_operation_handler;
   StorageBridge::ErrorHandler error_handler;
+  StorageCatalog latest_catalog;
+  std::vector<NetworkMount> managed_network_mounts;
+  bool network_snapshot_complete = false;
+  bool have_catalog = false;
 
   ~SharedState() { stop(); }
 
@@ -158,13 +167,19 @@ struct SharedState {
       plainroot_storage_client_destroy_v1(client);
       client = nullptr;
     }
+    if (network_client != nullptr) {
+      plainroot_storage_network_client_destroy_v1(network_client);
+      network_client = nullptr;
+    }
     client_fd = -1;
+    network_client_fd = -1;
     if (stop_fd >= 0) {
       close(stop_fd);
       stop_fd = -1;
     }
     catalog_handler = {};
     operation_handler = {};
+    network_operation_handler = {};
     error_handler = {};
   }
 };
@@ -179,7 +194,138 @@ void on_catalog(const plainroot_storage_client_snapshot *snapshot, uint32_t,
   if (!state.catalog_handler || state.stopping.load(std::memory_order_acquire))
     return;
   try {
-    state.catalog_handler(copy_catalog(snapshot));
+    state.latest_catalog = copy_catalog(snapshot);
+    state.latest_catalog.network_complete = state.network_snapshot_complete;
+    state.have_catalog = true;
+    StorageCatalog merged = state.latest_catalog;
+    for (const NetworkMount &managed : state.managed_network_mounts) {
+      const auto existing = std::find_if(
+          merged.network_mounts.begin(), merged.network_mounts.end(),
+          [&](const NetworkMount &mount) {
+            return mount.target == managed.target;
+          });
+      if (existing == merged.network_mounts.end())
+        merged.network_mounts.push_back(managed);
+      else
+        *existing = managed;
+    }
+    state.catalog_handler(std::move(merged));
+  } catch (...) {
+    try {
+      if (state.error_handler)
+        state.error_handler({PLAINROOT_STORAGE_OUT_OF_MEMORY, ENOMEM});
+    } catch (...) {
+    }
+  }
+}
+
+void on_network_event(const plainroot_storage_network_event_v1 *event,
+                      void *user_data) {
+  auto &state = *static_cast<SharedState *>(user_data);
+  if (event == nullptr || state.stopping.load(std::memory_order_acquire))
+    return;
+  try {
+    if (event->type == PLAINROOT_STORAGE_NETWORK_EVENT_ERROR) {
+      if (state.network_operation_handler) {
+        NetworkOperationUpdate update{};
+        update.type = event->type;
+        update.result = event->result;
+        state.network_operation_handler(std::move(update));
+      } else if (state.error_handler) {
+        state.error_handler({event->result, event->native_code});
+      }
+      return;
+    }
+
+    if (event->type == PLAINROOT_STORAGE_NETWORK_EVENT_REQUEST_COMPLETED) {
+      if (state.network_operation_handler) {
+        NetworkOperationUpdate update{};
+        update.type = event->type;
+        update.request_kind = event->request_kind;
+        update.result = event->result;
+        update.operation_id = copy_bytes(event->operation_id);
+        update.mount_id = copy_bytes(event->mount_id);
+        update.mount_path = copy_bytes(event->mount_path);
+        state.network_operation_handler(std::move(update));
+      }
+      return;
+    }
+
+    if (event->type == PLAINROOT_STORAGE_NETWORK_EVENT_OPERATION_CHANGED) {
+      if (state.network_operation_handler) {
+        NetworkOperationUpdate update{};
+        update.type = event->type;
+        update.operation_kind = event->operation_kind;
+        update.state = event->operation_state;
+        update.error = event->operation_error;
+        update.operation_id = copy_bytes(event->operation_id);
+        update.mount_id = copy_bytes(event->mount_id);
+        update.mount_path = copy_bytes(event->mount_path);
+        state.network_operation_handler(std::move(update));
+      }
+      return;
+    }
+
+    if (event->type != PLAINROOT_STORAGE_NETWORK_EVENT_MOUNTS_CHANGED ||
+        state.network_client == nullptr)
+      return;
+
+    plainroot_storage_network_mount_snapshot *snapshot = nullptr;
+    plainroot_storage_error_v1 error{};
+    error.struct_size = sizeof(error);
+    const auto result = plainroot_storage_network_client_get_mounts_v1(
+        state.network_client, &snapshot, &error);
+    if (result != PLAINROOT_STORAGE_OK) {
+      if (state.error_handler && result != PLAINROOT_STORAGE_NOT_READY)
+        state.error_handler({result, error.native_code});
+      return;
+    }
+    const std::unique_ptr<plainroot_storage_network_mount_snapshot,
+                          decltype(&plainroot_storage_network_mount_snapshot_release_v1)>
+        snapshot_guard(snapshot,
+                       &plainroot_storage_network_mount_snapshot_release_v1);
+    if (snapshot_guard == nullptr)
+      return;
+
+    std::vector<NetworkMount> mounts;
+    const size_t count = plainroot_storage_network_mount_snapshot_count_v1(
+        snapshot_guard.get());
+    mounts.reserve(count);
+    for (size_t index = 0; index < count; ++index) {
+      plainroot_storage_network_mount_v1 mount{};
+      mount.struct_size = sizeof(mount);
+      if (plainroot_storage_network_mount_snapshot_get_v1(
+              snapshot_guard.get(), index, &mount) != PLAINROOT_STORAGE_OK)
+        continue;
+      NetworkMount copied;
+      copied.id = copy_bytes(mount.id);
+      copied.target = copy_bytes(mount.path);
+      copied.filesystem_type = "fuse.sshfs";
+      copied.host = copy_bytes(mount.host);
+      copied.username = copy_bytes(mount.username);
+      copied.remote_path = copy_bytes(mount.remote_path);
+      copied.managed = true;
+      if (!copied.id.empty() && !copied.target.empty())
+        mounts.push_back(std::move(copied));
+    }
+    state.managed_network_mounts = std::move(mounts);
+    state.network_snapshot_complete = true;
+    if (state.have_catalog && state.catalog_handler) {
+      StorageCatalog merged = state.latest_catalog;
+      merged.network_complete = true;
+      for (const NetworkMount &managed : state.managed_network_mounts) {
+        const auto existing = std::find_if(
+            merged.network_mounts.begin(), merged.network_mounts.end(),
+            [&](const NetworkMount &mount) {
+              return mount.target == managed.target;
+            });
+        if (existing == merged.network_mounts.end())
+          merged.network_mounts.push_back(managed);
+        else
+          *existing = managed;
+      }
+      state.catalog_handler(std::move(merged));
+    }
   } catch (...) {
     try {
       if (state.error_handler)
@@ -216,24 +362,48 @@ void run_dispatch(void *user_data) {
   auto *task = static_cast<DispatchTask *>(user_data);
   const std::shared_ptr<SharedState> state = task->state;
   if (state->stopping.load(std::memory_order_acquire) ||
-      state->client == nullptr)
+      (state->client == nullptr && state->network_client == nullptr))
     return;
   size_t dispatched = 0;
   plainroot_storage_error_v1 error{};
   error.struct_size = sizeof(error);
-  const auto result = plainroot_storage_client_dispatch_v1(
-      state->client, &on_catalog, state.get(), &dispatched, &error);
+  if (state->client != nullptr) {
+    const auto result = plainroot_storage_client_dispatch_v1(
+        state->client, &on_catalog, state.get(), &dispatched, &error);
+    if (result != PLAINROOT_STORAGE_OK && state->error_handler &&
+        !state->stopping.load(std::memory_order_acquire)) {
+      try {
+        state->error_handler({result, error.native_code});
+      } catch (...) {
+      }
+    }
+  }
+  if (state->network_client != nullptr) {
+    size_t network_dispatched = 0;
+    error = {};
+    error.struct_size = sizeof(error);
+    const auto result = plainroot_storage_network_client_dispatch_v1(
+        state->network_client, &on_network_event, state.get(),
+        &network_dispatched, &error);
+    if (result != PLAINROOT_STORAGE_OK &&
+        !state->stopping.load(std::memory_order_acquire)) {
+      try {
+        if (state->network_operation_handler) {
+          NetworkOperationUpdate update{};
+          update.type = PLAINROOT_STORAGE_NETWORK_EVENT_ERROR;
+          update.result = result;
+          state->network_operation_handler(std::move(update));
+        } else if (state->error_handler) {
+          state->error_handler({result, error.native_code});
+        }
+      } catch (...) {
+      }
+    }
+  }
   state->dispatch_posted.store(false, std::memory_order_release);
   const uint64_t wake = 1;
   if (state->stop_fd >= 0)
     (void)write(state->stop_fd, &wake, sizeof(wake));
-  if (result != PLAINROOT_STORAGE_OK && state->error_handler &&
-      !state->stopping.load(std::memory_order_acquire)) {
-    try {
-      state->error_handler({result, error.native_code});
-    } catch (...) {
-    }
-  }
 }
 
 void destroy_dispatch(void *user_data) {
@@ -267,18 +437,23 @@ void drain_eventfd(int fd) {
   }
 }
 
-void poll_client(const std::shared_ptr<SharedState> &state) {
-  pollfd descriptors[2] = {{state->client_fd, POLLIN, 0},
+void poll_clients(const std::shared_ptr<SharedState> &state) {
+  pollfd descriptors[3] = {{state->client_fd, POLLIN, 0},
+                           {state->network_client_fd, POLLIN, 0},
                            {state->stop_fd, POLLIN, 0}};
   for (;;) {
     int result;
     do {
-      result = poll(descriptors, 2, -1);
+      result = poll(descriptors, 3, -1);
     } while (result < 0 && errno == EINTR);
-    if (result < 0 || (descriptors[1].revents & POLLIN) != 0 ||
+    if (result < 0 || (descriptors[2].revents & POLLIN) != 0 ||
         state->stopping.load(std::memory_order_acquire))
       return;
-    if ((descriptors[0].revents & (POLLIN | POLLERR | POLLHUP)) == 0)
+    const bool client_ready =
+        (descriptors[0].revents & (POLLIN | POLLERR | POLLHUP)) != 0;
+    const bool network_ready =
+        (descriptors[1].revents & (POLLIN | POLLERR | POLLHUP)) != 0;
+    if (!client_ready && !network_ready)
       continue;
 
     if (!queue_dispatch(state)) {
@@ -314,52 +489,79 @@ class StorageBridge::Impl {
 public:
   Impl(plainroot_toolkit_application *application,
        CatalogHandler catalog_handler, OperationHandler operation_handler,
+       NetworkOperationHandler network_operation_handler,
        ErrorHandler error_handler)
       : state_(std::make_shared<SharedState>()) {
     state_->application = application;
     state_->catalog_handler = std::move(catalog_handler);
     state_->operation_handler = std::move(operation_handler);
+    state_->network_operation_handler =
+        std::move(network_operation_handler);
     state_->error_handler = std::move(error_handler);
     if (application == nullptr)
       return;
 
     plainroot_storage_error_v1 error{};
     error.struct_size = sizeof(error);
-    if (plainroot_storage_client_create_v1(nullptr, &state_->client, &error) !=
-            PLAINROOT_STORAGE_OK ||
-        state_->client == nullptr) {
-      if (state_->error_handler)
-        state_->error_handler({PLAINROOT_STORAGE_NOT_READY, error.native_code});
-      return;
-    }
-    if (plainroot_storage_client_set_operation_callback_v1(
-            state_->client, &on_operation, state_.get(), &error) !=
-        PLAINROOT_STORAGE_OK) {
-      plainroot_storage_client_destroy_v1(state_->client);
-      state_->client = nullptr;
-      if (state_->error_handler)
-        state_->error_handler({PLAINROOT_STORAGE_IO_ERROR, error.native_code});
-      return;
-    }
-    state_->client_fd =
-        plainroot_storage_client_notification_fd_v1(state_->client);
-    state_->stop_fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-    if (state_->client_fd < 0 || state_->stop_fd < 0) {
-      if (state_->client != nullptr) {
+    const auto storage_result = plainroot_storage_client_create_v1(
+        nullptr, &state_->client, &error);
+    if (storage_result == PLAINROOT_STORAGE_OK && state_->client != nullptr) {
+      const auto callback_result =
+          plainroot_storage_client_set_operation_callback_v1(
+              state_->client, &on_operation, state_.get(), &error);
+      if (callback_result != PLAINROOT_STORAGE_OK) {
         plainroot_storage_client_destroy_v1(state_->client);
         state_->client = nullptr;
+      } else {
+        state_->client_fd =
+            plainroot_storage_client_notification_fd_v1(state_->client);
+        if (state_->client_fd < 0) {
+          plainroot_storage_client_destroy_v1(state_->client);
+          state_->client = nullptr;
+        }
       }
-      if (state_->stop_fd >= 0) {
-        close(state_->stop_fd);
-        state_->stop_fd = -1;
+    }
+
+    error = {};
+    error.struct_size = sizeof(error);
+    const auto network_result = plainroot_storage_network_client_create_v1(
+        &state_->network_client, &error);
+    if (network_result == PLAINROOT_STORAGE_OK &&
+        state_->network_client != nullptr) {
+      state_->network_client_fd =
+          plainroot_storage_network_client_notification_fd_v1(
+              state_->network_client);
+      if (state_->network_client_fd < 0) {
+        plainroot_storage_network_client_destroy_v1(state_->network_client);
+        state_->network_client = nullptr;
       }
+    }
+
+    if (state_->client == nullptr) {
+      state_->latest_catalog.complete = true;
+      state_->have_catalog = true;
+    }
+
+    if (state_->client == nullptr && state_->network_client == nullptr) {
+      if (state_->error_handler) {
+        const auto result = storage_result != PLAINROOT_STORAGE_OK
+                                ? storage_result
+                                : network_result;
+        state_->error_handler({result, error.native_code});
+      }
+      return;
+    }
+
+    state_->stop_fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+    if (state_->stop_fd < 0) {
+      state_->stop();
       if (state_->error_handler)
         state_->error_handler({PLAINROOT_STORAGE_IO_ERROR, errno});
       return;
     }
     try {
       const auto shared = state_;
-      state_->poller = std::thread([shared] { poll_client(shared); });
+      state_->poller = std::thread([shared] { poll_clients(shared); });
       ready_ = true;
     } catch (...) {
       state_->stop();
@@ -396,11 +598,41 @@ public:
         state_->client, {id.data(), id.size()}, &request_id, nullptr);
   }
 
-  plainroot_storage_result_v1 request_snapshot() {
-    if (!ready_ || state_->client == nullptr)
+  plainroot_storage_result_v1 connect_sftp(const std::string &host,
+                                           const std::string &username,
+                                           uint16_t port,
+                                           const std::string &remote_path) {
+    if (!ready_ || state_->network_client == nullptr)
       return PLAINROOT_STORAGE_NOT_READY;
-    return plainroot_storage_client_request_snapshot_v1(state_->client,
-                                                        nullptr);
+    uint64_t request_id = 0;
+    return plainroot_storage_network_client_connect_sftp_v1(
+        state_->network_client, host.c_str(), username.c_str(), port,
+        remote_path.c_str(), &request_id, nullptr);
+  }
+
+  plainroot_storage_result_v1 disconnect_network(const std::string &id) {
+    if (!ready_ || state_->network_client == nullptr)
+      return PLAINROOT_STORAGE_NOT_READY;
+    uint64_t request_id = 0;
+    return plainroot_storage_network_client_disconnect_v1(
+        state_->network_client, {id.data(), id.size()}, &request_id, nullptr);
+  }
+
+  plainroot_storage_result_v1 request_snapshot() {
+    if (!ready_)
+      return PLAINROOT_STORAGE_NOT_READY;
+    plainroot_storage_result_v1 storage_result = PLAINROOT_STORAGE_NOT_READY;
+    plainroot_storage_result_v1 network_result = PLAINROOT_STORAGE_NOT_READY;
+    if (state_->client != nullptr)
+      storage_result = plainroot_storage_client_request_snapshot_v1(
+          state_->client, nullptr);
+    if (state_->network_client != nullptr)
+      network_result = plainroot_storage_network_client_request_mounts_v1(
+          state_->network_client, nullptr, nullptr);
+    return storage_result == PLAINROOT_STORAGE_OK ||
+                   network_result == PLAINROOT_STORAGE_OK
+               ? PLAINROOT_STORAGE_OK
+               : (state_->client != nullptr ? storage_result : network_result);
   }
 
 private:
@@ -411,9 +643,11 @@ private:
 StorageBridge::StorageBridge(plainroot_toolkit_application *application,
                              CatalogHandler catalog_handler,
                              OperationHandler operation_handler,
+                             NetworkOperationHandler network_operation_handler,
                              ErrorHandler error_handler)
     : impl_(std::make_unique<Impl>(application, std::move(catalog_handler),
                                    std::move(operation_handler),
+                                   std::move(network_operation_handler),
                                    std::move(error_handler))) {}
 
 StorageBridge::~StorageBridge() = default;
@@ -434,6 +668,19 @@ plainroot_storage_result_v1 StorageBridge::mount_volume(const std::string &id,
 plainroot_storage_result_v1
 StorageBridge::unmount_mount(const std::string &id) {
   return impl_ ? impl_->unmount_mount(id) : PLAINROOT_STORAGE_NOT_READY;
+}
+
+plainroot_storage_result_v1
+StorageBridge::connect_sftp(const std::string &host,
+                            const std::string &username, uint16_t port,
+                            const std::string &remote_path) {
+  return impl_ ? impl_->connect_sftp(host, username, port, remote_path)
+               : PLAINROOT_STORAGE_NOT_READY;
+}
+
+plainroot_storage_result_v1
+StorageBridge::disconnect_network(const std::string &id) {
+  return impl_ ? impl_->disconnect_network(id) : PLAINROOT_STORAGE_NOT_READY;
 }
 
 plainroot_storage_result_v1 StorageBridge::request_snapshot() {

@@ -70,6 +70,9 @@ msgstr "Speicherorte sind nicht verfügbar."
 msgid "Storage information is incomplete; mount actions are unavailable."
 msgstr "Speicherinformationen sind unvollständig; Einhängeaktionen sind nicht verfügbar."
 
+msgid "Storage information is incomplete; removable-volume actions are unavailable."
+msgstr "Die Speicherinformationen sind unvollständig; Aktionen für Wechseldatenträger sind nicht verfügbar."
+
 msgid "No removable volumes or mounted network locations."
 msgstr "Keine Wechseldatenträger oder eingebundenen Netzwerkorte gefunden."
 
@@ -150,3 +153,90 @@ msgstr "Aushängen bestätigen"
 
 msgid "Cancel"
 msgstr "Abbrechen"
+
+msgid "Connect to SFTP"
+msgstr "Mit SFTP verbinden"
+
+msgid "Hide SFTP form"
+msgstr "SFTP-Formular ausblenden"
+
+msgid "Server name or address"
+msgstr "Servername oder Adresse"
+
+msgid "Server address"
+msgstr "Serveradresse"
+
+msgid "Username (optional)"
+msgstr "Benutzername (optional)"
+
+msgid "Username"
+msgstr "Benutzername"
+
+msgid "Remote folder (optional)"
+msgstr "Remote-Ordner (optional)"
+
+msgid "Remote folder"
+msgstr "Remote-Ordner"
+
+msgid "Connect"
+msgstr "Verbinden"
+
+msgid "Enter a server name or address."
+msgstr "Geben Sie einen Servernamen oder eine Adresse ein."
+
+msgid "Confirm disconnect"
+msgstr "Trennen bestätigen"
+
+msgid "Disconnect"
+msgstr "Trennen"
+
+msgid "Network service is unavailable."
+msgstr "Der Netzwerkdienst ist nicht verfügbar."
+
+msgid "Unable to start the network operation."
+msgstr "Der Netzwerkvorgang kann nicht gestartet werden."
+
+msgid "Connecting to SFTP location…"
+msgstr "Verbindung zum SFTP-Speicherort wird hergestellt …"
+
+msgid "Disconnecting network location…"
+msgstr "Netzwerkort wird getrennt …"
+
+msgid "Network location disconnected."
+msgstr "Netzwerkort wurde getrennt."
+
+msgid "Network location connected."
+msgstr "Netzwerkort wurde verbunden."
+
+msgid "Network connection was cancelled."
+msgstr "Netzwerkverbindung wurde abgebrochen."
+
+msgid "Network operation outcome is uncertain."
+msgstr "Der Ausgang des Netzwerkvorgangs ist ungewiss."
+
+msgid "Check the server address and try again."
+msgstr "Prüfen Sie die Serveradresse und versuchen Sie es erneut."
+
+msgid "SFTP support is unavailable."
+msgstr "SFTP-Unterstützung ist nicht verfügbar."
+
+msgid "Unable to start the network mount service."
+msgstr "Der Netzwerk-Einhängedienst kann nicht gestartet werden."
+
+msgid "Could not connect to the SFTP server."
+msgstr "Die Verbindung zum SFTP-Server ist fehlgeschlagen."
+
+msgid "Could not disconnect the network location."
+msgstr "Der Netzwerkort konnte nicht getrennt werden."
+
+msgid "The network operation failed."
+msgstr "Der Netzwerkvorgang ist fehlgeschlagen."
+
+msgid "Port (default 22)"
+msgstr "Port (Standard: 22)"
+
+msgid "Port"
+msgstr "Port"
+
+msgid "Enter a valid port from 1 to 65535."
+msgstr "Geben Sie einen gültigen Port zwischen 1 und 65535 ein."

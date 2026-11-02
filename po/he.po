@@ -70,6 +70,9 @@ msgstr "מיקומי האחסון אינם זמינים."
 msgid "Storage information is incomplete; mount actions are unavailable."
 msgstr "פרטי האחסון אינם מלאים; פעולות העיגון אינן זמינות."
 
+msgid "Storage information is incomplete; removable-volume actions are unavailable."
+msgstr "פרטי האחסון אינם מלאים; פעולות עבור אמצעי אחסון נשלפים אינן זמינות."
+
 msgid "No removable volumes or mounted network locations."
 msgstr "לא נמצאו אמצעי אחסון נשלפים או מיקומי רשת מעוגנים."
 
@@ -150,3 +153,90 @@ msgstr "אישור ניתוק"
 
 msgid "Cancel"
 msgstr "ביטול"
+
+msgid "Connect to SFTP"
+msgstr "התחברות באמצעות SFTP"
+
+msgid "Hide SFTP form"
+msgstr "הסתרת טופס SFTP"
+
+msgid "Server name or address"
+msgstr "שם השרת או כתובתו"
+
+msgid "Server address"
+msgstr "כתובת השרת"
+
+msgid "Username (optional)"
+msgstr "שם משתמש (לא חובה)"
+
+msgid "Username"
+msgstr "שם משתמש"
+
+msgid "Remote folder (optional)"
+msgstr "תיקייה מרוחקת (לא חובה)"
+
+msgid "Remote folder"
+msgstr "תיקייה מרוחקת"
+
+msgid "Connect"
+msgstr "התחברות"
+
+msgid "Enter a server name or address."
+msgstr "יש להזין שם שרת או כתובת."
+
+msgid "Confirm disconnect"
+msgstr "אישור ניתוק"
+
+msgid "Disconnect"
+msgstr "ניתוק"
+
+msgid "Network service is unavailable."
+msgstr "שירות הרשת אינו זמין."
+
+msgid "Unable to start the network operation."
+msgstr "לא ניתן להתחיל את פעולת הרשת."
+
+msgid "Connecting to SFTP location…"
+msgstr "מתחבר למיקום SFTP…"
+
+msgid "Disconnecting network location…"
+msgstr "מנתק את מיקום הרשת…"
+
+msgid "Network location disconnected."
+msgstr "הניתוק ממיקום הרשת הושלם."
+
+msgid "Network location connected."
+msgstr "החיבור למיקום הרשת הושלם."
+
+msgid "Network connection was cancelled."
+msgstr "החיבור לרשת בוטל."
+
+msgid "Network operation outcome is uncertain."
+msgstr "תוצאת פעולת הרשת אינה ודאית."
+
+msgid "Check the server address and try again."
+msgstr "יש לבדוק את כתובת השרת ולנסות שוב."
+
+msgid "SFTP support is unavailable."
+msgstr "תמיכה ב־SFTP אינה זמינה."
+
+msgid "Unable to start the network mount service."
+msgstr "לא ניתן להפעיל את שירות עיגון הרשת."
+
+msgid "Could not connect to the SFTP server."
+msgstr "החיבור לשרת SFTP נכשל."
+
+msgid "Could not disconnect the network location."
+msgstr "לא ניתן לנתק את מיקום הרשת."
+
+msgid "The network operation failed."
+msgstr "פעולת הרשת נכשלה."
+
+msgid "Port (default 22)"
+msgstr "פורט (ברירת מחדל 22)"
+
+msgid "Port"
+msgstr "פורט"
+
+msgid "Enter a valid port from 1 to 65535."
+msgstr "יש להזין מספר פורט תקין בין 1 ל־65535."

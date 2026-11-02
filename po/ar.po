@@ -71,6 +71,9 @@ msgstr "مواقع التخزين غير متاحة."
 msgid "Storage information is incomplete; mount actions are unavailable."
 msgstr "معلومات التخزين غير مكتملة؛ إجراءات التركيب غير متاحة."
 
+msgid "Storage information is incomplete; removable-volume actions are unavailable."
+msgstr "معلومات التخزين غير مكتملة؛ إجراءات وحدات التخزين القابلة للإزالة غير متاحة."
+
 msgid "No removable volumes or mounted network locations."
 msgstr "لا توجد وحدات تخزين قابلة للإزالة أو مواقع شبكة مركّبة."
 
@@ -151,3 +154,90 @@ msgstr "تأكيد إلغاء التركيب"
 
 msgid "Cancel"
 msgstr "إلغاء"
+
+msgid "Connect to SFTP"
+msgstr "الاتصال عبر SFTP"
+
+msgid "Hide SFTP form"
+msgstr "إخفاء نموذج SFTP"
+
+msgid "Server name or address"
+msgstr "اسم الخادم أو عنوانه"
+
+msgid "Server address"
+msgstr "عنوان الخادم"
+
+msgid "Username (optional)"
+msgstr "اسم المستخدم (اختياري)"
+
+msgid "Username"
+msgstr "اسم المستخدم"
+
+msgid "Remote folder (optional)"
+msgstr "المجلد البعيد (اختياري)"
+
+msgid "Remote folder"
+msgstr "المجلد البعيد"
+
+msgid "Connect"
+msgstr "اتصال"
+
+msgid "Enter a server name or address."
+msgstr "أدخل اسم الخادم أو عنوانه."
+
+msgid "Confirm disconnect"
+msgstr "تأكيد قطع الاتصال"
+
+msgid "Disconnect"
+msgstr "قطع الاتصال"
+
+msgid "Network service is unavailable."
+msgstr "خدمة الشبكة غير متاحة."
+
+msgid "Unable to start the network operation."
+msgstr "تعذّر بدء عملية الشبكة."
+
+msgid "Connecting to SFTP location…"
+msgstr "جارٍ الاتصال بموقع SFTP…"
+
+msgid "Disconnecting network location…"
+msgstr "جارٍ قطع الاتصال بموقع الشبكة…"
+
+msgid "Network location disconnected."
+msgstr "تم قطع الاتصال بموقع الشبكة."
+
+msgid "Network location connected."
+msgstr "تم الاتصال بموقع الشبكة."
+
+msgid "Network connection was cancelled."
+msgstr "تم إلغاء الاتصال بالشبكة."
+
+msgid "Network operation outcome is uncertain."
+msgstr "نتيجة عملية الشبكة غير مؤكدة."
+
+msgid "Check the server address and try again."
+msgstr "تحقق من عنوان الخادم وحاول مجددًا."
+
+msgid "SFTP support is unavailable."
+msgstr "دعم SFTP غير متاح."
+
+msgid "Unable to start the network mount service."
+msgstr "تعذّر بدء خدمة تركيب الشبكة."
+
+msgid "Could not connect to the SFTP server."
+msgstr "تعذّر الاتصال بخادم SFTP."
+
+msgid "Could not disconnect the network location."
+msgstr "تعذّر قطع الاتصال بموقع الشبكة."
+
+msgid "The network operation failed."
+msgstr "فشلت عملية الشبكة."
+
+msgid "Port (default 22)"
+msgstr "المنفذ (الافتراضي 22)"
+
+msgid "Port"
+msgstr "المنفذ"
+
+msgid "Enter a valid port from 1 to 65535."
+msgstr "أدخل رقم منفذ صالحًا من 1 إلى 65535."

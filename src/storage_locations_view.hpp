@@ -14,6 +14,10 @@ struct StorageLocationActions {
   std::function<void(std::string, bool)> mount;
   std::function<void(std::string)> open;
   std::function<void(std::string)> unmount;
+  std::function<void(std::string)> disconnect_network;
+  std::function<plainroot_storage_result_v1(std::string, std::string, uint16_t,
+                                           std::string)>
+      connect_sftp;
   std::function<void()> refresh;
   std::function<void()> request_redraw;
 };

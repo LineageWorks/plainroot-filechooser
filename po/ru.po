@@ -71,6 +71,9 @@ msgstr "Места хранения недоступны."
 msgid "Storage information is incomplete; mount actions are unavailable."
 msgstr "Сведения о хранилище неполные; операции подключения недоступны."
 
+msgid "Storage information is incomplete; removable-volume actions are unavailable."
+msgstr "Сведения о хранилище неполные; действия со съёмными томами недоступны."
+
 msgid "No removable volumes or mounted network locations."
 msgstr "Нет съёмных томов или подключённых сетевых расположений."
 
@@ -151,3 +154,90 @@ msgstr "Подтвердить отключение"
 
 msgid "Cancel"
 msgstr "Отмена"
+
+msgid "Connect to SFTP"
+msgstr "Подключиться по SFTP"
+
+msgid "Hide SFTP form"
+msgstr "Скрыть форму SFTP"
+
+msgid "Server name or address"
+msgstr "Имя или адрес сервера"
+
+msgid "Server address"
+msgstr "Адрес сервера"
+
+msgid "Username (optional)"
+msgstr "Имя пользователя (необязательно)"
+
+msgid "Username"
+msgstr "Имя пользователя"
+
+msgid "Remote folder (optional)"
+msgstr "Удалённая папка (необязательно)"
+
+msgid "Remote folder"
+msgstr "Удалённая папка"
+
+msgid "Connect"
+msgstr "Подключить"
+
+msgid "Enter a server name or address."
+msgstr "Введите имя или адрес сервера."
+
+msgid "Confirm disconnect"
+msgstr "Подтвердить отключение"
+
+msgid "Disconnect"
+msgstr "Отключить"
+
+msgid "Network service is unavailable."
+msgstr "Сетевая служба недоступна."
+
+msgid "Unable to start the network operation."
+msgstr "Не удалось запустить сетевую операцию."
+
+msgid "Connecting to SFTP location…"
+msgstr "Подключение к расположению SFTP…"
+
+msgid "Disconnecting network location…"
+msgstr "Отключение сетевого расположения…"
+
+msgid "Network location disconnected."
+msgstr "Сетевое расположение отключено."
+
+msgid "Network location connected."
+msgstr "Сетевое расположение подключено."
+
+msgid "Network connection was cancelled."
+msgstr "Подключение к сети отменено."
+
+msgid "Network operation outcome is uncertain."
+msgstr "Результат сетевой операции неизвестен."
+
+msgid "Check the server address and try again."
+msgstr "Проверьте адрес сервера и попробуйте снова."
+
+msgid "SFTP support is unavailable."
+msgstr "Поддержка SFTP недоступна."
+
+msgid "Unable to start the network mount service."
+msgstr "Не удалось запустить службу сетевого монтирования."
+
+msgid "Could not connect to the SFTP server."
+msgstr "Не удалось подключиться к серверу SFTP."
+
+msgid "Could not disconnect the network location."
+msgstr "Не удалось отключить сетевое расположение."
+
+msgid "The network operation failed."
+msgstr "Сетевая операция завершилась ошибкой."
+
+msgid "Port (default 22)"
+msgstr "Порт (по умолчанию 22)"
+
+msgid "Port"
+msgstr "Порт"
+
+msgid "Enter a valid port from 1 to 65535."
+msgstr "Введите допустимый номер порта от 1 до 65535."

@@ -114,6 +114,12 @@ public:
             },
             [this](std::string path) { navigate(std::move(path)); },
             [this](std::string id) { unmount_mount(id); },
+            [this](std::string id) { disconnect_network(id); },
+            [this](std::string host, std::string username, uint16_t port,
+                   std::string remote_path) {
+              return connect_sftp(std::move(host), std::move(username), port,
+                                  std::move(remote_path));
+            },
             [this] { refresh_storage(); }, [this] { request_redraw(); }});
     auto *storage_view_widget = storage_view_->create();
 
@@ -195,6 +201,9 @@ public:
         },
         [this](detail::StorageOperationUpdate update) {
           apply_storage_operation(update);
+        },
+        [this](detail::NetworkOperationUpdate update) {
+          apply_network_operation(std::move(update));
         },
         [this](detail::StorageServiceError error) {
           apply_storage_error(error);
@@ -354,7 +363,7 @@ private:
     storage_view_->set_catalog(std::move(catalog));
     if (!complete) {
       set_storage_status(tr(
-          "Storage information is incomplete; mount actions are unavailable."));
+          "Storage information is incomplete; removable-volume actions are unavailable."));
     } else if (empty) {
       set_storage_status(
           tr("No removable volumes or mounted network locations."));
@@ -426,6 +435,93 @@ private:
     request_redraw();
   }
 
+  void apply_network_operation(detail::NetworkOperationUpdate update) {
+    if (update.type == PLAINROOT_STORAGE_NETWORK_EVENT_ERROR) {
+      storage_operation_pending_ = false;
+      set_storage_status(tr(update.result == PLAINROOT_STORAGE_NOT_READY
+                                ? "Network service is unavailable."
+                                : "Unable to start the network operation."));
+      request_redraw();
+      return;
+    }
+
+    if (update.type == PLAINROOT_STORAGE_NETWORK_EVENT_REQUEST_COMPLETED) {
+      if (update.request_kind != PLAINROOT_STORAGE_NETWORK_REQUEST_CONNECT &&
+          update.request_kind !=
+              PLAINROOT_STORAGE_NETWORK_REQUEST_DISCONNECT)
+        return;
+      if (update.result != PLAINROOT_STORAGE_OK) {
+        storage_operation_pending_ = false;
+        set_storage_status(tr(update.result == PLAINROOT_STORAGE_NOT_READY
+                                  ? "Network service is unavailable."
+                                  : "Unable to start the network operation."));
+      } else {
+        const bool disconnect =
+            update.request_kind == PLAINROOT_STORAGE_NETWORK_REQUEST_DISCONNECT;
+        set_storage_status(tr(disconnect ? "Disconnecting network location…"
+                                         : "Connecting to SFTP location…"));
+      }
+      request_redraw();
+      return;
+    }
+
+    if (update.type != PLAINROOT_STORAGE_NETWORK_EVENT_OPERATION_CHANGED)
+      return;
+    if (update.state == PLAINROOT_STORAGE_NETWORK_OPERATION_SUCCEEDED) {
+      storage_operation_pending_ = false;
+      const bool disconnect =
+          update.operation_kind == PLAINROOT_STORAGE_NETWORK_OPERATION_DISCONNECT;
+      set_storage_status(tr(disconnect ? "Network location disconnected."
+                                       : "Network location connected."));
+      if (storage_bridge_ != nullptr)
+        (void)storage_bridge_->request_snapshot();
+    } else if (update.state == PLAINROOT_STORAGE_NETWORK_OPERATION_FAILED) {
+      storage_operation_pending_ = false;
+      set_storage_status(tr(network_operation_error_message(update.error)));
+      if (storage_bridge_ != nullptr)
+        (void)storage_bridge_->request_snapshot();
+    } else if (update.state ==
+               PLAINROOT_STORAGE_NETWORK_OPERATION_CANCELLED) {
+      storage_operation_pending_ = false;
+      set_storage_status(tr("Network connection was cancelled."));
+    } else if (update.state ==
+               PLAINROOT_STORAGE_NETWORK_OPERATION_INDETERMINATE) {
+      storage_operation_pending_ = false;
+      set_storage_status(tr("Network operation outcome is uncertain."));
+      if (storage_bridge_ != nullptr)
+        (void)storage_bridge_->request_snapshot();
+    } else if (update.operation_kind ==
+               PLAINROOT_STORAGE_NETWORK_OPERATION_DISCONNECT) {
+      set_storage_status(tr("Disconnecting network location…"));
+    } else {
+      set_storage_status(tr("Connecting to SFTP location…"));
+    }
+    request_redraw();
+  }
+
+  static const char *network_operation_error_message(uint32_t error) {
+    switch (error) {
+    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_INVALID_REQUEST:
+      return "Check the server address and try again.";
+    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_DEPENDENCY_UNAVAILABLE:
+      return "SFTP support is unavailable.";
+    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_MOUNTPOINT_UNAVAILABLE:
+      return "A mount location is unavailable.";
+    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_SYSTEMD_FAILED:
+      return "Unable to start the network mount service.";
+    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_CONNECTION_FAILED:
+      return "Could not connect to the SFTP server.";
+    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_UNMOUNT_FAILED:
+      return "Could not disconnect the network location.";
+    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_CANCELLED:
+      return "Network connection was cancelled.";
+    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_OUTCOME_UNKNOWN:
+      return "Network operation outcome is uncertain.";
+    default:
+      return "The network operation failed.";
+    }
+  }
+
   static const char *storage_operation_error_message(uint32_t error) {
     switch (error) {
     case PLAINROOT_STORAGE_OPERATION_ERROR_AUTHORIZATION_DENIED:
@@ -452,7 +548,7 @@ private:
   void mount_volume(const std::string &id, bool read_only) {
     if (!storage_catalog_complete_) {
       set_storage_status(tr(
-          "Storage information is incomplete; mount actions are unavailable."));
+          "Storage information is incomplete; removable-volume actions are unavailable."));
       request_redraw();
       return;
     }
@@ -476,7 +572,7 @@ private:
   void unmount_mount(const std::string &id) {
     if (!storage_catalog_complete_) {
       set_storage_status(tr(
-          "Storage information is incomplete; mount actions are unavailable."));
+          "Storage information is incomplete; removable-volume actions are unavailable."));
       request_redraw();
       return;
     }
@@ -492,6 +588,50 @@ private:
       set_storage_status(tr("Unmounting location…"));
     } else {
       apply_storage_error({result, 0});
+    }
+    request_redraw();
+  }
+
+  plainroot_storage_result_v1 connect_sftp(std::string host,
+                                           std::string username, uint16_t port,
+                                           std::string remote_path) {
+    if (storage_operation_pending_) {
+      set_storage_status(tr("A storage operation is already in progress."));
+      request_redraw();
+      return PLAINROOT_STORAGE_BUSY;
+    }
+    const auto result = storage_bridge_ == nullptr
+                            ? PLAINROOT_STORAGE_NOT_READY
+                            : storage_bridge_->connect_sftp(host, username, port,
+                                                            remote_path);
+    if (result == PLAINROOT_STORAGE_OK) {
+      storage_operation_pending_ = true;
+      set_storage_status(tr("Connecting to SFTP location…"));
+    } else {
+      set_storage_status(tr(result == PLAINROOT_STORAGE_NOT_READY
+                                ? "Network service is unavailable."
+                                : "Unable to start the network operation."));
+    }
+    request_redraw();
+    return result;
+  }
+
+  void disconnect_network(const std::string &id) {
+    if (storage_operation_pending_) {
+      set_storage_status(tr("A storage operation is already in progress."));
+      request_redraw();
+      return;
+    }
+    const auto result = storage_bridge_ == nullptr
+                            ? PLAINROOT_STORAGE_NOT_READY
+                            : storage_bridge_->disconnect_network(id);
+    if (result == PLAINROOT_STORAGE_OK) {
+      storage_operation_pending_ = true;
+      set_storage_status(tr("Disconnecting network location…"));
+    } else {
+      set_storage_status(tr(result == PLAINROOT_STORAGE_NOT_READY
+                                ? "Network service is unavailable."
+                                : "Unable to start the network operation."));
     }
     request_redraw();
   }
