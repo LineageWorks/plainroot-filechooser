@@ -18,13 +18,17 @@ struct DirectoryEntry {
 };
 
 struct DirectoryResult {
+  enum class Operation { Listing, CreateDirectory };
+
   uint64_t generation = 0;
+  uint64_t request_id = 0;
   std::string path;
   plainroot_core_fs_result_v1 result = PLAINROOT_CORE_FS_IO_ERROR;
   int32_t native_code = 0;
   std::vector<DirectoryEntry> entries;
   bool mime_classified = false;
   bool mime_database_available = false;
+  Operation operation = Operation::Listing;
 };
 
 class DirectoryLoader {
@@ -40,6 +44,8 @@ public:
   bool ready() const;
   void request(std::string path, uint64_t generation,
                bool classify_mime = false);
+  void create_directory(std::string path, uint64_t generation,
+                        uint64_t request_id);
   void stop();
 
 private:

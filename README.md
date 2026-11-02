@@ -29,6 +29,10 @@ offers disconnect only for network mounts owned by
 Local file browsing remains available when either storage service is
 unavailable. Closing the browser never unmounts a volume or network location.
 The window follows the active Plainroot appearance theme through the toolkit.
+The New folder action reveals an inline name field and creates exactly one
+directory asynchronously through `plainroot-core`, so slow mounted filesystems
+do not block the chooser. It rejects path components, reports collisions and
+filesystem errors, then refreshes the current listing.
 
 The build also includes an unregistered `plainroot-filechooser-portal`
 prototype. It exports the portal FileChooser and Request interfaces through

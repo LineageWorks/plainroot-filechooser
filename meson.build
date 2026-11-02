@@ -12,7 +12,7 @@ project(
 )
 
 toolkit_dep = dependency('plainroot-toolkit', version: '>= 0.21.0')
-core_dep = dependency('plainroot-core', version: '>= 0.7.0')
+core_dep = dependency('plainroot-core', version: '>= 0.8.0')
 i18n_dep = dependency('plainroot-i18n', version: '>= 0.1.0')
 storage_dep = dependency('plainroot-storage-client', version: '>= 0.1.0')
 network_storage_dep = dependency(

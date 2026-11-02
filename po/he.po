@@ -351,3 +351,45 @@ msgstr "לא ניתן לבדוק את הקובץ שנבחר."
 
 msgid "File name entered. Choose Open to check it."
 msgstr "הוזן שם קובץ. בחרו בפתיחה כדי לבדוק אותו."
+
+msgid "New folder"
+msgstr "תיקייה חדשה"
+
+msgid "Folder name"
+msgstr "שם התיקייה"
+
+msgid "Create"
+msgstr "יצירה"
+
+msgid "Enter a folder name."
+msgstr "יש להזין שם תיקייה."
+
+msgid "Use a folder name without slashes or dot components."
+msgstr "יש להשתמש בשם תיקייה ללא לוכסנים או רכיבי נקודה."
+
+msgid "Folder name is too long."
+msgstr "שם התיקייה ארוך מדי."
+
+msgid "Unable to create the folder."
+msgstr "לא ניתן ליצור את התיקייה."
+
+msgid "An item with this name already exists."
+msgstr "קובץ או תיקייה בשם זה כבר קיימים."
+
+msgid "You do not have permission to create a folder here."
+msgstr "אין לך הרשאה ליצור תיקייה כאן."
+
+msgid "This location is read-only."
+msgstr "המיקום הזה לקריאה בלבד."
+
+msgid "There is not enough space to create a folder."
+msgstr "אין מספיק מקום ליצירת תיקייה."
+
+msgid "The current folder is no longer available."
+msgstr "התיקייה הנוכחית אינה זמינה עוד."
+
+msgid "Folder created."
+msgstr "התיקייה נוצרה."
+
+msgid "Creating folder…"
+msgstr "התיקייה נוצרת…"

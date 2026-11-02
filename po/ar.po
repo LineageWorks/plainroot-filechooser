@@ -352,3 +352,45 @@ msgstr "تعذّر التحقق من الملف المحدد."
 
 msgid "File name entered. Choose Open to check it."
 msgstr "تم إدخال اسم الملف. اختر فتح للتحقق منه."
+
+msgid "New folder"
+msgstr "مجلد جديد"
+
+msgid "Folder name"
+msgstr "اسم المجلد"
+
+msgid "Create"
+msgstr "إنشاء"
+
+msgid "Enter a folder name."
+msgstr "أدخل اسمًا للمجلد."
+
+msgid "Use a folder name without slashes or dot components."
+msgstr "استخدم اسم مجلد من دون شرطات مائلة أو مكونات «.» و«..»."
+
+msgid "Folder name is too long."
+msgstr "اسم المجلد طويل جدًا."
+
+msgid "Unable to create the folder."
+msgstr "تعذّر إنشاء المجلد."
+
+msgid "An item with this name already exists."
+msgstr "يوجد ملف أو مجلد بهذا الاسم بالفعل."
+
+msgid "You do not have permission to create a folder here."
+msgstr "لا تملك صلاحية إنشاء مجلد هنا."
+
+msgid "This location is read-only."
+msgstr "هذا الموقع للقراءة فقط."
+
+msgid "There is not enough space to create a folder."
+msgstr "لا توجد مساحة كافية لإنشاء مجلد."
+
+msgid "The current folder is no longer available."
+msgstr "المجلد الحالي لم يعد متاحًا."
+
+msgid "Folder created."
+msgstr "تم إنشاء المجلد."
+
+msgid "Creating folder…"
+msgstr "جارٍ إنشاء المجلد…"

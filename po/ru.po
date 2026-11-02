@@ -352,3 +352,45 @@ msgstr "Не удалось проверить выбранный файл."
 
 msgid "File name entered. Choose Open to check it."
 msgstr "Имя файла введено. Нажмите «Открыть», чтобы проверить его."
+
+msgid "New folder"
+msgstr "Новая папка"
+
+msgid "Folder name"
+msgstr "Имя папки"
+
+msgid "Create"
+msgstr "Создать"
+
+msgid "Enter a folder name."
+msgstr "Введите имя папки."
+
+msgid "Use a folder name without slashes or dot components."
+msgstr "Введите имя папки без косых черт и компонентов «.» или «..»."
+
+msgid "Folder name is too long."
+msgstr "Имя папки слишком длинное."
+
+msgid "Unable to create the folder."
+msgstr "Не удалось создать папку."
+
+msgid "An item with this name already exists."
+msgstr "Файл или папка с таким именем уже существует."
+
+msgid "You do not have permission to create a folder here."
+msgstr "У вас нет разрешения создавать папки в этом месте."
+
+msgid "This location is read-only."
+msgstr "Это расположение доступно только для чтения."
+
+msgid "There is not enough space to create a folder."
+msgstr "Недостаточно места для создания папки."
+
+msgid "The current folder is no longer available."
+msgstr "Текущая папка больше недоступна."
+
+msgid "Folder created."
+msgstr "Папка создана."
+
+msgid "Creating folder…"
+msgstr "Создание папки…"

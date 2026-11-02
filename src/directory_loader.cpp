@@ -4,6 +4,8 @@
 
 #include <atomic>
 #include <cerrno>
+#include <deque>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <new>
@@ -42,11 +44,45 @@ public:
         return;
       latest_generation_.store(generation, std::memory_order_release);
       failed = startup_failed_.load(std::memory_order_relaxed);
-      if (!failed)
-        jobs_.push_back({std::move(path), generation, classify_mime});
+      if (!failed) {
+        std::erase_if(jobs_, [](const Job &job) {
+          return job.operation == DirectoryResult::Operation::Listing;
+        });
+        jobs_.push_back({DirectoryResult::Operation::Listing,
+                         std::move(path), generation, 0, classify_mime});
+      }
     }
     if (failed) {
-      publish({generation, std::move(path), PLAINROOT_CORE_FS_IO_ERROR, 0, {}});
+      DirectoryResult result{};
+      result.generation = generation;
+      result.path = std::move(path);
+      result.result = PLAINROOT_CORE_FS_IO_ERROR;
+      publish(std::move(result));
+      return;
+    }
+    wake_worker();
+  }
+
+  void create_directory(std::string path, uint64_t generation,
+                        uint64_t request_id) {
+    bool failed = false;
+    {
+      std::lock_guard lock(mutex_);
+      if (stopping_)
+        return;
+      failed = startup_failed_.load(std::memory_order_relaxed);
+      if (!failed)
+        jobs_.push_back({DirectoryResult::Operation::CreateDirectory,
+                         std::move(path), generation, request_id, false});
+    }
+    if (failed) {
+      DirectoryResult result{};
+      result.operation = DirectoryResult::Operation::CreateDirectory;
+      result.generation = generation;
+      result.request_id = request_id;
+      result.path = std::move(path);
+      result.result = PLAINROOT_CORE_FS_IO_ERROR;
+      publish(std::move(result));
       return;
     }
     wake_worker();
@@ -71,8 +107,11 @@ public:
 
 private:
   struct Job {
+    DirectoryResult::Operation operation =
+        DirectoryResult::Operation::Listing;
     std::string path;
     uint64_t generation = 0;
+    uint64_t request_id = 0;
     bool classify_mime = false;
   };
 
@@ -114,14 +153,17 @@ private:
     auto &pending = *static_cast<Pending *>(user_data);
     DirectoryResult delivery{};
     delivery.generation = pending.job.generation;
+    delivery.request_id = pending.job.request_id;
     delivery.path = pending.job.path;
     delivery.result = result;
     delivery.native_code = native_code;
+    delivery.operation = pending.job.operation;
     delivery.mime_classified = pending.job.classify_mime;
     delivery.mime_database_available =
         pending.owner->mime_database_ != nullptr &&
         pending.owner->mime_database_->available();
-    if (result == PLAINROOT_CORE_FS_OK) {
+    if (result == PLAINROOT_CORE_FS_OK &&
+        pending.job.operation == DirectoryResult::Operation::Listing) {
       plainroot_core_fs_listing *listing = nullptr;
       delivery.result =
           plainroot_core_fs_async_request_take_listing_v1(request, &listing);
@@ -186,11 +228,40 @@ private:
     std::lock_guard lock(mutex_);
     *stopping = stopping_;
     std::vector<Job> jobs;
-    if (!jobs_.empty()) {
-      jobs.push_back(std::move(jobs_.back()));
-      jobs_.clear();
-    }
+    jobs.assign(std::make_move_iterator(jobs_.begin()),
+                std::make_move_iterator(jobs_.end()));
+    jobs_.clear();
     return jobs;
+  }
+
+  void submit_job(plainroot_core_fs_async_executor *executor, Job job,
+                  std::vector<std::unique_ptr<Pending>> *pending) {
+    auto next = std::make_unique<Pending>();
+    next->owner = this;
+    next->job = std::move(job);
+    plainroot_core_fs_path_v1 path{};
+    path.struct_size = sizeof(path);
+    path.data = next->job.path.data();
+    path.size = next->job.path.size();
+    const auto submitted =
+        next->job.operation == DirectoryResult::Operation::CreateDirectory
+            ? plainroot_core_fs_async_create_directory_v1(
+                  executor, &path, &Impl::completed, next.get(),
+                  &next->request)
+            : plainroot_core_fs_async_list_directory_v1(
+                  executor, &path, &Impl::completed, next.get(),
+                  &next->request);
+    if (submitted == PLAINROOT_CORE_FS_OK) {
+      pending->push_back(std::move(next));
+    } else {
+      DirectoryResult result{};
+      result.operation = next->job.operation;
+      result.generation = next->job.generation;
+      result.request_id = next->job.request_id;
+      result.path = next->job.path;
+      result.result = submitted;
+      publish(std::move(result));
+    }
   }
 
   static void
@@ -226,14 +297,20 @@ private:
     const auto created = plainroot_core_fs_async_executor_create_v1(
         &options, nullptr, nullptr, &executor, nullptr);
     if (created != PLAINROOT_CORE_FS_OK || executor == nullptr) {
-      std::vector<Job> failed_jobs;
+      std::deque<Job> failed_jobs;
       {
         std::lock_guard lock(mutex_);
         startup_failed_.store(true, std::memory_order_release);
         failed_jobs.swap(jobs_);
       }
       for (const Job &job : failed_jobs) {
-        publish({job.generation, job.path, PLAINROOT_CORE_FS_IO_ERROR, 0, {}});
+        DirectoryResult result{};
+        result.operation = job.operation;
+        result.generation = job.generation;
+        result.request_id = job.request_id;
+        result.path = job.path;
+        result.result = PLAINROOT_CORE_FS_IO_ERROR;
+        publish(std::move(result));
       }
       return;
     }
@@ -257,24 +334,16 @@ private:
         auto jobs = take_jobs(&stopping);
         if (stopping)
           break;
-        if (!jobs.empty()) {
-          for (const auto &existing : pending)
-            (void)plainroot_core_fs_async_request_cancel_v1(existing->request);
-          Job job = std::move(jobs.back());
-          auto next = std::make_unique<Pending>();
-          next->owner = this;
-          next->job = std::move(job);
-          plainroot_core_fs_path_v1 path{};
-          path.struct_size = sizeof(path);
-          path.data = next->job.path.data();
-          path.size = next->job.path.size();
-          const auto submitted = plainroot_core_fs_async_list_directory_v1(
-              executor, &path, &Impl::completed, next.get(), &next->request);
-          if (submitted == PLAINROOT_CORE_FS_OK) {
-            pending.push_back(std::move(next));
-          } else {
-            publish({next->job.generation, next->job.path, submitted, 0, {}});
+        for (Job &job : jobs) {
+          if (job.operation == DirectoryResult::Operation::Listing) {
+            for (const auto &existing : pending) {
+              if (existing->job.operation ==
+                  DirectoryResult::Operation::Listing)
+                (void)plainroot_core_fs_async_request_cancel_v1(
+                    existing->request);
+            }
           }
+          submit_job(executor, std::move(job), &pending);
         }
       }
 
@@ -300,7 +369,7 @@ private:
   int notification_fd_ = -1;
   std::thread worker_;
   std::mutex mutex_;
-  std::vector<Job> jobs_;
+  std::deque<Job> jobs_;
   std::unique_ptr<MimeDatabase> mime_database_;
   std::atomic<uint64_t> latest_generation_{0};
   bool stopping_ = false;
@@ -319,6 +388,12 @@ void DirectoryLoader::request(std::string path, uint64_t generation,
                               bool classify_mime) {
   if (impl_)
     impl_->request(std::move(path), generation, classify_mime);
+}
+
+void DirectoryLoader::create_directory(std::string path, uint64_t generation,
+                                       uint64_t request_id) {
+  if (impl_)
+    impl_->create_directory(std::move(path), generation, request_id);
 }
 
 void DirectoryLoader::stop() {

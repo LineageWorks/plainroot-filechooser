@@ -351,3 +351,45 @@ msgstr "Die ausgewählte Datei kann nicht überprüft werden."
 
 msgid "File name entered. Choose Open to check it."
 msgstr "Dateiname eingegeben. Wählen Sie Öffnen, um ihn zu prüfen."
+
+msgid "New folder"
+msgstr "Neuer Ordner"
+
+msgid "Folder name"
+msgstr "Ordnername"
+
+msgid "Create"
+msgstr "Erstellen"
+
+msgid "Enter a folder name."
+msgstr "Geben Sie einen Ordnernamen ein."
+
+msgid "Use a folder name without slashes or dot components."
+msgstr "Verwenden Sie einen Ordnernamen ohne Schrägstriche oder Punktkomponenten."
+
+msgid "Folder name is too long."
+msgstr "Der Ordnername ist zu lang."
+
+msgid "Unable to create the folder."
+msgstr "Der Ordner kann nicht erstellt werden."
+
+msgid "An item with this name already exists."
+msgstr "Eine Datei oder ein Ordner mit diesem Namen existiert bereits."
+
+msgid "You do not have permission to create a folder here."
+msgstr "Sie haben keine Berechtigung, hier einen Ordner zu erstellen."
+
+msgid "This location is read-only."
+msgstr "Dieser Speicherort ist schreibgeschützt."
+
+msgid "There is not enough space to create a folder."
+msgstr "Es ist nicht genug Speicherplatz vorhanden, um einen Ordner zu erstellen."
+
+msgid "The current folder is no longer available."
+msgstr "Der aktuelle Ordner ist nicht mehr verfügbar."
+
+msgid "Folder created."
+msgstr "Ordner erstellt."
+
+msgid "Creating folder…"
+msgstr "Ordner wird erstellt …"

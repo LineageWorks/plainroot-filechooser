@@ -9,6 +9,7 @@
 #include "storage_locations_view.hpp"
 
 #include <plainroot/i18n/i18n.h>
+#include <plainroot/ui/style.h>
 
 #include <glib.h>
 
@@ -166,6 +167,8 @@ public:
         context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
     auto *up = make_button("Up", &Impl::up_activated);
     auto *home = make_button("Home", &Impl::home_activated);
+    new_folder_button_ =
+        make_button("New folder", &Impl::new_folder_activated);
     breadcrumb_scroll_ =
         plainroot_ui_horizontal_scroll_area_create_v1(context_, 0.0F, 1.0F);
     breadcrumb_strip_ = plainroot_ui_box_create_v1(
@@ -253,6 +256,29 @@ public:
             filename_field_, PLAINROOT_UI_TEXT_LTR);
     }
 
+    auto *new_folder_actions = plainroot_ui_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
+    new_folder_form_ = plainroot_ui_adaptive_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
+        560.0F, 8.0F, 0.0F);
+    const std::string folder_name_hint = tr("Folder name");
+    new_folder_field_ = plainroot_ui_text_field_create_v1(
+        context_, "", 0, folder_name_hint.c_str(),
+        static_cast<uint32_t>(folder_name_hint.size()), NAME_MAX, 1.0F,
+        nullptr, nullptr);
+    new_folder_create_button_ =
+        make_button("Create", &Impl::create_folder_activated);
+    new_folder_cancel_button_ =
+        make_button("Cancel", &Impl::cancel_create_folder_activated);
+    if (new_folder_create_button_ != nullptr)
+      (void)plainroot_ui_button_set_style_v1(
+          new_folder_create_button_, PLAINROOT_UI_BUTTON_STYLE_FILLED);
+    if (new_folder_field_ != nullptr)
+      (void)plainroot_ui_widget_set_text_direction_v1(
+          new_folder_field_, PLAINROOT_UI_TEXT_LTR);
+    if (new_folder_form_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(new_folder_form_, 0U);
+
     list_scroll_ =
         plainroot_ui_vertical_scroll_area_create_v1(context_, 0, 0, 1.0F);
     entries_list_ = plainroot_ui_list_create_v1(context_, 1.0F);
@@ -292,6 +318,10 @@ public:
     if (outer == nullptr || padding == nullptr || page == nullptr ||
         title == nullptr || location_row == nullptr ||
         location_actions == nullptr || up == nullptr || home == nullptr ||
+        new_folder_button_ == nullptr || new_folder_form_ == nullptr ||
+        new_folder_actions == nullptr || new_folder_field_ == nullptr ||
+        new_folder_create_button_ == nullptr ||
+        new_folder_cancel_button_ == nullptr ||
         storage_view_widget == nullptr || breadcrumb_scroll_ == nullptr ||
         breadcrumb_strip_ == nullptr || controls == nullptr ||
         search_field_ == nullptr || hidden_switch_ == nullptr ||
@@ -423,6 +453,12 @@ public:
         (save_files_panel != nullptr && !add(page, save_files_panel)) ||
         !add(location_row, location_actions) ||
         !add(location_actions, up) || !add(location_actions, home) ||
+        !add(location_actions, new_folder_button_) ||
+        !add(page, new_folder_form_) ||
+        !add(new_folder_form_, new_folder_field_) ||
+        !add(new_folder_form_, new_folder_actions) ||
+        !add(new_folder_actions, new_folder_create_button_) ||
+        !add(new_folder_actions, new_folder_cancel_button_) ||
         (show_filename_entry &&
          (!add(page, filename_row) || !add(filename_row, filename_label) ||
           !add(filename_row, filename_field_))) ||
@@ -529,7 +565,15 @@ public:
       set_status(tr("Choose an absolute directory path."));
       return;
     }
+    ++folder_create_request_id_;
+    folder_creation_pending_ = false;
+    set_folder_creation_controls_enabled(true);
+    if (new_folder_field_ != nullptr)
+      (void)plainroot_ui_widget_set_text_v1(new_folder_field_, "", 0U);
+    if (new_folder_form_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(new_folder_form_, 0U);
     current_path_ = std::move(path);
+    new_folder_created_ = false;
     render_breadcrumbs();
     if (!save_file_ && filename_field_ != nullptr) {
       initial_filename_.clear();
@@ -567,6 +611,18 @@ private:
     loader_.request(current_path_, generation_, selected_filter_has_mime());
     schedule_render();
     request_redraw();
+  }
+
+  void set_folder_creation_controls_enabled(bool enabled) {
+    const uint32_t value = enabled ? 1U : 0U;
+    if (new_folder_button_ != nullptr)
+      (void)plainroot_ui_widget_set_enabled_v1(new_folder_button_, value);
+    if (new_folder_field_ != nullptr)
+      (void)plainroot_ui_widget_set_enabled_v1(new_folder_field_, value);
+    if (new_folder_create_button_ != nullptr)
+      (void)plainroot_ui_widget_set_enabled_v1(new_folder_create_button_, value);
+    if (new_folder_cancel_button_ != nullptr)
+      (void)plainroot_ui_widget_set_enabled_v1(new_folder_cancel_button_, value);
   }
 
   using ButtonCallback = void (*)(void *, plainroot_ui_widget *);
@@ -608,6 +664,119 @@ private:
     auto &self = *static_cast<Impl *>(user_data);
     const char *home = std::getenv("HOME");
     self.navigate(home != nullptr && home[0] == '/' ? home : "/");
+  }
+
+  static void new_folder_activated(void *user_data, plainroot_ui_widget *) {
+    auto &self = *static_cast<Impl *>(user_data);
+    if (self.folder_creation_pending_)
+      return;
+    uint8_t visible = 0;
+    if (self.new_folder_form_ == nullptr ||
+        plainroot_ui_widget_get_visible_v1(self.new_folder_form_, &visible) !=
+            PLAINROOT_UI_RESULT_OK)
+      return;
+    if (plainroot_ui_widget_set_visible_v1(self.new_folder_form_,
+                                           visible == 0U ? 1U : 0U) !=
+        PLAINROOT_UI_RESULT_OK)
+      return;
+    if (visible == 0U)
+      self.set_status("");
+    self.request_redraw();
+  }
+
+  static void cancel_create_folder_activated(void *user_data,
+                                             plainroot_ui_widget *) {
+    auto &self = *static_cast<Impl *>(user_data);
+    if (self.folder_creation_pending_)
+      return;
+    ++self.folder_create_request_id_;
+    self.folder_creation_pending_ = false;
+    if (self.new_folder_field_ != nullptr)
+      (void)plainroot_ui_widget_set_text_v1(self.new_folder_field_, "", 0U);
+    if (self.new_folder_form_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(self.new_folder_form_, 0U);
+    self.set_status("");
+    self.request_redraw();
+  }
+
+  static void create_folder_activated(void *user_data, plainroot_ui_widget *) {
+    auto &self = *static_cast<Impl *>(user_data);
+    if (self.folder_creation_pending_)
+      return;
+    const char *value = nullptr;
+    uint32_t length = 0;
+    if (self.new_folder_field_ == nullptr ||
+        plainroot_ui_text_field_get_text_v1(self.new_folder_field_, &value,
+                                            &length) !=
+            PLAINROOT_UI_RESULT_OK ||
+        (value == nullptr && length != 0U)) {
+      self.set_status(tr("Unable to create the folder."));
+      self.request_redraw();
+      return;
+    }
+
+    const std::string name(value == nullptr ? "" : value, length);
+    if (name.empty()) {
+      self.set_status(tr("Enter a folder name."));
+      self.request_redraw();
+      return;
+    }
+    if (name == "." || name == ".." || name.find('/') != std::string::npos) {
+      self.set_status(
+          tr("Use a folder name without slashes or dot components."));
+      self.request_redraw();
+      return;
+    }
+    if (name.size() > NAME_MAX) {
+      self.set_status(tr("Folder name is too long."));
+      self.request_redraw();
+      return;
+    }
+
+    const std::string target = join_path(self.current_path_, name);
+    self.folder_creation_pending_ = true;
+    self.set_folder_creation_controls_enabled(false);
+    const uint64_t request_id = ++self.folder_create_request_id_;
+    self.loader_.create_directory(target, self.generation_, request_id);
+    self.set_status(tr("Creating folder…"));
+    self.request_redraw();
+  }
+
+  static const char *create_folder_error_message(
+      plainroot_core_fs_result_v1 result) {
+    if (result == PLAINROOT_CORE_FS_ALREADY_EXISTS)
+      return "An item with this name already exists.";
+    if (result == PLAINROOT_CORE_FS_PERMISSION_DENIED)
+      return "You do not have permission to create a folder here.";
+    if (result == PLAINROOT_CORE_FS_READ_ONLY)
+      return "This location is read-only.";
+    if (result == PLAINROOT_CORE_FS_NO_SPACE)
+      return "There is not enough space to create a folder.";
+    if (result == PLAINROOT_CORE_FS_NOT_FOUND ||
+        result == PLAINROOT_CORE_FS_NOT_DIRECTORY)
+      return "The current folder is no longer available.";
+    return "Unable to create the folder.";
+  }
+
+  void apply_create_folder_result(detail::DirectoryResult result) {
+    if (result.generation != generation_ ||
+        result.request_id != folder_create_request_id_ ||
+        !folder_creation_pending_)
+      return;
+    folder_creation_pending_ = false;
+    set_folder_creation_controls_enabled(true);
+    if (result.result != PLAINROOT_CORE_FS_OK) {
+      set_status(tr(create_folder_error_message(result.result)));
+      request_redraw();
+      return;
+    }
+
+    (void)plainroot_ui_widget_set_text_v1(new_folder_field_, "", 0U);
+    (void)plainroot_ui_widget_set_visible_v1(new_folder_form_, 0U);
+    new_folder_created_ = true;
+    request_directory_load(true);
+    set_status(tr("Folder created."));
+    request_redraw();
   }
 
   static void search_changed(void *user_data, plainroot_ui_widget *widget) {
@@ -1105,6 +1274,11 @@ private:
   }
 
   void apply_directory_result(detail::DirectoryResult result) {
+    if (result.operation ==
+        detail::DirectoryResult::Operation::CreateDirectory) {
+      apply_create_folder_result(std::move(result));
+      return;
+    }
     if (result.generation != generation_)
       return;
     directory_loading_ = false;
@@ -1113,8 +1287,14 @@ private:
       entries_mime_classified_ = result.mime_classified;
       mime_database_available_ = result.mime_database_available;
       status_error_.clear();
-      set_status(entries_.empty() ? tr("This folder is empty.") : "");
+      if (new_folder_created_) {
+        set_status(tr("Folder created."));
+        new_folder_created_ = false;
+      } else {
+        set_status(entries_.empty() ? tr("This folder is empty.") : "");
+      }
     } else {
+      new_folder_created_ = false;
       entries_.clear();
       if (result.native_code == 0) {
         status_error_ = tr("Unable to read this folder.");
@@ -1616,6 +1796,8 @@ private:
   bool initializing_choice_controls_ = false;
   bool overwrite_dialog_open_ = false;
   bool overwrite_confirmed_ = false;
+  bool new_folder_created_ = false;
+  bool folder_creation_pending_ = false;
   bool directory_loading_ = false;
   bool entries_mime_classified_ = false;
   bool mime_database_available_ = false;
@@ -1623,6 +1805,7 @@ private:
   detail::DirectorySortOrder sort_order_ =
       detail::DirectorySortOrder::name_ascending;
   uint64_t generation_ = 0;
+  uint64_t folder_create_request_id_ = 0;
   std::string current_path_;
   std::string search_query_;
   std::string initial_filename_;
@@ -1643,6 +1826,11 @@ private:
   std::vector<plainroot_ui_widget *> choice_widgets_;
   plainroot_ui_widget *breadcrumb_scroll_ = nullptr;
   plainroot_ui_widget *breadcrumb_strip_ = nullptr;
+  plainroot_ui_widget *new_folder_button_ = nullptr;
+  plainroot_ui_widget *new_folder_form_ = nullptr;
+  plainroot_ui_widget *new_folder_field_ = nullptr;
+  plainroot_ui_widget *new_folder_create_button_ = nullptr;
+  plainroot_ui_widget *new_folder_cancel_button_ = nullptr;
   plainroot_ui_widget *filename_field_ = nullptr;
   plainroot_ui_widget *search_field_ = nullptr;
   plainroot_ui_widget *hidden_switch_ = nullptr;
