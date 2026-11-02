@@ -25,6 +25,7 @@ systemd_dep = dependency('libsystemd')
 
 browser_sources = [
   'src/browser_controller.cpp',
+  'src/directory_breadcrumbs.cpp',
   'src/directory_sort.cpp',
   'src/directory_loader.cpp',
   'src/open_filename.cpp',
@@ -87,6 +88,16 @@ directory_sort_test = executable(
   install: false,
 )
 test('FileChooser directory sorting', directory_sort_test)
+
+directory_breadcrumbs_test = executable(
+  'filechooser-directory-breadcrumbs-test',
+  [
+    'tests/directory_breadcrumbs_test.cpp',
+    'src/directory_breadcrumbs.cpp',
+  ],
+  install: false,
+)
+test('FileChooser directory breadcrumbs', directory_breadcrumbs_test)
 
 open_filename_test = executable(
   'filechooser-open-filename-test',

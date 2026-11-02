@@ -11,7 +11,8 @@ must stay free of GIO.
 The `plainroot-filechooser-browser` executable is an integration prototype for
 the local browser UI. It uses `plainroot-toolkit` for its window and widgets and
 `plainroot-core` asynchronous filesystem listing for directory navigation.
-Search is applied to the displayed listing, hidden entries can be shown, and
+The current folder path uses clickable ancestor breadcrumbs. Search is applied
+to the displayed listing, hidden entries can be shown, and
 the listing supports locale-aware, natural filename ordering in either
 direction while keeping directories first. Single-file open and save modes
 provide an editable filename field; open requests validate a typed name in the

@@ -1,5 +1,6 @@
 #include "browser_controller.hpp"
 
+#include "directory_breadcrumbs.hpp"
 #include "directory_loader.hpp"
 #include "directory_sort.hpp"
 #include "open_filename.hpp"
@@ -17,6 +18,7 @@
 #include <cstdlib>
 #include <fnmatch.h>
 #include <limits.h>
+#include <limits>
 #include <memory>
 #include <cstring>
 #include <sys/stat.h>
@@ -104,6 +106,11 @@ public:
     plainroot_core_fs_entry_kind_v1 kind = PLAINROOT_CORE_FS_ENTRY_UNKNOWN;
   };
 
+  struct BreadcrumbAction {
+    Impl *controller = nullptr;
+    std::string path;
+  };
+
   bool create_ui() {
     auto *outer =
         plainroot_ui_vertical_scroll_area_create_v1(context_, 0, 0, 1.0F);
@@ -150,13 +157,15 @@ public:
         context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
     auto *up = make_button("Up", &Impl::up_activated);
     auto *home = make_button("Home", &Impl::home_activated);
-    const std::string initial_path = tr("Loading folder…");
-    path_label_ =
-        plainroot_ui_label_create_v1(context_, initial_path.c_str(),
-                                     static_cast<uint32_t>(initial_path.size()),
-                                     PLAINROOT_UI_COLOR_ON_SURFACE_V3, 1.0F);
-    if (path_label_ != nullptr)
-      (void)plainroot_ui_widget_set_text_direction_v1(path_label_,
+    breadcrumb_scroll_ =
+        plainroot_ui_horizontal_scroll_area_create_v1(context_, 0.0F, 1.0F);
+    breadcrumb_strip_ = plainroot_ui_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_HORIZONTAL, 4.0F, 0.0F);
+    if (breadcrumb_scroll_ != nullptr)
+      (void)plainroot_ui_widget_set_text_direction_v1(breadcrumb_scroll_,
+                                                      PLAINROOT_UI_TEXT_LTR);
+    if (breadcrumb_strip_ != nullptr)
+      (void)plainroot_ui_widget_set_text_direction_v1(breadcrumb_strip_,
                                                       PLAINROOT_UI_TEXT_LTR);
 
     auto *controls = plainroot_ui_adaptive_box_create_v1(
@@ -240,9 +249,10 @@ public:
     if (outer == nullptr || padding == nullptr || page == nullptr ||
         title == nullptr || location_row == nullptr ||
         location_actions == nullptr || up == nullptr || home == nullptr ||
-        storage_view_widget == nullptr || path_label_ == nullptr ||
-        controls == nullptr || search_field_ == nullptr ||
-        hidden_switch_ == nullptr || sort_dropdown_ == nullptr ||
+        storage_view_widget == nullptr || breadcrumb_scroll_ == nullptr ||
+        breadcrumb_strip_ == nullptr || controls == nullptr ||
+        search_field_ == nullptr || hidden_switch_ == nullptr ||
+        sort_dropdown_ == nullptr ||
         (filters_.size() > 1U && filter_dropdown_ == nullptr) ||
         list_scroll_ == nullptr || entries_list_ == nullptr ||
         status_label_ == nullptr || footer == nullptr ||
@@ -294,7 +304,8 @@ public:
         (show_filename_entry &&
          (!add(page, filename_row) || !add(filename_row, filename_label) ||
           !add(filename_row, filename_field_))) ||
-        !add(location_row, path_label_) || !add(page, controls) ||
+        !add(location_row, breadcrumb_scroll_) ||
+        !add(breadcrumb_scroll_, breadcrumb_strip_) || !add(page, controls) ||
         !add(controls, search_field_) || !add(controls, hidden_switch_) ||
         !add(controls, sort_dropdown_) ||
         (filter_dropdown_ != nullptr && !add(controls, filter_dropdown_)) ||
@@ -378,12 +389,12 @@ public:
     current_path_ = std::move(path);
     selected_path_.clear();
     selected_paths_.clear();
+    render_breadcrumbs();
     if (!save_file_ && filename_field_ != nullptr) {
       initial_filename_.clear();
       set_label(filename_field_, initial_filename_);
     }
     ++generation_;
-    set_label(path_label_, display_path(current_path_));
     if (allow_multiple_) {
       update_selection_summary();
     } else {
@@ -560,6 +571,13 @@ private:
     action.controller->request_redraw();
   }
 
+  static void breadcrumb_activated(void *user_data, plainroot_ui_widget *) {
+    const auto &action = *static_cast<BreadcrumbAction *>(user_data);
+    auto *controller = action.controller;
+    std::string path = action.path;
+    controller->navigate(std::move(path));
+  }
+
   static void selection_changed(void *user_data, plainroot_ui_widget *widget) {
     auto &action = *static_cast<EntryAction *>(user_data);
     if (action.controller == nullptr || widget == nullptr)
@@ -698,6 +716,95 @@ private:
       set_status(tr("Unable to check the selected file."));
       break;
     }
+    request_redraw();
+  }
+
+  void render_breadcrumbs() {
+    if (breadcrumb_strip_ == nullptr)
+      return;
+
+    for (plainroot_ui_widget *child : breadcrumb_widgets_) {
+      (void)plainroot_ui_widget_remove_child_v1(breadcrumb_strip_, child);
+      (void)plainroot_ui_widget_destroy_subtree_v1(child);
+    }
+    breadcrumb_widgets_.clear();
+    breadcrumb_actions_.clear();
+
+    const auto breadcrumbs = detail::directory_breadcrumbs(current_path_);
+    if (breadcrumbs.empty())
+      return;
+    breadcrumb_widgets_.reserve(breadcrumbs.size() * 2U - 1U);
+    breadcrumb_actions_.reserve(breadcrumbs.size() - 1U);
+
+    const auto add_widget = [this](plainroot_ui_widget *widget) {
+      if (widget == nullptr ||
+          plainroot_ui_widget_add_child_v1(breadcrumb_strip_, widget) !=
+              PLAINROOT_UI_RESULT_OK) {
+        if (widget != nullptr)
+          (void)plainroot_ui_widget_destroy_subtree_v1(widget);
+        return false;
+      }
+      breadcrumb_widgets_.push_back(widget);
+      return true;
+    };
+    const auto add_separator = [this, &add_widget]() {
+      constexpr std::string_view separator = "›";
+      auto *widget = plainroot_ui_label_create_v1(
+          context_, separator.data(), static_cast<uint32_t>(separator.size()),
+          PLAINROOT_UI_COLOR_ON_SURFACE_VARIANT_V3, 0.0F);
+      if (widget != nullptr)
+        (void)plainroot_ui_widget_set_text_direction_v1(widget,
+                                                        PLAINROOT_UI_TEXT_LTR);
+      return add_widget(widget);
+    };
+    const auto add_ancestor = [this, &add_widget](const std::string &label,
+                                                  const std::string &path) {
+      auto action = std::make_unique<BreadcrumbAction>();
+      action->controller = this;
+      action->path = path;
+      auto *button = plainroot_ui_button_create_v1(
+          context_, label.c_str(), static_cast<uint32_t>(label.size()), 0.0F,
+          &Impl::breadcrumb_activated, action.get());
+      if (button == nullptr || plainroot_ui_button_set_style_v1(
+                                   button, PLAINROOT_UI_BUTTON_STYLE_TEXT) !=
+                                   PLAINROOT_UI_RESULT_OK) {
+        if (button != nullptr)
+          (void)plainroot_ui_widget_destroy_subtree_v1(button);
+        return false;
+      }
+      (void)plainroot_ui_widget_set_text_direction_v1(button,
+                                                      PLAINROOT_UI_TEXT_LTR);
+      if (!add_widget(button))
+        return false;
+      breadcrumb_actions_.push_back(std::move(action));
+      return true;
+    };
+    const auto add_current = [this, &add_widget](const std::string &label) {
+      auto *widget = plainroot_ui_label_create_v1(
+          context_, label.c_str(), static_cast<uint32_t>(label.size()),
+          PLAINROOT_UI_COLOR_ON_SURFACE_V3, 0.0F);
+      if (widget != nullptr)
+        (void)plainroot_ui_widget_set_text_direction_v1(widget,
+                                                        PLAINROOT_UI_TEXT_LTR);
+      return add_widget(widget);
+    };
+
+    for (size_t index = 0; index < breadcrumbs.size(); ++index) {
+      if (index != 0U && !add_separator())
+        break;
+      const detail::DirectoryBreadcrumb &breadcrumb = breadcrumbs[index];
+      const std::string label = display_path(breadcrumb.name);
+      const bool added = breadcrumb.current
+                             ? add_current(label)
+                             : add_ancestor(label, breadcrumb.path);
+      if (!added)
+        break;
+    }
+
+    // The active folder stays visible when a deep path overflows the viewport.
+    // Layout clamps this pending offset to the new content extent.
+    (void)plainroot_ui_scroll_area_set_offset_v1(
+        breadcrumb_scroll_, std::numeric_limits<float>::max(), 0.0F);
     request_redraw();
   }
 
@@ -1300,7 +1407,10 @@ private:
   std::vector<detail::DirectoryEntry> entries_;
   std::vector<plainroot_ui_widget *> rows_;
   std::vector<std::unique_ptr<EntryAction>> actions_;
-  plainroot_ui_widget *path_label_ = nullptr;
+  std::vector<plainroot_ui_widget *> breadcrumb_widgets_;
+  std::vector<std::unique_ptr<BreadcrumbAction>> breadcrumb_actions_;
+  plainroot_ui_widget *breadcrumb_scroll_ = nullptr;
+  plainroot_ui_widget *breadcrumb_strip_ = nullptr;
   plainroot_ui_widget *filename_field_ = nullptr;
   plainroot_ui_widget *search_field_ = nullptr;
   plainroot_ui_widget *hidden_switch_ = nullptr;
