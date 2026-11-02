@@ -22,6 +22,9 @@ msgstr "קבצים שנבחרו: %s"
 msgid "Selected files"
 msgstr "קבצים שנבחרו"
 
+msgid "Unable to read the selected options."
+msgstr "לא ניתן לקרוא את האפשרויות שנבחרו."
+
 msgid "Select at least one file."
 msgstr "יש לבחור קובץ אחד לפחות."
 

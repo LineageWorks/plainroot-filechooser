@@ -22,6 +22,9 @@ msgstr "Ausgewählte Dateien: %s"
 msgid "Selected files"
 msgstr "Ausgewählte Dateien"
 
+msgid "Unable to read the selected options."
+msgstr "Die ausgewählten Optionen können nicht gelesen werden."
+
 msgid "Select at least one file."
 msgstr "Wählen Sie mindestens eine Datei aus."
 

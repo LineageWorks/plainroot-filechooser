@@ -37,16 +37,19 @@ requests, and supports `SaveFile` requests with suggested names and overwrite
 confirmation. Multiple selection uses checkboxes and returns every selected
 file as a `file://` URI. Successful requests, request closure, and user
 cancellation are handled. Glob filters can select the visible file set, and
-the selected `current_filter` is returned with successful responses. MIME
+the selected `current_filter` is returned with successful responses. Portal
+`choices` are rendered as adaptive dropdowns or boolean checkboxes and returned
+as selected ID/value pairs. Request parsing bounds group and option counts and
+string sizes, and rejects duplicate IDs or invalid initial selections. MIME
 filters use the shared MIME database's `globs2`, aliases, and subclass data,
 plus libmagic content sniffing for ambiguous or unmatched filenames. MIME
 classification runs on the directory worker and is requested only when the
 selected filter uses MIME patterns. Glob and MIME patterns in one filter are
 combined as alternatives. The backend and browser link libmagic but remain
-free of GIO. The prototype is not advertised to the portal broker; choices,
-parent-window modality, and live
-multiple-file/filter portal acceptance remain open. Keep GTK selected as the
-fallback until those capabilities and request lifecycle are validated.
+free of GIO. The prototype is not advertised to the portal broker; parent-window
+modality and live multiple-file/filter/choice portal acceptance remain open.
+Keep GTK selected as the fallback until those capabilities and request
+lifecycle are validated.
 
 Live removable-volume mount and SSHFS connect/disconnect acceptance are still
 pending; the current host does not have the `sshfs` executable installed.

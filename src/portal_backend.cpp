@@ -1,6 +1,7 @@
 #include "portal_backend.hpp"
 
 #include "browser_controller.hpp"
+#include "portal_choices.hpp"
 #include "ui_context_factory.hpp"
 
 #include <plainroot/i18n/i18n.h>
@@ -58,6 +59,7 @@ struct PortalRequest {
   std::string current_name;
   std::string current_file_path;
   std::vector<BrowserFilter> filters;
+  std::vector<BrowserChoice> choices;
   BrowserFilter current_filter;
   int32_t selected_filter_index = -1;
   bool has_current_filter = false;
@@ -325,6 +327,9 @@ bool parse_options(sd_bus_message *message, PortalRequest &request) {
       request.has_current_filter =
           parse_current_filter(message, request.current_filter);
       result = request.has_current_filter ? 1 : -EINVAL;
+    } else if (std::strcmp(key, "choices") == 0 &&
+               std::strcmp(contents, "a(ssa(ss)s)") == 0) {
+      result = parse_portal_choices(message, request.choices) ? 1 : -EINVAL;
     } else {
       result = sd_bus_message_skip(message, contents);
     }
@@ -579,7 +584,8 @@ public:
   void finish(PortalRequest &request, uint32_t response,
               const std::vector<std::string> &native_paths,
               bool close_window,
-              const BrowserFilter *current_filter = nullptr) {
+              const BrowserFilter *current_filter = nullptr,
+              const std::vector<BrowserChoiceSelection> *choices = nullptr) {
     if (request.finished)
       return;
     if (response == kResponseSuccess) {
@@ -604,7 +610,7 @@ public:
       }
       if (response == kResponseSuccess &&
           uris.size() == native_paths.size() && !uris.empty()) {
-        send_reply(request, response, uris, current_filter);
+        send_reply(request, response, uris, current_filter, choices);
         request.finished = true;
         unregister_request(request);
         if (close_window && request.window != nullptr)
@@ -612,7 +618,7 @@ public:
         return;
       }
     }
-    send_reply(request, response, {}, nullptr);
+    send_reply(request, response, {}, nullptr, nullptr);
     request.finished = true;
     unregister_request(request);
     if (close_window && request.window != nullptr)
@@ -710,6 +716,7 @@ private:
     request.controller->set_allow_multiple(request.multiple);
     request.controller->set_filters(request.filters,
                                     request.selected_filter_index);
+    request.controller->set_choices(request.choices);
     request.controller->set_save_file(request.save_file);
     request.controller->set_initial_filename(request.current_name);
     request.controller->set_accept_label(request.accept_label);
@@ -759,12 +766,14 @@ private:
   static void browser_completed(
       void *user_data, bool accepted,
       const std::vector<std::string> &native_paths,
-      const BrowserFilter *current_filter) {
+      const BrowserFilter *current_filter,
+      const std::vector<BrowserChoiceSelection> &choices) {
     auto &request = *static_cast<PortalRequest *>(user_data);
     request.backend->finish(request,
                             accepted ? kResponseSuccess : kResponseCancelled,
                             native_paths, true,
-                            accepted ? current_filter : nullptr);
+                            accepted ? current_filter : nullptr,
+                            accepted ? &choices : nullptr);
   }
 
   static int window_close_requested(void *user_data,
@@ -776,7 +785,8 @@ private:
 
   void send_reply(PortalRequest &request, uint32_t response,
                   const std::vector<std::string> &uris,
-                  const BrowserFilter *current_filter) {
+                  const BrowserFilter *current_filter,
+                  const std::vector<BrowserChoiceSelection> *choices) {
     if (request.call == nullptr)
       return;
     sd_bus_message *reply = nullptr;
@@ -790,6 +800,9 @@ private:
     if (result >= 0 && response == kResponseSuccess &&
         current_filter != nullptr &&
         !append_filter_option(reply, *current_filter))
+      result = -EINVAL;
+    if (result >= 0 && response == kResponseSuccess && choices != nullptr &&
+        !choices->empty() && !append_portal_choices(reply, *choices))
       result = -EINVAL;
     if (result >= 0)
       result = sd_bus_message_close_container(reply);

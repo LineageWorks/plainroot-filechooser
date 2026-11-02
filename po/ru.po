@@ -23,6 +23,9 @@ msgstr "Выбранные файлы: %s"
 msgid "Selected files"
 msgstr "Выбранные файлы"
 
+msgid "Unable to read the selected options."
+msgstr "Не удалось прочитать выбранные параметры."
+
 msgid "Select at least one file."
 msgstr "Выберите хотя бы один файл."
 

@@ -112,6 +112,11 @@ public:
     std::string path;
   };
 
+  struct ChoiceAction {
+    Impl *controller = nullptr;
+    size_t index = 0;
+  };
+
   bool create_ui() {
     auto *outer =
         plainroot_ui_vertical_scroll_area_create_v1(context_, 0, 0, 1.0F);
@@ -299,6 +304,82 @@ public:
     if (sort_result != PLAINROOT_UI_RESULT_OK)
       return false;
 
+    plainroot_ui_widget *choices_panel = nullptr;
+    choice_widgets_.assign(choices_.size(), nullptr);
+    if (!choices_.empty()) {
+      choices_panel = plainroot_ui_box_create_v1(
+          context_, PLAINROOT_UI_AXIS_VERTICAL, 8.0F, 0.0F);
+      if (choices_panel == nullptr)
+        return false;
+      for (size_t index = 0; index < choices_.size(); ++index) {
+        const BrowserChoice &choice = choices_[index];
+        auto action = std::make_unique<ChoiceAction>();
+        action->controller = this;
+        action->index = index;
+        plainroot_ui_widget *control = nullptr;
+        plainroot_ui_widget *choice_row = nullptr;
+        if (choice.options.empty()) {
+          control = plainroot_ui_checkbox_create_v1(
+              context_, choice.label.c_str(),
+              static_cast<uint32_t>(choice.label.size()),
+              choice_selections_[index].value == "true" ? 1U : 0U, 0.0F,
+              &Impl::choice_changed, action.get());
+        } else {
+          choice_row = plainroot_ui_adaptive_box_create_v1(
+              context_, PLAINROOT_UI_AXIS_VERTICAL,
+              PLAINROOT_UI_AXIS_HORIZONTAL, kExpandedControlsWidth, 8.0F,
+              0.0F);
+          auto *choice_label = plainroot_ui_label_create_v1(
+              context_, choice.label.c_str(),
+              static_cast<uint32_t>(choice.label.size()),
+              PLAINROOT_UI_COLOR_ON_SURFACE_V3, 0.0F);
+          control = plainroot_ui_dropdown_create_v1(
+              context_, choice.label.c_str(),
+              static_cast<uint32_t>(choice.label.size()), 1.0F,
+              &Impl::choice_changed, action.get());
+          if (control != nullptr)
+            (void)plainroot_ui_widget_set_accessible_name_v1(
+                control, choice.label.c_str(),
+                static_cast<uint32_t>(choice.label.size()));
+          if (choice_row == nullptr || choice_label == nullptr ||
+              control == nullptr)
+            return false;
+          for (size_t option_index = 0;
+               option_index < choice.options.size(); ++option_index) {
+            const BrowserChoiceOption &option = choice.options[option_index];
+            auto *widget_option = plainroot_ui_list_box_option_create_v1(
+                context_, option.label.c_str(),
+                static_cast<uint32_t>(option.label.size()),
+                static_cast<int32_t>(option_index), 0.0F);
+            if (!add(control, widget_option))
+              return false;
+          }
+          const auto selected = std::find_if(
+              choice.options.begin(), choice.options.end(),
+              [this, index](const BrowserChoiceOption &option) {
+                return option.id == choice_selections_[index].value;
+              });
+          if (selected == choice.options.end())
+            return false;
+          const int32_t selected_index = static_cast<int32_t>(
+              std::distance(choice.options.begin(), selected));
+          initializing_choice_controls_ = true;
+          const auto set_result =
+              plainroot_ui_dropdown_set_value_v1(control, selected_index);
+          initializing_choice_controls_ = false;
+          if (set_result != PLAINROOT_UI_RESULT_OK ||
+              !add(choice_row, choice_label) || !add(choice_row, control))
+            return false;
+        }
+        if (control == nullptr ||
+            !add(choices_panel,
+                 choice_row == nullptr ? control : choice_row))
+          return false;
+        choice_widgets_[index] = control;
+        choice_actions_.push_back(std::move(action));
+      }
+    }
+
     if (!add(outer, padding) || !add(padding, page) || !add(page, title) ||
         !add(page, location_row) || !add(location_row, location_actions) ||
         !add(location_actions, up) || !add(location_actions, home) ||
@@ -310,6 +391,7 @@ public:
         !add(controls, search_field_) || !add(controls, hidden_switch_) ||
         !add(controls, sort_dropdown_) ||
         (filter_dropdown_ != nullptr && !add(controls, filter_dropdown_)) ||
+        (choices_panel != nullptr && !add(page, choices_panel)) ||
         !add(page, storage_view_widget) || !add(page, list_scroll_) ||
         !add(list_scroll_, entries_list_) || !add(page, status_label_) ||
         !add(page, footer) || !add(footer, selected_label_) ||
@@ -365,6 +447,22 @@ public:
     }
   }
 
+  void set_choices(std::vector<BrowserChoice> choices) {
+    choices_ = std::move(choices);
+    choice_selections_.clear();
+    choice_selections_.reserve(choices_.size());
+    for (const BrowserChoice &choice : choices_) {
+      std::string value = choice.initial_selection;
+      if (choice.options.empty()) {
+        if (value.empty())
+          value = "false";
+      } else if (value.empty()) {
+        value = choice.options.front().id;
+      }
+      choice_selections_.push_back({choice.id, std::move(value)});
+    }
+  }
+
   void set_save_file(bool save_file) { save_file_ = save_file; }
 
   void set_initial_filename(std::string filename) {
@@ -378,7 +476,7 @@ public:
   void cancel() {
     if (!finished_ && completion_ != nullptr) {
       finished_ = true;
-      completion_(completion_user_data_, false, {}, nullptr);
+      completion_(completion_user_data_, false, {}, nullptr, {});
     }
   }
 
@@ -521,6 +619,17 @@ private:
                            ? detail::DirectorySortOrder::name_ascending
                            : detail::DirectorySortOrder::name_descending;
     self.schedule_render();
+  }
+
+  static void choice_changed(void *user_data, plainroot_ui_widget *) {
+    auto &action = *static_cast<ChoiceAction *>(user_data);
+    Impl &self = *action.controller;
+    if (self.initializing_choice_controls_ ||
+        action.index >= self.choice_selections_.size())
+      return;
+    std::string value;
+    if (self.read_choice_value(action.index, value))
+      self.choice_selections_[action.index].value = std::move(value);
   }
 
   static void filename_changed(void *user_data, plainroot_ui_widget *widget) {
@@ -916,7 +1025,15 @@ private:
                   static_cast<size_t>(selected_filter_index_) < filters_.size()
               ? &filters_[static_cast<size_t>(selected_filter_index_)]
               : nullptr;
-      completion_(completion_user_data_, true, paths, current_filter);
+      std::vector<BrowserChoiceSelection> selected_choices;
+      if (!collect_choice_selections(selected_choices)) {
+        set_status(tr("Unable to read the selected options."));
+        request_redraw();
+        finished_ = false;
+        return;
+      }
+      completion_(completion_user_data_, true, paths, current_filter,
+                  selected_choices);
       return;
     }
     for (const std::string &path : paths) {
@@ -1380,6 +1497,43 @@ private:
                                           static_cast<uint32_t>(value.size()));
   }
 
+  bool read_choice_value(size_t index, std::string &value) const {
+    if (index >= choices_.size() || index >= choice_widgets_.size() ||
+        index >= choice_selections_.size() ||
+        choice_widgets_[index] == nullptr)
+      return false;
+    const BrowserChoice &choice = choices_[index];
+    if (choice.options.empty()) {
+      uint32_t checked = 0;
+      if (plainroot_ui_checkbox_get_checked_v1(choice_widgets_[index],
+                                                &checked) !=
+          PLAINROOT_UI_RESULT_OK)
+        return false;
+      value = checked != 0U ? "true" : "false";
+      return true;
+    }
+
+    int32_t selected = -1;
+    uint32_t has_value = 0;
+    if (plainroot_ui_dropdown_get_value_v1(choice_widgets_[index], &selected,
+                                           &has_value) !=
+            PLAINROOT_UI_RESULT_OK ||
+        has_value == 0U || selected < 0 ||
+        static_cast<size_t>(selected) >= choice.options.size())
+      return false;
+    value = choice.options[static_cast<size_t>(selected)].id;
+    return true;
+  }
+
+  bool collect_choice_selections(
+      std::vector<BrowserChoiceSelection> &selections) const {
+    selections = choice_selections_;
+    for (size_t index = 0; index < selections.size(); ++index)
+      if (!read_choice_value(index, selections[index].value))
+        return false;
+    return true;
+  }
+
   void set_status(const std::string &text) { set_label(status_label_, text); }
 
   void set_storage_status(const std::string &text) {
@@ -1412,6 +1566,7 @@ private:
   bool show_hidden_ = false;
   bool initializing_filter_dropdown_ = false;
   bool initializing_sort_dropdown_ = false;
+  bool initializing_choice_controls_ = false;
   bool overwrite_dialog_open_ = false;
   bool overwrite_confirmed_ = false;
   bool directory_loading_ = false;
@@ -1428,12 +1583,16 @@ private:
   std::string selected_path_;
   std::vector<std::string> selected_paths_;
   std::vector<BrowserFilter> filters_;
+  std::vector<BrowserChoice> choices_;
+  std::vector<BrowserChoiceSelection> choice_selections_;
   std::string status_error_;
   std::vector<detail::DirectoryEntry> entries_;
   std::vector<plainroot_ui_widget *> rows_;
   std::vector<std::unique_ptr<EntryAction>> actions_;
   std::vector<plainroot_ui_widget *> breadcrumb_widgets_;
   std::vector<std::unique_ptr<BreadcrumbAction>> breadcrumb_actions_;
+  std::vector<std::unique_ptr<ChoiceAction>> choice_actions_;
+  std::vector<plainroot_ui_widget *> choice_widgets_;
   plainroot_ui_widget *breadcrumb_scroll_ = nullptr;
   plainroot_ui_widget *breadcrumb_strip_ = nullptr;
   plainroot_ui_widget *filename_field_ = nullptr;
@@ -1489,6 +1648,11 @@ void BrowserController::set_filters(std::vector<BrowserFilter> filters,
                                     int32_t selected_filter) {
   if (impl_)
     impl_->set_filters(std::move(filters), selected_filter);
+}
+
+void BrowserController::set_choices(std::vector<BrowserChoice> choices) {
+  if (impl_)
+    impl_->set_choices(std::move(choices));
 }
 
 void BrowserController::set_save_file(bool save_file) {

@@ -76,6 +76,7 @@ executable(
   [
     'src/portal_main.cpp',
     'src/portal_backend.cpp',
+    'src/portal_choices.cpp',
   ],
   link_with: filechooser_common,
   dependencies: common_dependencies + [systemd_dep],
@@ -124,6 +125,22 @@ open_filename_test = executable(
   install: false,
 )
 test('FileChooser typed open filename', open_filename_test)
+
+portal_choices_test = executable(
+  'filechooser-portal-choices-test',
+  [
+    'tests/portal_choices_test.cpp',
+    'src/portal_choices.cpp',
+  ],
+  dependencies: [systemd_dep],
+  install: false,
+)
+dbus_run_session = find_program('dbus-run-session')
+test(
+  'FileChooser portal choices contract',
+  dbus_run_session,
+  args: ['--', portal_choices_test.full_path()],
+)
 
 # The portal target is deliberately not registered by default. Its request
 # lifecycle and FileChooser parity must be validated before a portals.conf

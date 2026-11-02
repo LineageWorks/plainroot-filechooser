@@ -23,6 +23,9 @@ msgstr "الملفات المحددة: %s"
 msgid "Selected files"
 msgstr "الملفات المحددة"
 
+msgid "Unable to read the selected options."
+msgstr "تعذّرت قراءة الخيارات المحددة."
+
 msgid "Select at least one file."
 msgstr "اختر ملفًا واحدًا على الأقل."
 

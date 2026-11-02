@@ -3,6 +3,8 @@
 #include <plainroot/toolkit/toolkit.h>
 #include <plainroot/ui/ui.h>
 
+#include "browser_choice.hpp"
+
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -24,7 +26,9 @@ class BrowserController {
 public:
   using CompletionFn = void (*)(void *user_data, bool accepted,
                                 const std::vector<std::string> &native_paths,
-                                const BrowserFilter *current_filter);
+                                const BrowserFilter *current_filter,
+                                const std::vector<BrowserChoiceSelection>
+                                    &choices);
 
   BrowserController(plainroot_toolkit_application *application,
                     plainroot_ui_context *context,
@@ -43,6 +47,7 @@ public:
   void set_allow_multiple(bool allow_multiple);
   void set_filters(std::vector<BrowserFilter> filters,
                    int32_t selected_filter);
+  void set_choices(std::vector<BrowserChoice> choices);
   void set_save_file(bool save_file);
   void set_initial_filename(std::string filename);
   void set_accept_label(std::string label);
