@@ -95,8 +95,8 @@ msgstr "البحث في الملفات"
 msgid "Filter files"
 msgstr "تصفية الملفات"
 
-msgid "MIME type filters are not applied yet."
-msgstr "لم تُطبّق فلاتر نوع MIME بعد."
+msgid "MIME type filtering is unavailable on this system."
+msgstr "ترشيح أنواع MIME غير متاح على هذا النظام."
 
 msgid "Show hidden files"
 msgstr "إظهار الملفات المخفية"

@@ -95,8 +95,8 @@ msgstr "Поиск файлов"
 msgid "Filter files"
 msgstr "Фильтр файлов"
 
-msgid "MIME type filters are not applied yet."
-msgstr "Фильтры по типу MIME пока не применяются."
+msgid "MIME type filtering is unavailable on this system."
+msgstr "Фильтрация по типу MIME недоступна в этой системе."
 
 msgid "Show hidden files"
 msgstr "Показывать скрытые файлы"

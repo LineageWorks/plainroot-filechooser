@@ -3,6 +3,7 @@
 #include "directory_breadcrumbs.hpp"
 #include "directory_loader.hpp"
 #include "directory_sort.hpp"
+#include "mime_database.hpp"
 #include "open_filename.hpp"
 #include "storage_bridge.hpp"
 #include "storage_locations_view.hpp"
@@ -387,30 +388,42 @@ public:
       return;
     }
     current_path_ = std::move(path);
-    selected_path_.clear();
-    selected_paths_.clear();
     render_breadcrumbs();
     if (!save_file_ && filename_field_ != nullptr) {
       initial_filename_.clear();
       set_label(filename_field_, initial_filename_);
     }
+    request_directory_load(false);
+  }
+
+private:
+  void request_directory_load(bool preserve_selection) {
+    if (!preserve_selection) {
+      selected_path_.clear();
+      selected_paths_.clear();
+    }
     ++generation_;
-    if (allow_multiple_) {
-      update_selection_summary();
-    } else {
-      set_label(selected_label_,
-                tr(select_directory_
-                       ? "The current folder will be returned."
-                       : (save_file_ ? "Enter a name for the file to save."
-                                     : "No file selected")));
+    entries_.clear();
+    directory_loading_ = true;
+    entries_mime_classified_ = false;
+    mime_database_available_ = false;
+    if (!preserve_selection) {
+      if (allow_multiple_) {
+        update_selection_summary();
+      } else {
+        set_label(selected_label_,
+                  tr(select_directory_
+                         ? "The current folder will be returned."
+                         : (save_file_ ? "Enter a name for the file to save."
+                                       : "No file selected")));
+      }
     }
     set_status(tr("Loading folder…"));
-    loader_.request(current_path_, generation_);
+    loader_.request(current_path_, generation_, selected_filter_has_mime());
     schedule_render();
     request_redraw();
   }
 
-private:
   using ButtonCallback = void (*)(void *, plainroot_ui_widget *);
 
   static bool add(plainroot_ui_widget *parent, plainroot_ui_widget *child) {
@@ -486,6 +499,10 @@ private:
         static_cast<size_t>(selected) >= self.filters_.size())
       return;
     self.selected_filter_index_ = selected;
+    if (self.selected_filter_has_mime() && !self.entries_mime_classified_) {
+      self.request_directory_load(true);
+      return;
+    }
     self.schedule_render();
     self.request_redraw();
   }
@@ -926,8 +943,11 @@ private:
   void apply_directory_result(detail::DirectoryResult result) {
     if (result.generation != generation_)
       return;
+    directory_loading_ = false;
     if (result.result == PLAINROOT_CORE_FS_OK) {
       entries_ = std::move(result.entries);
+      entries_mime_classified_ = result.mime_classified;
+      mime_database_available_ = result.mime_database_available;
       status_error_.clear();
       set_status(entries_.empty() ? tr("This folder is empty.") : "");
     } else {
@@ -1302,13 +1322,16 @@ private:
       actions_.push_back(std::move(action));
     }
 
-    if (status_error_.empty() && selected_filter_has_unhandled_mime()) {
-      set_status(tr("MIME type filters are not applied yet."));
-    } else if (visible.empty() && status_error_.empty()) {
-      set_status(search_query_.empty() ? tr("This folder is empty.")
-                                       : tr("No matching files."));
-    } else if (!visible.empty() && status_error_.empty()) {
-      set_status("");
+    if (status_error_.empty() && !directory_loading_) {
+      if (selected_filter_has_mime() && entries_mime_classified_ &&
+          !mime_database_available_) {
+        set_status(tr("MIME type filtering is unavailable on this system."));
+      } else if (visible.empty()) {
+        set_status(search_query_.empty() ? tr("This folder is empty.")
+                                         : tr("No matching files."));
+      } else {
+        set_status("");
+      }
     }
     request_redraw();
   }
@@ -1322,24 +1345,23 @@ private:
 
     const BrowserFilter &filter =
         filters_[static_cast<size_t>(selected_filter_index_)];
-    bool has_glob = false;
-    bool has_unhandled_mime = false;
+    if (filter.patterns.empty())
+      return true;
     for (const BrowserFilterPattern &pattern : filter.patterns) {
       if (pattern.type == 0U) {
-        has_glob = true;
         if (fnmatch(pattern.pattern.c_str(), entry.name.c_str(), 0) == 0)
           return true;
       } else if (pattern.type == 1U) {
-        has_unhandled_mime = true;
+        if (mime_database_available_ &&
+            detail::mime_type_pattern_matches(entry.mime_types,
+                                              pattern.pattern))
+          return true;
       }
     }
-
-    // Keep MIME patterns permissive until the chooser has a MIME database
-    // implementation. The status message makes this limitation visible.
-    return has_unhandled_mime || !has_glob;
+    return false;
   }
 
-  bool selected_filter_has_unhandled_mime() const {
+  bool selected_filter_has_mime() const {
     if (selected_filter_index_ < 0 ||
         static_cast<size_t>(selected_filter_index_) >= filters_.size())
       return false;
@@ -1392,6 +1414,9 @@ private:
   bool initializing_sort_dropdown_ = false;
   bool overwrite_dialog_open_ = false;
   bool overwrite_confirmed_ = false;
+  bool directory_loading_ = false;
+  bool entries_mime_classified_ = false;
+  bool mime_database_available_ = false;
   int32_t selected_filter_index_ = -1;
   detail::DirectorySortOrder sort_order_ =
       detail::DirectorySortOrder::name_ascending;

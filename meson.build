@@ -20,6 +20,7 @@ network_storage_dep = dependency(
   version: '>= 0.1.0',
 )
 glib_dep = dependency('glib-2.0', version: '>= 2.66')
+magic_dep = dependency('libmagic', version: '>= 5.39')
 threads_dep = dependency('threads')
 systemd_dep = dependency('libsystemd')
 
@@ -28,6 +29,7 @@ browser_sources = [
   'src/directory_breadcrumbs.cpp',
   'src/directory_sort.cpp',
   'src/directory_loader.cpp',
+  'src/mime_database.cpp',
   'src/open_filename.cpp',
   'src/storage_bridge.cpp',
   'src/storage_locations_view.cpp',
@@ -44,6 +46,7 @@ filechooser_common = static_library(
     storage_dep,
     network_storage_dep,
     glib_dep,
+    magic_dep,
     threads_dep,
   ],
   install: false,
@@ -56,6 +59,7 @@ common_dependencies = [
   storage_dep,
   network_storage_dep,
   glib_dep,
+  magic_dep,
   threads_dep,
 ]
 
@@ -98,6 +102,17 @@ directory_breadcrumbs_test = executable(
   install: false,
 )
 test('FileChooser directory breadcrumbs', directory_breadcrumbs_test)
+
+mime_database_test = executable(
+  'filechooser-mime-database-test',
+  [
+    'tests/mime_database_test.cpp',
+    'src/mime_database.cpp',
+  ],
+  dependencies: [glib_dep, magic_dep],
+  install: false,
+)
+test('FileChooser MIME database', mime_database_test)
 
 open_filename_test = executable(
   'filechooser-open-filename-test',

@@ -1,5 +1,7 @@
 #include "directory_loader.hpp"
 
+#include "mime_database.hpp"
+
 #include <atomic>
 #include <cerrno>
 #include <memory>
@@ -32,15 +34,16 @@ public:
            !startup_failed_.load(std::memory_order_acquire);
   }
 
-  void request(std::string path, uint64_t generation) {
+  void request(std::string path, uint64_t generation, bool classify_mime) {
     bool failed = false;
     {
       std::lock_guard lock(mutex_);
       if (stopping_)
         return;
+      latest_generation_.store(generation, std::memory_order_release);
       failed = startup_failed_.load(std::memory_order_relaxed);
       if (!failed)
-        jobs_.push_back({std::move(path), generation});
+        jobs_.push_back({std::move(path), generation, classify_mime});
     }
     if (failed) {
       publish({generation, std::move(path), PLAINROOT_CORE_FS_IO_ERROR, 0, {}});
@@ -55,6 +58,7 @@ public:
       if (stopping_)
         return;
       stopping_ = true;
+      latest_generation_.fetch_add(1, std::memory_order_acq_rel);
     }
     wake_worker();
     if (worker_.joinable())
@@ -69,6 +73,7 @@ private:
   struct Job {
     std::string path;
     uint64_t generation = 0;
+    bool classify_mime = false;
   };
 
   struct Pending {
@@ -112,6 +117,10 @@ private:
     delivery.path = pending.job.path;
     delivery.result = result;
     delivery.native_code = native_code;
+    delivery.mime_classified = pending.job.classify_mime;
+    delivery.mime_database_available =
+        pending.owner->mime_database_ != nullptr &&
+        pending.owner->mime_database_->available();
     if (result == PLAINROOT_CORE_FS_OK) {
       plainroot_core_fs_listing *listing = nullptr;
       delivery.result =
@@ -126,10 +135,30 @@ private:
                   PLAINROOT_CORE_FS_OK ||
               (entry.name == nullptr && entry.name_size != 0U))
             continue;
-          delivery.entries.push_back(
-              {std::string(entry.name == nullptr ? "" : entry.name,
-                           entry.name_size),
-               entry.kind});
+          DirectoryEntry directory_entry{
+              std::string(entry.name == nullptr ? "" : entry.name,
+                          entry.name_size),
+              entry.kind,
+              {}};
+          const bool regular_or_symlink =
+              directory_entry.kind == PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE ||
+              directory_entry.kind == PLAINROOT_CORE_FS_ENTRY_SYMLINK;
+          if (pending.job.classify_mime && regular_or_symlink &&
+              delivery.mime_database_available) {
+            if (pending.owner->latest_generation_.load(
+                    std::memory_order_acquire) != pending.job.generation)
+              break;
+            const std::string native_path =
+                pending.job.path == "/"
+                    ? "/" + directory_entry.name
+                    : pending.job.path +
+                          (pending.job.path.ends_with('/') ? "" : "/") +
+                          directory_entry.name;
+            directory_entry.mime_types =
+                pending.owner->mime_database_->types_for_file(
+                    native_path, directory_entry.name);
+          }
+          delivery.entries.push_back(std::move(directory_entry));
         }
       }
       if (listing != nullptr)
@@ -182,6 +211,12 @@ private:
   }
 
   void run() {
+    try {
+      mime_database_ = std::make_unique<MimeDatabase>();
+    } catch (...) {
+      mime_database_.reset();
+    }
+
     plainroot_core_fs_async_executor_options_v1 options{};
     options.struct_size = sizeof(options);
     options.worker_count = 1;
@@ -266,6 +301,8 @@ private:
   std::thread worker_;
   std::mutex mutex_;
   std::vector<Job> jobs_;
+  std::unique_ptr<MimeDatabase> mime_database_;
+  std::atomic<uint64_t> latest_generation_{0};
   bool stopping_ = false;
   std::atomic<bool> startup_failed_{false};
 };
@@ -278,9 +315,10 @@ DirectoryLoader::~DirectoryLoader() = default;
 
 bool DirectoryLoader::ready() const { return impl_ && impl_->ready(); }
 
-void DirectoryLoader::request(std::string path, uint64_t generation) {
+void DirectoryLoader::request(std::string path, uint64_t generation,
+                              bool classify_mime) {
   if (impl_)
-    impl_->request(std::move(path), generation);
+    impl_->request(std::move(path), generation, classify_mime);
 }
 
 void DirectoryLoader::stop() {

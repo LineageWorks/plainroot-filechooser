@@ -14,6 +14,7 @@ namespace plainroot::filechooser::detail {
 struct DirectoryEntry {
   std::string name;
   plainroot_core_fs_entry_kind_v1 kind = PLAINROOT_CORE_FS_ENTRY_UNKNOWN;
+  std::vector<std::string> mime_types;
 };
 
 struct DirectoryResult {
@@ -22,6 +23,8 @@ struct DirectoryResult {
   plainroot_core_fs_result_v1 result = PLAINROOT_CORE_FS_IO_ERROR;
   int32_t native_code = 0;
   std::vector<DirectoryEntry> entries;
+  bool mime_classified = false;
+  bool mime_database_available = false;
 };
 
 class DirectoryLoader {
@@ -35,7 +38,8 @@ public:
   ~DirectoryLoader();
 
   bool ready() const;
-  void request(std::string path, uint64_t generation);
+  void request(std::string path, uint64_t generation,
+               bool classify_mime = false);
   void stop();
 
 private:

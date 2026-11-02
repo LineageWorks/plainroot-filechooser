@@ -13,11 +13,11 @@ using plainroot::filechooser::detail::sort_directory_entries;
 
 int main() {
   const std::array entries{
-      DirectoryEntry{"file10.txt", PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE},
-      DirectoryEntry{"folder10", PLAINROOT_CORE_FS_ENTRY_DIRECTORY},
-      DirectoryEntry{"file2.txt", PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE},
-      DirectoryEntry{"folder2", PLAINROOT_CORE_FS_ENTRY_DIRECTORY},
-      DirectoryEntry{".hidden", PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE},
+      DirectoryEntry{"file10.txt", PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE, {}},
+      DirectoryEntry{"folder10", PLAINROOT_CORE_FS_ENTRY_DIRECTORY, {}},
+      DirectoryEntry{"file2.txt", PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE, {}},
+      DirectoryEntry{"folder2", PLAINROOT_CORE_FS_ENTRY_DIRECTORY, {}},
+      DirectoryEntry{".hidden", PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE, {}},
   };
   std::vector<const DirectoryEntry *> input;
   for (const DirectoryEntry &entry : entries)

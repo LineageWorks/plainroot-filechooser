@@ -94,8 +94,8 @@ msgstr "חיפוש קבצים"
 msgid "Filter files"
 msgstr "סינון קבצים"
 
-msgid "MIME type filters are not applied yet."
-msgstr "מסנני MIME עדיין לא מוחלים."
+msgid "MIME type filtering is unavailable on this system."
+msgstr "סינון לפי סוג MIME אינו זמין במערכת זו."
 
 msgid "Show hidden files"
 msgstr "הצגת קבצים מוסתרים"

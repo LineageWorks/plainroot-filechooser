@@ -38,8 +38,13 @@ confirmation. Multiple selection uses checkboxes and returns every selected
 file as a `file://` URI. Successful requests, request closure, and user
 cancellation are handled. Glob filters can select the visible file set, and
 the selected `current_filter` is returned with successful responses. MIME
-filters are parsed and round-tripped but are not applied yet. It is not
-advertised to the portal broker; choices, parent-window modality, and live
+filters use the shared MIME database's `globs2`, aliases, and subclass data,
+plus libmagic content sniffing for ambiguous or unmatched filenames. MIME
+classification runs on the directory worker and is requested only when the
+selected filter uses MIME patterns. Glob and MIME patterns in one filter are
+combined as alternatives. The backend and browser link libmagic but remain
+free of GIO. The prototype is not advertised to the portal broker; choices,
+parent-window modality, and live
 multiple-file/filter portal acceptance remain open. Keep GTK selected as the
 fallback until those capabilities and request lifecycle are validated.
 
@@ -49,7 +54,9 @@ pending; the current host does not have the `sshfs` executable installed.
 The browser accepts an optional absolute starting directory. Directory names
 remain native byte paths for navigation and selection; names that are not valid
 UTF-8 are rendered in a safe display form. Directory I/O runs outside the UI
-thread, and results are applied on the toolkit application thread.
+thread, and results are applied on the toolkit application thread. MIME data is
+read from user and system XDG MIME directories; libmagic is used for content
+sniffing when filename rules do not resolve to one unambiguous type.
 
 ## Build
 
