@@ -69,8 +69,10 @@ std::string parent_path(std::string_view path) {
 class BrowserController::Impl {
 public:
   Impl(plainroot_toolkit_application *application,
-       plainroot_ui_context *context)
-      : application_(application), context_(context),
+       plainroot_ui_context *context, CompletionFn completion,
+       void *completion_user_data)
+      : application_(application), context_(context), completion_(completion),
+        completion_user_data_(completion_user_data),
         loader_(application, [this](detail::DirectoryResult result) {
           apply_directory_result(std::move(result));
         }) {}
@@ -98,7 +100,8 @@ public:
         context_, kPagePadding, kPagePadding, kPagePadding, kPagePadding, 1.0F);
     auto *page = plainroot_ui_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, kContentSpacing, 1.0F);
-    const std::string title_text = tr("Choose a file");
+    const std::string title_text =
+        requested_title_.empty() ? tr("Choose a file") : requested_title_;
     auto *title = plainroot_ui_label_create_v1(
         context_, title_text.c_str(), static_cast<uint32_t>(title_text.size()),
         PLAINROOT_UI_COLOR_ON_SURFACE_V3, 0.0F);
@@ -217,6 +220,15 @@ public:
 
   void set_window(plainroot_toolkit_window *window) { window_ = window; }
 
+  void set_title(std::string title) { requested_title_ = std::move(title); }
+
+  void cancel() {
+    if (!finished_ && completion_ != nullptr) {
+      finished_ = true;
+      completion_(completion_user_data_, false, nullptr);
+    }
+  }
+
   void navigate(std::string path) {
     if (path.empty() || path.front() != '/') {
       set_status(tr("Choose an absolute directory path."));
@@ -310,11 +322,19 @@ private:
       self.request_redraw();
       return;
     }
-    (void)std::fwrite(self.selected_path_.data(), 1, self.selected_path_.size(),
-                      stdout);
-    (void)std::fputc('\n', stdout);
-    (void)std::fflush(stdout);
-    plainroot_toolkit_application_quit(self.application_);
+    if (self.completion_ != nullptr) {
+      if (!self.finished_) {
+        self.finished_ = true;
+        self.completion_(self.completion_user_data_, true,
+                         self.selected_path_.c_str());
+      }
+    } else {
+      (void)std::fwrite(self.selected_path_.data(), 1,
+                        self.selected_path_.size(), stdout);
+      (void)std::fputc('\n', stdout);
+      (void)std::fflush(stdout);
+      plainroot_toolkit_application_quit(self.application_);
+    }
   }
 
   static void render_task(void *user_data) {
@@ -733,12 +753,16 @@ private:
   plainroot_toolkit_application *application_ = nullptr;
   plainroot_ui_context *context_ = nullptr;
   plainroot_toolkit_window *window_ = nullptr;
+  CompletionFn completion_ = nullptr;
+  void *completion_user_data_ = nullptr;
+  std::string requested_title_;
   detail::DirectoryLoader loader_;
   std::unique_ptr<detail::StorageLocationsView> storage_view_;
   bool storage_catalog_complete_ = false;
   bool storage_operation_pending_ = false;
   std::unique_ptr<detail::StorageBridge> storage_bridge_;
   bool ui_ready_ = false;
+  bool finished_ = false;
   bool show_hidden_ = false;
   uint64_t generation_ = 0;
   std::string current_path_;
@@ -758,8 +782,11 @@ private:
 };
 
 BrowserController::BrowserController(plainroot_toolkit_application *application,
-                                     plainroot_ui_context *context)
-    : impl_(std::make_unique<Impl>(application, context)) {}
+                                     plainroot_ui_context *context,
+                                     CompletionFn completion,
+                                     void *completion_user_data)
+    : impl_(std::make_unique<Impl>(application, context, completion,
+                                  completion_user_data)) {}
 
 BrowserController::~BrowserController() = default;
 
@@ -777,9 +804,19 @@ void BrowserController::set_window(plainroot_toolkit_window *window) {
     impl_->set_window(window);
 }
 
+void BrowserController::set_title(std::string title) {
+  if (impl_)
+    impl_->set_title(std::move(title));
+}
+
 void BrowserController::navigate(std::string path) {
   if (impl_)
     impl_->navigate(std::move(path));
+}
+
+void BrowserController::cancel() {
+  if (impl_)
+    impl_->cancel();
 }
 
 } // namespace plainroot::filechooser

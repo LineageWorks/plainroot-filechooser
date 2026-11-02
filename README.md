@@ -25,11 +25,17 @@ Local file browsing remains available when either storage service is
 unavailable. Closing the browser never unmounts a volume or network location.
 The window follows the active Plainroot appearance theme through the toolkit.
 
-The browser is not yet registered as an XDG portal backend. Portal request
-handling, filters, save flows, broader GTK parity, and backend registration
-remain on the roadmap. Live removable-volume mount and SSHFS connect/disconnect
-acceptance are still pending; the current host does not have the `sshfs`
-executable installed.
+The build also includes an unregistered `plainroot-filechooser-portal`
+prototype. It exports the portal FileChooser and Request interfaces through
+`sd-bus`, supports a single-file `OpenFile` request, returns a `file://` URI,
+and handles request closure and user cancellation. It is not advertised to the
+portal broker yet. Save requests, multiple selection, directory selection,
+filters, choices, parent-window modality, and live portal acceptance remain
+unimplemented. Keep GTK selected as the fallback until those capabilities and
+request lifecycle are validated.
+
+Live removable-volume mount and SSHFS connect/disconnect acceptance are still
+pending; the current host does not have the `sshfs` executable installed.
 
 The browser accepts an optional absolute starting directory. Directory names
 remain native byte paths for navigation and selection; names that are not valid

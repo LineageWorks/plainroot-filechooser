@@ -21,16 +21,19 @@ network_storage_dep = dependency(
 )
 glib_dep = dependency('glib-2.0', version: '>= 2.66')
 threads_dep = dependency('threads')
+systemd_dep = dependency('libsystemd')
 
-executable(
-  'plainroot-filechooser-browser',
-  [
-    'src/main.cpp',
-    'src/browser_controller.cpp',
-    'src/directory_loader.cpp',
-    'src/storage_bridge.cpp',
-    'src/storage_locations_view.cpp',
-  ],
+browser_sources = [
+  'src/browser_controller.cpp',
+  'src/directory_loader.cpp',
+  'src/storage_bridge.cpp',
+  'src/storage_locations_view.cpp',
+  'src/ui_context_factory.cpp',
+]
+
+filechooser_common = static_library(
+  'plainroot-filechooser-common',
+  browser_sources,
   dependencies: [
     toolkit_dep,
     core_dep,
@@ -40,7 +43,40 @@ executable(
     glib_dep,
     threads_dep,
   ],
+  install: false,
+)
+
+common_dependencies = [
+  toolkit_dep,
+  core_dep,
+  i18n_dep,
+  storage_dep,
+  network_storage_dep,
+  glib_dep,
+  threads_dep,
+]
+
+executable(
+  'plainroot-filechooser-browser',
+  'src/main.cpp',
+  link_with: filechooser_common,
+  dependencies: common_dependencies,
   install: true,
 )
+
+executable(
+  'plainroot-filechooser-portal',
+  [
+    'src/portal_main.cpp',
+    'src/portal_backend.cpp',
+  ],
+  link_with: filechooser_common,
+  dependencies: common_dependencies + [systemd_dep],
+  install: true,
+)
+
+# The portal target is deliberately not registered by default. Its request
+# lifecycle and FileChooser parity must be validated before a portals.conf
+# preference can route applications to it.
 
 subdir('po')
