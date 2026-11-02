@@ -13,6 +13,18 @@ msgstr ""
 msgid "Choose a file"
 msgstr "Datei auswählen"
 
+msgid "Choose files"
+msgstr "Dateien auswählen"
+
+msgid "Selected files: %s"
+msgstr "Ausgewählte Dateien: %s"
+
+msgid "Selected files"
+msgstr "Ausgewählte Dateien"
+
+msgid "Select at least one file."
+msgstr "Wählen Sie mindestens eine Datei aus."
+
 msgid "Choose a folder"
 msgstr "Ordner auswählen"
 

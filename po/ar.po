@@ -14,6 +14,18 @@ msgstr ""
 msgid "Choose a file"
 msgstr "اختر ملفًا"
 
+msgid "Choose files"
+msgstr "اختر ملفات"
+
+msgid "Selected files: %s"
+msgstr "الملفات المحددة: %s"
+
+msgid "Selected files"
+msgstr "الملفات المحددة"
+
+msgid "Select at least one file."
+msgstr "اختر ملفًا واحدًا على الأقل."
+
 msgid "Choose a folder"
 msgstr "اختر مجلدًا"
 

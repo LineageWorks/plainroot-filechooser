@@ -24,6 +24,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace plainroot::filechooser {
 namespace {
@@ -175,7 +176,8 @@ bool parse_options(sd_bus_message *message, PortalRequest &request) {
   return result >= 0 && sd_bus_message_exit_container(message) >= 0;
 }
 
-bool append_uris(sd_bus_message *reply, const char *uri) {
+bool append_uris(sd_bus_message *reply,
+                 const std::vector<std::string> &uris) {
   int result = sd_bus_message_open_container(reply, SD_BUS_TYPE_DICT_ENTRY,
                                               "sv");
   if (result >= 0)
@@ -184,8 +186,9 @@ bool append_uris(sd_bus_message *reply, const char *uri) {
     result = sd_bus_message_open_container(reply, SD_BUS_TYPE_VARIANT, "as");
   if (result >= 0)
     result = sd_bus_message_open_container(reply, SD_BUS_TYPE_ARRAY, "s");
-  if (result >= 0)
-    result = sd_bus_message_append(reply, "s", uri);
+  for (const std::string &uri : uris)
+    if (result >= 0)
+      result = sd_bus_message_append(reply, "s", uri.c_str());
   if (result >= 0)
     result = sd_bus_message_close_container(reply);
   if (result >= 0)
@@ -284,7 +287,7 @@ public:
                                         : error.data());
           for (const auto &request : requests_)
             if (!request->finished)
-              finish(*request, kResponseError, nullptr, false);
+              finish(*request, kResponseError, {}, false);
         }
         discard_closed_requests();
         continue;
@@ -342,9 +345,9 @@ public:
                          save_file_request
                              ? "Malformed FileChooser.SaveFile options"
                              : "Malformed FileChooser.OpenFile options");
-    if (request->multiple)
-      return reply_error(message, SD_BUS_ERROR_NOT_SUPPORTED,
-                         "This backend does not support multiple-file selection");
+    if (request->multiple && (save_file_request || request->directory))
+      return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
+                         "Multiple selection cannot be combined with save or folder selection");
     if (save_file_request && request->directory)
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
                          "SaveFile does not support directory selection");
@@ -367,12 +370,16 @@ public:
       const char *fallback = plainroot_i18n_gettext_v1(
           kDomain, save_file_request
                        ? "Save file"
-                       : (request->directory ? "Choose a folder"
-                                             : "Choose a file"));
+                       : (request->directory
+                              ? "Choose a folder"
+                              : (request->multiple ? "Choose files"
+                                                   : "Choose a file")));
       const char *english_fallback =
           save_file_request ? "Save file"
-                            : (request->directory ? "Choose a folder"
-                                                  : "Choose a file");
+                            : (request->directory
+                                   ? "Choose a folder"
+                                   : (request->multiple ? "Choose files"
+                                                        : "Choose a file"));
       request->title = fallback == nullptr ? english_fallback : fallback;
     }
     if (request->start_path.empty()) {
@@ -408,19 +415,38 @@ public:
   }
 
   void finish(PortalRequest &request, uint32_t response,
-              const char *native_path, bool close_window) {
+              const std::vector<std::string> &native_paths,
+              bool close_window) {
     if (request.finished)
       return;
     if (response == kResponseSuccess) {
-      GError *error = nullptr;
-      gchar *uri = g_filename_to_uri(native_path, nullptr, &error);
-      if (uri == nullptr) {
-        if (error != nullptr)
-          g_error_free(error);
+      if (native_paths.empty()) {
         response = kResponseError;
-      } else {
-        send_reply(request, response, uri);
-        g_free(uri);
+      }
+      std::vector<std::string> uris;
+      try {
+        if (response == kResponseSuccess) {
+          uris.reserve(native_paths.size());
+          for (const std::string &native_path : native_paths) {
+            GError *error = nullptr;
+            gchar *uri =
+                g_filename_to_uri(native_path.c_str(), nullptr, &error);
+            if (uri == nullptr) {
+              if (error != nullptr)
+                g_error_free(error);
+              response = kResponseError;
+              break;
+            }
+            uris.emplace_back(uri);
+            g_free(uri);
+          }
+        }
+      } catch (const std::bad_alloc &) {
+        response = kResponseError;
+      }
+      if (response == kResponseSuccess &&
+          uris.size() == native_paths.size() && !uris.empty()) {
+        send_reply(request, response, uris);
         request.finished = true;
         unregister_request(request);
         if (close_window && request.window != nullptr)
@@ -428,7 +454,7 @@ public:
         return;
       }
     }
-    send_reply(request, response, nullptr);
+    send_reply(request, response, {});
     request.finished = true;
     unregister_request(request);
     if (close_window && request.window != nullptr)
@@ -499,9 +525,9 @@ private:
         if (request.controller != nullptr)
           request.controller->cancel();
         else
-          finish(request, kResponseCancelled, nullptr, false);
+          finish(request, kResponseCancelled, {}, false);
         if (!request.finished)
-          finish(request, kResponseCancelled, nullptr, true);
+          finish(request, kResponseCancelled, {}, true);
         continue;
       }
       if (request.window != nullptr)
@@ -516,25 +542,31 @@ private:
       language = "en";
     request.context = make_ui_context(language);
     if (request.context == nullptr) {
-      finish(request, kResponseError, nullptr, false);
+      finish(request, kResponseError, {}, false);
       return;
     }
     request.controller = std::make_unique<BrowserController>(
         application_, request.context, browser_completed, &request);
     request.controller->set_title(request.title);
     request.controller->set_select_directory(request.directory);
+    request.controller->set_allow_multiple(request.multiple);
     request.controller->set_save_file(request.save_file);
     request.controller->set_initial_filename(request.current_name);
     request.controller->set_accept_label(request.accept_label);
     if (!request.controller->ready() || !request.controller->create_ui()) {
-      finish(request, kResponseError, nullptr, false);
+      finish(request, kResponseError, {}, false);
       return;
     }
 
     plainroot_toolkit_window_options_v1 options{};
     options.struct_size = sizeof(options);
     options.title = request.title.empty()
-                        ? (request.save_file ? "Save file" : "Choose a file")
+                        ? (request.save_file
+                               ? "Save file"
+                               : (request.directory
+                                      ? "Choose a folder"
+                                      : (request.multiple ? "Choose files"
+                                                          : "Choose a file")))
                         : request.title.c_str();
     options.app_id = "org.plainroot.FileChooser";
     options.initial_width = 1000;
@@ -557,30 +589,31 @@ private:
       std::fprintf(stderr, "plainroot-filechooser-portal: %s\n",
                    error[0] == '\0' ? "unable to create chooser window"
                                     : error.data());
-      finish(request, kResponseError, nullptr, false);
+      finish(request, kResponseError, {}, false);
       return;
     }
     request.controller->set_window(request.window);
     request.controller->navigate(request.start_path);
   }
 
-  static void browser_completed(void *user_data, bool accepted,
-                                const char *native_path) {
+  static void browser_completed(
+      void *user_data, bool accepted,
+      const std::vector<std::string> &native_paths) {
     auto &request = *static_cast<PortalRequest *>(user_data);
     request.backend->finish(request,
                             accepted ? kResponseSuccess : kResponseCancelled,
-                            native_path, true);
+                            native_paths, true);
   }
 
   static int window_close_requested(void *user_data,
                                     plainroot_toolkit_window *) {
     auto &request = *static_cast<PortalRequest *>(user_data);
-    request.backend->finish(request, kResponseCancelled, nullptr, false);
+    request.backend->finish(request, kResponseCancelled, {}, false);
     return 1;
   }
 
   void send_reply(PortalRequest &request, uint32_t response,
-                  const char *uri) {
+                  const std::vector<std::string> &uris) {
     if (request.call == nullptr)
       return;
     sd_bus_message *reply = nullptr;
@@ -589,7 +622,7 @@ private:
       result = sd_bus_message_append(reply, "u", response);
     if (result >= 0)
       result = sd_bus_message_open_container(reply, SD_BUS_TYPE_ARRAY, "{sv}");
-    if (result >= 0 && uri != nullptr && !append_uris(reply, uri))
+    if (result >= 0 && !uris.empty() && !append_uris(reply, uris))
       result = -EINVAL;
     if (result >= 0)
       result = sd_bus_message_close_container(reply);
@@ -633,7 +666,7 @@ private:
         if (plainroot_toolkit_window_get_state(request->window, &state) ==
                 PLAINROOT_TOOLKIT_RESULT_OK &&
             (state.flags & PLAINROOT_TOOLKIT_WINDOW_CLOSED) != 0U)
-          finish(*request, kResponseCancelled, nullptr, false);
+          finish(*request, kResponseCancelled, {}, false);
       }
     }
     discard_finished_requests();

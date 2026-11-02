@@ -13,6 +13,18 @@ msgstr ""
 msgid "Choose a file"
 msgstr "בחירת קובץ"
 
+msgid "Choose files"
+msgstr "בחירת קבצים"
+
+msgid "Selected files: %s"
+msgstr "קבצים שנבחרו: %s"
+
+msgid "Selected files"
+msgstr "קבצים שנבחרו"
+
+msgid "Select at least one file."
+msgstr "יש לבחור קובץ אחד לפחות."
+
 msgid "Choose a folder"
 msgstr "בחירת תיקייה"
 

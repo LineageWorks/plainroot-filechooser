@@ -5,13 +5,14 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace plainroot::filechooser {
 
 class BrowserController {
 public:
   using CompletionFn = void (*)(void *user_data, bool accepted,
-                                const char *native_path);
+                                const std::vector<std::string> &native_paths);
 
   BrowserController(plainroot_toolkit_application *application,
                     plainroot_ui_context *context,
@@ -27,6 +28,7 @@ public:
   void set_window(plainroot_toolkit_window *window);
   void set_title(std::string title);
   void set_select_directory(bool select_directory);
+  void set_allow_multiple(bool allow_multiple);
   void set_save_file(bool save_file);
   void set_initial_filename(std::string filename);
   void set_accept_label(std::string label);
