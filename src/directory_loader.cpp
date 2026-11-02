@@ -1,0 +1,291 @@
+#include "directory_loader.hpp"
+
+#include <atomic>
+#include <cerrno>
+#include <memory>
+#include <mutex>
+#include <new>
+#include <poll.h>
+#include <thread>
+#include <utility>
+
+#include <sys/eventfd.h>
+#include <unistd.h>
+
+namespace plainroot::filechooser::detail {
+
+class DirectoryLoader::Impl {
+public:
+  using ResultHandler = std::function<void(DirectoryResult)>;
+
+  Impl(plainroot_toolkit_application *application, ResultHandler result_handler)
+      : application_(application), result_handler_(std::move(result_handler)),
+        notification_fd_(eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK)) {
+    if (notification_fd_ >= 0)
+      worker_ = std::thread([this] { run(); });
+  }
+
+  ~Impl() { stop(); }
+
+  bool ready() const {
+    return notification_fd_ >= 0 && worker_.joinable() &&
+           !startup_failed_.load(std::memory_order_acquire);
+  }
+
+  void request(std::string path, uint64_t generation) {
+    bool failed = false;
+    {
+      std::lock_guard lock(mutex_);
+      if (stopping_)
+        return;
+      failed = startup_failed_.load(std::memory_order_relaxed);
+      if (!failed)
+        jobs_.push_back({std::move(path), generation});
+    }
+    if (failed) {
+      publish({generation, std::move(path), PLAINROOT_CORE_FS_IO_ERROR, 0, {}});
+      return;
+    }
+    wake_worker();
+  }
+
+  void stop() {
+    {
+      std::lock_guard lock(mutex_);
+      if (stopping_)
+        return;
+      stopping_ = true;
+    }
+    wake_worker();
+    if (worker_.joinable())
+      worker_.join();
+    if (notification_fd_ >= 0) {
+      close(notification_fd_);
+      notification_fd_ = -1;
+    }
+  }
+
+private:
+  struct Job {
+    std::string path;
+    uint64_t generation = 0;
+  };
+
+  struct Pending {
+    Impl *owner = nullptr;
+    Job job;
+    plainroot_core_fs_async_request *request = nullptr;
+    bool completed = false;
+  };
+
+  struct Delivery {
+    ResultHandler handler;
+    DirectoryResult result;
+  };
+
+  static void apply_delivery(void *user_data) {
+    auto *delivery = static_cast<Delivery *>(user_data);
+    delivery->handler(std::move(delivery->result));
+  }
+
+  static void destroy_delivery(void *user_data) {
+    delete static_cast<Delivery *>(user_data);
+  }
+
+  void publish(DirectoryResult result) {
+    auto *delivery =
+        new (std::nothrow) Delivery{result_handler_, std::move(result)};
+    if (delivery == nullptr)
+      return;
+    const auto posted = plainroot_toolkit_application_post_v1(
+        application_, &Impl::apply_delivery, delivery, &Impl::destroy_delivery);
+    if (posted != PLAINROOT_TOOLKIT_RESULT_OK)
+      delete delivery;
+  }
+
+  static void completed(plainroot_core_fs_async_request *request,
+                        plainroot_core_fs_result_v1 result, int32_t native_code,
+                        void *user_data) {
+    auto &pending = *static_cast<Pending *>(user_data);
+    DirectoryResult delivery{};
+    delivery.generation = pending.job.generation;
+    delivery.path = pending.job.path;
+    delivery.result = result;
+    delivery.native_code = native_code;
+    if (result == PLAINROOT_CORE_FS_OK) {
+      plainroot_core_fs_listing *listing = nullptr;
+      delivery.result =
+          plainroot_core_fs_async_request_take_listing_v1(request, &listing);
+      if (delivery.result == PLAINROOT_CORE_FS_OK && listing != nullptr) {
+        const size_t count = plainroot_core_fs_listing_count_v1(listing);
+        delivery.entries.reserve(count);
+        for (size_t index = 0; index < count; ++index) {
+          plainroot_core_fs_entry_v1 entry{};
+          entry.struct_size = sizeof(entry);
+          if (plainroot_core_fs_listing_get_v1(listing, index, &entry) !=
+                  PLAINROOT_CORE_FS_OK ||
+              (entry.name == nullptr && entry.name_size != 0U))
+            continue;
+          delivery.entries.push_back(
+              {std::string(entry.name == nullptr ? "" : entry.name,
+                           entry.name_size),
+               entry.kind});
+        }
+      }
+      if (listing != nullptr)
+        plainroot_core_fs_listing_release_v1(listing);
+    }
+    pending.owner->publish(std::move(delivery));
+    pending.completed = true;
+  }
+
+  void wake_worker() {
+    if (notification_fd_ < 0)
+      return;
+    const uint64_t value = 1;
+    (void)write(notification_fd_, &value, sizeof(value));
+  }
+
+  void drain_notifications() {
+    uint64_t value = 0;
+    while (read(notification_fd_, &value, sizeof(value)) ==
+           static_cast<ssize_t>(sizeof(value))) {
+    }
+  }
+
+  std::vector<Job> take_jobs(bool *stopping) {
+    std::lock_guard lock(mutex_);
+    *stopping = stopping_;
+    std::vector<Job> jobs;
+    if (!jobs_.empty()) {
+      jobs.push_back(std::move(jobs_.back()));
+      jobs_.clear();
+    }
+    return jobs;
+  }
+
+  static void
+  release_completed(plainroot_core_fs_async_executor *executor,
+                    std::vector<std::unique_ptr<Pending>> *pending) {
+    size_t dispatched = 0;
+    (void)plainroot_core_fs_async_executor_dispatch_v1(executor, 0,
+                                                       &dispatched);
+    auto &requests = *pending;
+    for (auto iterator = requests.begin(); iterator != requests.end();) {
+      if (!(*iterator)->completed) {
+        ++iterator;
+        continue;
+      }
+      plainroot_core_fs_async_request_release_v1((*iterator)->request);
+      iterator = requests.erase(iterator);
+    }
+  }
+
+  void run() {
+    plainroot_core_fs_async_executor_options_v1 options{};
+    options.struct_size = sizeof(options);
+    options.worker_count = 1;
+    options.maximum_queued_requests = 8;
+    options.maximum_pending_requests = 8;
+    plainroot_core_fs_async_executor *executor = nullptr;
+    const auto created = plainroot_core_fs_async_executor_create_v1(
+        &options, nullptr, nullptr, &executor, nullptr);
+    if (created != PLAINROOT_CORE_FS_OK || executor == nullptr) {
+      std::vector<Job> failed_jobs;
+      {
+        std::lock_guard lock(mutex_);
+        startup_failed_.store(true, std::memory_order_release);
+        failed_jobs.swap(jobs_);
+      }
+      for (const Job &job : failed_jobs) {
+        publish({job.generation, job.path, PLAINROOT_CORE_FS_IO_ERROR, 0, {}});
+      }
+      return;
+    }
+
+    std::vector<std::unique_ptr<Pending>> pending;
+    const int executor_fd =
+        plainroot_core_fs_async_executor_notification_fd_v1(executor);
+    bool stopping = false;
+    while (!stopping) {
+      pollfd descriptors[2] = {{notification_fd_, POLLIN, 0},
+                               {executor_fd, POLLIN, 0}};
+      int poll_result;
+      do {
+        poll_result = poll(descriptors, 2, -1);
+      } while (poll_result < 0 && errno == EINTR);
+      if (poll_result < 0)
+        break;
+
+      if ((descriptors[0].revents & POLLIN) != 0) {
+        drain_notifications();
+        auto jobs = take_jobs(&stopping);
+        if (stopping)
+          break;
+        if (!jobs.empty()) {
+          for (const auto &existing : pending)
+            (void)plainroot_core_fs_async_request_cancel_v1(existing->request);
+          Job job = std::move(jobs.back());
+          auto next = std::make_unique<Pending>();
+          next->owner = this;
+          next->job = std::move(job);
+          plainroot_core_fs_path_v1 path{};
+          path.struct_size = sizeof(path);
+          path.data = next->job.path.data();
+          path.size = next->job.path.size();
+          const auto submitted = plainroot_core_fs_async_list_directory_v1(
+              executor, &path, &Impl::completed, next.get(), &next->request);
+          if (submitted == PLAINROOT_CORE_FS_OK) {
+            pending.push_back(std::move(next));
+          } else {
+            publish({next->job.generation, next->job.path, submitted, 0, {}});
+          }
+        }
+      }
+
+      if ((descriptors[1].revents & POLLIN) != 0)
+        release_completed(executor, &pending);
+    }
+
+    for (const auto &request : pending)
+      (void)plainroot_core_fs_async_request_cancel_v1(request->request);
+    (void)plainroot_core_fs_async_executor_shutdown_v1(executor);
+    while (!pending.empty()) {
+      release_completed(executor, &pending);
+      if (pending.empty())
+        break;
+      pollfd descriptor{executor_fd, POLLIN, 0};
+      (void)poll(&descriptor, 1, 50);
+    }
+    (void)plainroot_core_fs_async_executor_release_v1(executor);
+  }
+
+  plainroot_toolkit_application *application_ = nullptr;
+  ResultHandler result_handler_;
+  int notification_fd_ = -1;
+  std::thread worker_;
+  std::mutex mutex_;
+  std::vector<Job> jobs_;
+  bool stopping_ = false;
+  std::atomic<bool> startup_failed_{false};
+};
+
+DirectoryLoader::DirectoryLoader(plainroot_toolkit_application *application,
+                                 ResultHandler result_handler)
+    : impl_(std::make_unique<Impl>(application, std::move(result_handler))) {}
+
+DirectoryLoader::~DirectoryLoader() = default;
+
+bool DirectoryLoader::ready() const { return impl_ && impl_->ready(); }
+
+void DirectoryLoader::request(std::string path, uint64_t generation) {
+  if (impl_)
+    impl_->request(std::move(path), generation);
+}
+
+void DirectoryLoader::stop() {
+  if (impl_)
+    impl_->stop();
+}
+
+} // namespace plainroot::filechooser::detail
