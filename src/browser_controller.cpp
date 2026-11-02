@@ -1,6 +1,8 @@
 #include "browser_controller.hpp"
 
 #include "directory_loader.hpp"
+#include "storage_bridge.hpp"
+#include "storage_locations_view.hpp"
 
 #include <plainroot/i18n/i18n.h>
 
@@ -73,11 +75,15 @@ public:
           apply_directory_result(std::move(result));
         }) {}
 
-  ~Impl() { loader_.stop(); }
+  ~Impl() { shutdown(); }
 
   bool ready() const { return loader_.ready(); }
 
-  void shutdown() { loader_.stop(); }
+  void shutdown() {
+    if (storage_bridge_ != nullptr)
+      storage_bridge_->stop();
+    loader_.stop();
+  }
 
   struct EntryAction {
     Impl *controller = nullptr;
@@ -99,6 +105,17 @@ public:
     if (title != nullptr)
       (void)plainroot_ui_label_set_typography_v1(
           title, PLAINROOT_UI_LABEL_HEADLINE_SMALL);
+
+    storage_view_ = std::make_unique<detail::StorageLocationsView>(
+        context_,
+        detail::StorageLocationActions{
+            [this](std::string id, bool read_only) {
+              mount_volume(id, read_only);
+            },
+            [this](std::string path) { navigate(std::move(path)); },
+            [this](std::string id) { unmount_mount(id); },
+            [this] { refresh_storage(); }, [this] { request_redraw(); }});
+    auto *storage_view_widget = storage_view_->create();
 
     auto *location_row = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
@@ -150,11 +167,11 @@ public:
     if (outer == nullptr || padding == nullptr || page == nullptr ||
         title == nullptr || location_row == nullptr ||
         location_actions == nullptr || up == nullptr || home == nullptr ||
-        path_label_ == nullptr || controls == nullptr ||
-        search_field_ == nullptr || hidden_switch_ == nullptr ||
-        list_scroll_ == nullptr || entries_list_ == nullptr ||
-        status_label_ == nullptr || footer == nullptr ||
-        selected_label_ == nullptr || select == nullptr)
+        storage_view_widget == nullptr || path_label_ == nullptr ||
+        controls == nullptr || search_field_ == nullptr ||
+        hidden_switch_ == nullptr || list_scroll_ == nullptr ||
+        entries_list_ == nullptr || status_label_ == nullptr ||
+        footer == nullptr || selected_label_ == nullptr || select == nullptr)
       return false;
 
     if (!add(outer, padding) || !add(padding, page) || !add(page, title) ||
@@ -162,14 +179,30 @@ public:
         !add(location_actions, up) || !add(location_actions, home) ||
         !add(location_row, path_label_) || !add(page, controls) ||
         !add(controls, search_field_) || !add(controls, hidden_switch_) ||
-        !add(page, list_scroll_) || !add(list_scroll_, entries_list_) ||
-        !add(page, status_label_) || !add(page, footer) ||
-        !add(footer, selected_label_) || !add(footer, select) ||
+        !add(page, storage_view_widget) || !add(page, list_scroll_) ||
+        !add(list_scroll_, entries_list_) || !add(page, status_label_) ||
+        !add(page, footer) || !add(footer, selected_label_) ||
+        !add(footer, select) ||
         plainroot_ui_context_set_root_v1(context_, outer) !=
             PLAINROOT_UI_RESULT_OK)
       return false;
 
     ui_ready_ = true;
+    storage_bridge_ = std::make_unique<detail::StorageBridge>(
+        application_,
+        [this](detail::StorageCatalog catalog) {
+          apply_storage_catalog(std::move(catalog));
+        },
+        [this](detail::StorageOperationUpdate update) {
+          apply_storage_operation(update);
+        },
+        [this](detail::StorageServiceError error) {
+          apply_storage_error(error);
+        });
+    if (!storage_bridge_->ready())
+      set_storage_status(tr("Storage locations are unavailable."));
+    else
+      refresh_storage();
     return true;
   }
 
@@ -313,6 +346,156 @@ private:
     request_redraw();
   }
 
+  void apply_storage_catalog(detail::StorageCatalog catalog) {
+    const bool complete = catalog.complete;
+    const bool empty =
+        catalog.removable_volumes.empty() && catalog.network_mounts.empty();
+    storage_catalog_complete_ = complete;
+    storage_view_->set_catalog(std::move(catalog));
+    if (!complete) {
+      set_storage_status(tr(
+          "Storage information is incomplete; mount actions are unavailable."));
+    } else if (empty) {
+      set_storage_status(
+          tr("No removable volumes or mounted network locations."));
+    } else {
+      set_storage_status(tr("Storage locations are up to date."));
+    }
+    request_redraw();
+  }
+
+  void apply_storage_error(detail::StorageServiceError error) {
+    const char *message = "Unable to read storage locations.";
+    if (error.result == PLAINROOT_STORAGE_NOT_READY)
+      message = "Storage service is unavailable.";
+    else if (error.result == PLAINROOT_STORAGE_PERMISSION_DENIED)
+      message = "Storage access was denied.";
+    else if (error.result == PLAINROOT_STORAGE_BUSY)
+      message = "Storage service is busy.";
+    set_storage_status(tr(message));
+    request_redraw();
+  }
+
+  void refresh_storage() {
+    const auto result = storage_bridge_ == nullptr
+                            ? PLAINROOT_STORAGE_NOT_READY
+                            : storage_bridge_->request_snapshot();
+    if (result == PLAINROOT_STORAGE_OK)
+      set_storage_status(tr("Checking storage locations…"));
+    else
+      apply_storage_error({result, 0});
+    request_redraw();
+  }
+
+  void apply_storage_operation(detail::StorageOperationUpdate update) {
+    if (update.type == PLAINROOT_STORAGE_CLIENT_OPERATION_REQUEST_COMPLETED) {
+      if (update.result != PLAINROOT_STORAGE_OK) {
+        storage_operation_pending_ = false;
+        set_storage_status(tr("Unable to start the storage operation."));
+      } else {
+        set_storage_status(tr("Storage operation accepted."));
+      }
+      request_redraw();
+      return;
+    }
+
+    if (update.state == PLAINROOT_STORAGE_OPERATION_SUCCEEDED) {
+      storage_operation_pending_ = false;
+      set_storage_status(tr("Storage operation completed."));
+      if (storage_bridge_ != nullptr)
+        (void)storage_bridge_->request_snapshot();
+    } else if (update.state == PLAINROOT_STORAGE_OPERATION_FAILED) {
+      storage_operation_pending_ = false;
+      set_storage_status(tr(storage_operation_error_message(update.error)));
+      if (storage_bridge_ != nullptr)
+        (void)storage_bridge_->request_snapshot();
+    } else if (update.state == PLAINROOT_STORAGE_OPERATION_CANCELLED) {
+      storage_operation_pending_ = false;
+      set_storage_status(tr("Storage operation was cancelled."));
+    } else if (update.state == PLAINROOT_STORAGE_OPERATION_INDETERMINATE) {
+      storage_operation_pending_ = false;
+      set_storage_status(tr("Storage operation outcome is uncertain."));
+      if (storage_bridge_ != nullptr)
+        (void)storage_bridge_->request_snapshot();
+    } else {
+      const bool unmount =
+          update.operation_kind == PLAINROOT_STORAGE_OPERATION_UNMOUNT;
+      set_storage_status(
+          tr(unmount ? "Unmounting location…" : "Mounting volume…"));
+    }
+    request_redraw();
+  }
+
+  static const char *storage_operation_error_message(uint32_t error) {
+    switch (error) {
+    case PLAINROOT_STORAGE_OPERATION_ERROR_AUTHORIZATION_DENIED:
+      return "Storage authorization was denied.";
+    case PLAINROOT_STORAGE_OPERATION_ERROR_INCOMPLETE_SNAPSHOT:
+      return "Storage information is incomplete; refresh and try again.";
+    case PLAINROOT_STORAGE_OPERATION_ERROR_STALE_ENTITY:
+      return "This storage device changed. Refresh and try again.";
+    case PLAINROOT_STORAGE_OPERATION_ERROR_UNSUPPORTED_FILESYSTEM:
+      return "This filesystem is not supported for mounting.";
+    case PLAINROOT_STORAGE_OPERATION_ERROR_ALREADY_MOUNTED:
+      return "This volume is already mounted.";
+    case PLAINROOT_STORAGE_OPERATION_ERROR_MOUNT_NOT_OWNED:
+      return "This location is managed by another service.";
+    case PLAINROOT_STORAGE_OPERATION_ERROR_MOUNTPOINT_UNAVAILABLE:
+      return "A mount location is unavailable.";
+    case PLAINROOT_STORAGE_OPERATION_ERROR_AUTHORIZATION_UNAVAILABLE:
+      return "Storage authorization is unavailable.";
+    default:
+      return "The storage operation failed.";
+    }
+  }
+
+  void mount_volume(const std::string &id, bool read_only) {
+    if (!storage_catalog_complete_) {
+      set_storage_status(tr(
+          "Storage information is incomplete; mount actions are unavailable."));
+      request_redraw();
+      return;
+    }
+    if (storage_operation_pending_) {
+      set_storage_status(tr("A storage operation is already in progress."));
+      request_redraw();
+      return;
+    }
+    const auto result = storage_bridge_ == nullptr
+                            ? PLAINROOT_STORAGE_NOT_READY
+                            : storage_bridge_->mount_volume(id, read_only);
+    if (result == PLAINROOT_STORAGE_OK) {
+      storage_operation_pending_ = true;
+      set_storage_status(tr("Mounting volume…"));
+    } else {
+      apply_storage_error({result, 0});
+    }
+    request_redraw();
+  }
+
+  void unmount_mount(const std::string &id) {
+    if (!storage_catalog_complete_) {
+      set_storage_status(tr(
+          "Storage information is incomplete; mount actions are unavailable."));
+      request_redraw();
+      return;
+    }
+    if (storage_operation_pending_) {
+      set_storage_status(tr("A storage operation is already in progress."));
+      return;
+    }
+    const auto result = storage_bridge_ == nullptr
+                            ? PLAINROOT_STORAGE_NOT_READY
+                            : storage_bridge_->unmount_mount(id);
+    if (result == PLAINROOT_STORAGE_OK) {
+      storage_operation_pending_ = true;
+      set_storage_status(tr("Unmounting location…"));
+    } else {
+      apply_storage_error({result, 0});
+    }
+    request_redraw();
+  }
+
   void render_entries() {
     for (plainroot_ui_widget *row : rows_) {
       (void)plainroot_ui_widget_remove_child_v1(entries_list_, row);
@@ -397,6 +580,11 @@ private:
 
   void set_status(const std::string &text) { set_label(status_label_, text); }
 
+  void set_storage_status(const std::string &text) {
+    if (storage_view_ != nullptr)
+      storage_view_->set_status(text);
+  }
+
   void request_redraw() {
     if (window_ != nullptr)
       (void)plainroot_toolkit_window_request_redraw(window_);
@@ -406,6 +594,10 @@ private:
   plainroot_ui_context *context_ = nullptr;
   plainroot_toolkit_window *window_ = nullptr;
   detail::DirectoryLoader loader_;
+  std::unique_ptr<detail::StorageLocationsView> storage_view_;
+  bool storage_catalog_complete_ = false;
+  bool storage_operation_pending_ = false;
+  std::unique_ptr<detail::StorageBridge> storage_bridge_;
   bool ui_ready_ = false;
   bool show_hidden_ = false;
   uint64_t generation_ = 0;

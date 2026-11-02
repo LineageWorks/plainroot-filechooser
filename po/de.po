@@ -54,3 +54,99 @@ msgstr "Dieser Ordner kann nicht gelesen werden: %s"
 
 msgid "No matching files."
 msgstr "Keine passenden Dateien gefunden."
+
+msgid "Locations"
+msgstr "Orte"
+
+msgid "Refresh"
+msgstr "Aktualisieren"
+
+msgid "Checking storage locations…"
+msgstr "Speicherorte werden geprüft …"
+
+msgid "Storage locations are unavailable."
+msgstr "Speicherorte sind nicht verfügbar."
+
+msgid "Storage information is incomplete; mount actions are unavailable."
+msgstr "Speicherinformationen sind unvollständig; Einhängeaktionen sind nicht verfügbar."
+
+msgid "No removable volumes or mounted network locations."
+msgstr "Keine Wechseldatenträger oder eingebundenen Netzwerkorte gefunden."
+
+msgid "Storage locations are up to date."
+msgstr "Speicherorte sind aktuell."
+
+msgid "Unable to read storage locations."
+msgstr "Speicherorte können nicht gelesen werden."
+
+msgid "Storage service is unavailable."
+msgstr "Der Speicherdienst ist nicht verfügbar."
+
+msgid "Storage access was denied."
+msgstr "Der Zugriff auf den Speicher wurde verweigert."
+
+msgid "Storage service is busy."
+msgstr "Der Speicherdienst ist ausgelastet."
+
+msgid "Unable to start the storage operation."
+msgstr "Der Speichervorgang kann nicht gestartet werden."
+
+msgid "Storage operation accepted."
+msgstr "Der Speichervorgang wurde angenommen."
+
+msgid "Storage operation completed."
+msgstr "Der Speichervorgang wurde abgeschlossen."
+
+msgid "Storage operation was cancelled."
+msgstr "Der Speichervorgang wurde abgebrochen."
+
+msgid "Storage operation outcome is uncertain."
+msgstr "Das Ergebnis des Speichervorgangs ist ungewiss."
+
+msgid "Mounting volume…"
+msgstr "Datenträger wird eingebunden …"
+
+msgid "Unmounting location…"
+msgstr "Speicherort wird ausgehängt …"
+
+msgid "A storage operation is already in progress."
+msgstr "Ein Speichervorgang läuft bereits."
+
+msgid "Storage authorization was denied."
+msgstr "Die Speicherberechtigung wurde verweigert."
+
+msgid "Storage information is incomplete; refresh and try again."
+msgstr "Die Speicherinformationen sind unvollständig. Aktualisieren Sie sie und versuchen Sie es erneut."
+
+msgid "This storage device changed. Refresh and try again."
+msgstr "Dieses Speichergerät wurde geändert. Aktualisieren Sie die Ansicht und versuchen Sie es erneut."
+
+msgid "This filesystem is not supported for mounting."
+msgstr "Dieses Dateisystem wird zum Einbinden nicht unterstützt."
+
+msgid "This volume is already mounted."
+msgstr "Dieser Datenträger ist bereits eingebunden."
+
+msgid "This location is managed by another service."
+msgstr "Dieser Speicherort wird von einem anderen Dienst verwaltet."
+
+msgid "A mount location is unavailable."
+msgstr "Ein Einhängeort ist nicht verfügbar."
+
+msgid "Storage authorization is unavailable."
+msgstr "Die Speicherberechtigung ist nicht verfügbar."
+
+msgid "The storage operation failed."
+msgstr "Der Speichervorgang ist fehlgeschlagen."
+
+msgid "Mount"
+msgstr "Einbinden"
+
+msgid "Unmount"
+msgstr "Aushängen"
+
+msgid "Confirm unmount"
+msgstr "Aushängen bestätigen"
+
+msgid "Cancel"
+msgstr "Abbrechen"

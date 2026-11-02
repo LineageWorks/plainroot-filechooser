@@ -55,3 +55,99 @@ msgstr "Не удалось прочитать эту папку: %s"
 
 msgid "No matching files."
 msgstr "Подходящие файлы не найдены."
+
+msgid "Locations"
+msgstr "Расположения"
+
+msgid "Refresh"
+msgstr "Обновить"
+
+msgid "Checking storage locations…"
+msgstr "Проверка мест хранения…"
+
+msgid "Storage locations are unavailable."
+msgstr "Места хранения недоступны."
+
+msgid "Storage information is incomplete; mount actions are unavailable."
+msgstr "Сведения о хранилище неполные; операции подключения недоступны."
+
+msgid "No removable volumes or mounted network locations."
+msgstr "Нет съёмных томов или подключённых сетевых расположений."
+
+msgid "Storage locations are up to date."
+msgstr "Сведения о местах хранения обновлены."
+
+msgid "Unable to read storage locations."
+msgstr "Не удалось прочитать места хранения."
+
+msgid "Storage service is unavailable."
+msgstr "Служба хранения недоступна."
+
+msgid "Storage access was denied."
+msgstr "В доступе к хранилищу отказано."
+
+msgid "Storage service is busy."
+msgstr "Служба хранения занята."
+
+msgid "Unable to start the storage operation."
+msgstr "Не удалось запустить операцию с хранилищем."
+
+msgid "Storage operation accepted."
+msgstr "Запрос операции с хранилищем принят."
+
+msgid "Storage operation completed."
+msgstr "Операция с хранилищем завершена."
+
+msgid "Storage operation was cancelled."
+msgstr "Операция с хранилищем отменена."
+
+msgid "Storage operation outcome is uncertain."
+msgstr "Результат операции с хранилищем неизвестен."
+
+msgid "Mounting volume…"
+msgstr "Подключение тома…"
+
+msgid "Unmounting location…"
+msgstr "Отключение расположения…"
+
+msgid "A storage operation is already in progress."
+msgstr "Операция с хранилищем уже выполняется."
+
+msgid "Storage authorization was denied."
+msgstr "В разрешении на доступ к хранилищу отказано."
+
+msgid "Storage information is incomplete; refresh and try again."
+msgstr "Сведения о хранилище неполные. Обновите их и попробуйте снова."
+
+msgid "This storage device changed. Refresh and try again."
+msgstr "Это устройство хранения изменилось. Обновите данные и попробуйте снова."
+
+msgid "This filesystem is not supported for mounting."
+msgstr "Подключение этой файловой системы не поддерживается."
+
+msgid "This volume is already mounted."
+msgstr "Этот том уже подключён."
+
+msgid "This location is managed by another service."
+msgstr "Это расположение управляется другой службой."
+
+msgid "A mount location is unavailable."
+msgstr "Точка подключения недоступна."
+
+msgid "Storage authorization is unavailable."
+msgstr "Авторизация доступа к хранилищу недоступна."
+
+msgid "The storage operation failed."
+msgstr "Не удалось выполнить операцию с хранилищем."
+
+msgid "Mount"
+msgstr "Подключить"
+
+msgid "Unmount"
+msgstr "Отключить"
+
+msgid "Confirm unmount"
+msgstr "Подтвердить отключение"
+
+msgid "Cancel"
+msgstr "Отмена"

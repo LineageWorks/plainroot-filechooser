@@ -54,3 +54,99 @@ msgstr "לא ניתן לקרוא את התיקייה: %s"
 
 msgid "No matching files."
 msgstr "לא נמצאו קבצים תואמים."
+
+msgid "Locations"
+msgstr "מיקומים"
+
+msgid "Refresh"
+msgstr "רענון"
+
+msgid "Checking storage locations…"
+msgstr "מיקומי האחסון נבדקים…"
+
+msgid "Storage locations are unavailable."
+msgstr "מיקומי האחסון אינם זמינים."
+
+msgid "Storage information is incomplete; mount actions are unavailable."
+msgstr "פרטי האחסון אינם מלאים; פעולות העיגון אינן זמינות."
+
+msgid "No removable volumes or mounted network locations."
+msgstr "לא נמצאו אמצעי אחסון נשלפים או מיקומי רשת מעוגנים."
+
+msgid "Storage locations are up to date."
+msgstr "פרטי מיקומי האחסון מעודכנים."
+
+msgid "Unable to read storage locations."
+msgstr "לא ניתן לקרוא את מיקומי האחסון."
+
+msgid "Storage service is unavailable."
+msgstr "שירות האחסון אינו זמין."
+
+msgid "Storage access was denied."
+msgstr "הגישה לאחסון נדחתה."
+
+msgid "Storage service is busy."
+msgstr "שירות האחסון עסוק."
+
+msgid "Unable to start the storage operation."
+msgstr "לא ניתן להתחיל את פעולת האחסון."
+
+msgid "Storage operation accepted."
+msgstr "בקשת פעולת האחסון התקבלה."
+
+msgid "Storage operation completed."
+msgstr "פעולת האחסון הושלמה."
+
+msgid "Storage operation was cancelled."
+msgstr "פעולת האחסון בוטלה."
+
+msgid "Storage operation outcome is uncertain."
+msgstr "תוצאת פעולת האחסון אינה ודאית."
+
+msgid "Mounting volume…"
+msgstr "אמצעי האחסון מעוגן…"
+
+msgid "Unmounting location…"
+msgstr "המיקום מנותק…"
+
+msgid "A storage operation is already in progress."
+msgstr "פעולת אחסון כבר מתבצעת."
+
+msgid "Storage authorization was denied."
+msgstr "הרשאת האחסון נדחתה."
+
+msgid "Storage information is incomplete; refresh and try again."
+msgstr "פרטי האחסון אינם מלאים. יש לרענן ולנסות שוב."
+
+msgid "This storage device changed. Refresh and try again."
+msgstr "התקן האחסון השתנה. יש לרענן ולנסות שוב."
+
+msgid "This filesystem is not supported for mounting."
+msgstr "מערכת הקבצים הזו אינה נתמכת לעיגון."
+
+msgid "This volume is already mounted."
+msgstr "אמצעי האחסון הזה כבר מעוגן."
+
+msgid "This location is managed by another service."
+msgstr "השירות שמנהל את המיקום הזה הוא שירות אחר."
+
+msgid "A mount location is unavailable."
+msgstr "מיקום העיגון אינו זמין."
+
+msgid "Storage authorization is unavailable."
+msgstr "הרשאת האחסון אינה זמינה."
+
+msgid "The storage operation failed."
+msgstr "פעולת האחסון נכשלה."
+
+msgid "Mount"
+msgstr "עיגון"
+
+msgid "Unmount"
+msgstr "ניתוק"
+
+msgid "Confirm unmount"
+msgstr "אישור ניתוק"
+
+msgid "Cancel"
+msgstr "ביטול"

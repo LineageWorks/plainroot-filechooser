@@ -1,1 +1,3 @@
 src/main.cpp
+src/browser_controller.cpp
+src/storage_locations_view.cpp

@@ -55,3 +55,99 @@ msgstr "تعذّر قراءة هذا المجلد: %s"
 
 msgid "No matching files."
 msgstr "لم يتم العثور على ملفات مطابقة."
+
+msgid "Locations"
+msgstr "المواقع"
+
+msgid "Refresh"
+msgstr "تحديث"
+
+msgid "Checking storage locations…"
+msgstr "جارٍ التحقق من مواقع التخزين…"
+
+msgid "Storage locations are unavailable."
+msgstr "مواقع التخزين غير متاحة."
+
+msgid "Storage information is incomplete; mount actions are unavailable."
+msgstr "معلومات التخزين غير مكتملة؛ إجراءات التركيب غير متاحة."
+
+msgid "No removable volumes or mounted network locations."
+msgstr "لا توجد وحدات تخزين قابلة للإزالة أو مواقع شبكة مركّبة."
+
+msgid "Storage locations are up to date."
+msgstr "معلومات مواقع التخزين محدّثة."
+
+msgid "Unable to read storage locations."
+msgstr "تعذّرت قراءة مواقع التخزين."
+
+msgid "Storage service is unavailable."
+msgstr "خدمة التخزين غير متاحة."
+
+msgid "Storage access was denied."
+msgstr "رُفض الوصول إلى التخزين."
+
+msgid "Storage service is busy."
+msgstr "خدمة التخزين مشغولة."
+
+msgid "Unable to start the storage operation."
+msgstr "تعذّر بدء عملية التخزين."
+
+msgid "Storage operation accepted."
+msgstr "قُبل طلب عملية التخزين."
+
+msgid "Storage operation completed."
+msgstr "اكتملت عملية التخزين."
+
+msgid "Storage operation was cancelled."
+msgstr "أُلغيت عملية التخزين."
+
+msgid "Storage operation outcome is uncertain."
+msgstr "نتيجة عملية التخزين غير مؤكدة."
+
+msgid "Mounting volume…"
+msgstr "جارٍ تركيب وحدة التخزين…"
+
+msgid "Unmounting location…"
+msgstr "جارٍ إلغاء تركيب الموقع…"
+
+msgid "A storage operation is already in progress."
+msgstr "توجد عملية تخزين قيد التنفيذ بالفعل."
+
+msgid "Storage authorization was denied."
+msgstr "رُفض الإذن بعملية التخزين."
+
+msgid "Storage information is incomplete; refresh and try again."
+msgstr "معلومات التخزين غير مكتملة. حدّثها وحاول مجددًا."
+
+msgid "This storage device changed. Refresh and try again."
+msgstr "تغيّر جهاز التخزين هذا. حدّث المعلومات وحاول مجددًا."
+
+msgid "This filesystem is not supported for mounting."
+msgstr "تركيب نظام الملفات هذا غير مدعوم."
+
+msgid "This volume is already mounted."
+msgstr "وحدة التخزين هذه مركّبة بالفعل."
+
+msgid "This location is managed by another service."
+msgstr "تدير خدمة أخرى هذا الموقع."
+
+msgid "A mount location is unavailable."
+msgstr "موقع التركيب غير متاح."
+
+msgid "Storage authorization is unavailable."
+msgstr "إذن التخزين غير متاح."
+
+msgid "The storage operation failed."
+msgstr "فشلت عملية التخزين."
+
+msgid "Mount"
+msgstr "تركيب"
+
+msgid "Unmount"
+msgstr "إلغاء التركيب"
+
+msgid "Confirm unmount"
+msgstr "تأكيد إلغاء التركيب"
+
+msgid "Cancel"
+msgstr "إلغاء"

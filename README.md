@@ -12,10 +12,18 @@ The `plainroot-filechooser-browser` executable is an integration prototype for
 the local browser UI. It uses `plainroot-toolkit` for its window and widgets and
 `plainroot-core` asynchronous filesystem listing for directory navigation.
 Search is applied to the displayed listing, hidden entries can be shown, and
-file selection returns the native path on stdout. It is not yet registered as
-an XDG portal backend; request handling, mounted-volume actions, filters, save
-flows, and backend registration remain on the roadmap.
-The window follows the active Plainroot appearance theme through the toolkit.
+file selection returns the native path on stdout. It consumes
+`plainroot-storage-client` snapshots to list removable volumes and mounted
+network locations. Mount and confirmed unmount requests go through
+`plainroot-storaged`; partial snapshots suppress storage operations. Local file
+browsing remains available when the storage service is unavailable. Closing the
+browser never unmounts a volume or network location. The window follows the
+active Plainroot appearance theme through the toolkit.
+
+The browser is not yet registered as an XDG portal backend. Portal request
+handling, filters, save flows, broader GTK parity, and backend registration
+remain on the roadmap. Interactive mount and unmount acceptance is also still
+pending.
 
 The browser accepts an optional absolute starting directory. Directory names
 remain native byte paths for navigation and selection; names that are not valid
