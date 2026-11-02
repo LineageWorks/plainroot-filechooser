@@ -46,10 +46,14 @@ plus libmagic content sniffing for ambiguous or unmatched filenames. MIME
 classification runs on the directory worker and is requested only when the
 selected filter uses MIME patterns. Glob and MIME patterns in one filter are
 combined as alternatives. The backend and browser link libmagic but remain
-free of GIO. The prototype is not advertised to the portal broker; parent-window
-modality and live multiple-file/filter/choice portal acceptance remain open.
-Keep GTK selected as the fallback until those capabilities and request
-lifecycle are validated.
+free of GIO. Portal parent identifiers and the `modal` option are forwarded to
+toolkit window creation. On Wayland, `xdg-foreign` v2 transient parenting and
+the optional testing `xdg-dialog-v1` presentation hint are used when available.
+The modal hint does not enforce parent-event filtering, and parent destruction
+is not yet tied to portal request closure. X11 parent identifiers are ignored.
+The prototype is not advertised to the portal broker; live compositor/broker
+and multiple-file/filter/choice acceptance remain open. Keep GTK selected as
+the fallback until those capabilities and request lifecycle are validated.
 
 Live removable-volume mount and SSHFS connect/disconnect acceptance are still
 pending; the current host does not have the `sshfs` executable installed.

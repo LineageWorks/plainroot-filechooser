@@ -65,6 +65,7 @@ struct PortalRequest {
   bool has_current_filter = false;
   bool multiple = false;
   bool directory = false;
+  bool modal = true;
   bool save_file = false;
   bool cancel_requested = false;
   bool finished = false;
@@ -271,7 +272,12 @@ bool parse_options(sd_bus_message *message, PortalRequest &request) {
                                        contents) < 0)
       return false;
 
-    if (std::strcmp(key, "multiple") == 0 &&
+    if (std::strcmp(key, "modal") == 0 &&
+        std::strcmp(contents, "b") == 0) {
+      int value = 1;
+      result = sd_bus_message_read(message, "b", &value);
+      request.modal = value != 0;
+    } else if (std::strcmp(key, "multiple") == 0 &&
         std::strcmp(contents, "b") == 0) {
       int value = 0;
       result = sd_bus_message_read(message, "b", &value);
@@ -743,6 +749,8 @@ private:
     options.maximum_width = 1600;
     options.maximum_height = 1200;
     options.content_max_width = 1280.0F;
+    options.parent_window_identifier = request.parent_window.c_str();
+    options.modal = request.modal ? 1U : 0U;
     options.ui_context = request.context;
     options.clear_color[0] = 0.055F;
     options.clear_color[1] = 0.065F;
