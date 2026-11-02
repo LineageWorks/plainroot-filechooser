@@ -40,6 +40,18 @@ msgstr "Der aktuelle Ordner wird zurückgegeben."
 msgid "Save file"
 msgstr "Datei speichern"
 
+msgid "Save files"
+msgstr "Dateien speichern"
+
+msgid "Files to save"
+msgstr "Zu speichernde Dateien"
+
+msgid "Existing or repeated names receive numbered variants."
+msgstr "Vorhandene oder doppelte Namen erhalten eine Nummer."
+
+msgid "The selected folder will be used to save these files."
+msgstr "Der ausgewählte Ordner wird zum Speichern dieser Dateien verwendet."
+
 msgid "Save"
 msgstr "Speichern"
 

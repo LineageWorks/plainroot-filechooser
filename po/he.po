@@ -40,6 +40,18 @@ msgstr "התיקייה הנוכחית תוחזר."
 msgid "Save file"
 msgstr "שמירת קובץ"
 
+msgid "Save files"
+msgstr "שמירת קבצים"
+
+msgid "Files to save"
+msgstr "קבצים לשמירה"
+
+msgid "Existing or repeated names receive numbered variants."
+msgstr "לשמות קיימים או כפולים יתווסף מספר."
+
+msgid "The selected folder will be used to save these files."
+msgstr "התיקייה שנבחרה תשמש לשמירת הקבצים האלה."
+
 msgid "Save"
 msgstr "שמירה"
 

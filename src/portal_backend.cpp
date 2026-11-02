@@ -2,6 +2,7 @@
 
 #include "browser_controller.hpp"
 #include "portal_choices.hpp"
+#include "save_files.hpp"
 #include "ui_context_factory.hpp"
 
 #include <plainroot/i18n/i18n.h>
@@ -58,6 +59,7 @@ struct PortalRequest {
   std::string start_path;
   std::string current_name;
   std::string current_file_path;
+  std::vector<std::string> save_filenames;
   std::vector<BrowserFilter> filters;
   std::vector<BrowserChoice> choices;
   BrowserFilter current_filter;
@@ -67,6 +69,8 @@ struct PortalRequest {
   bool directory = false;
   bool modal = true;
   bool save_file = false;
+  bool save_files = false;
+  bool has_save_filenames = false;
   bool cancel_requested = false;
   bool finished = false;
   plainroot_ui_context *context = nullptr;
@@ -85,7 +89,8 @@ int open_file_method(sd_bus_message *message, void *user_data,
                      sd_bus_error *ret_error);
 int save_file_method(sd_bus_message *message, void *user_data,
                      sd_bus_error *ret_error);
-int unsupported_method(sd_bus_message *message, void *, sd_bus_error *);
+int save_files_method(sd_bus_message *message, void *user_data,
+                      sd_bus_error *ret_error);
 int close_request_method(sd_bus_message *message, void *user_data,
                          sd_bus_error *ret_error);
 
@@ -95,7 +100,7 @@ const sd_bus_vtable kChooserVtable[] = {
                   SD_BUS_VTABLE_UNPRIVILEGED),
     SD_BUS_METHOD("SaveFile", "osssa{sv}", "ua{sv}", save_file_method,
                   SD_BUS_VTABLE_UNPRIVILEGED),
-    SD_BUS_METHOD("SaveFiles", "osssa{sv}", "ua{sv}", unsupported_method,
+    SD_BUS_METHOD("SaveFiles", "osssa{sv}", "ua{sv}", save_files_method,
                   SD_BUS_VTABLE_UNPRIVILEGED),
     SD_BUS_VTABLE_END,
 };
@@ -277,12 +282,12 @@ bool parse_options(sd_bus_message *message, PortalRequest &request) {
       int value = 1;
       result = sd_bus_message_read(message, "b", &value);
       request.modal = value != 0;
-    } else if (std::strcmp(key, "multiple") == 0 &&
+    } else if (!request.save_files && std::strcmp(key, "multiple") == 0 &&
         std::strcmp(contents, "b") == 0) {
       int value = 0;
       result = sd_bus_message_read(message, "b", &value);
       request.multiple = value != 0;
-    } else if (std::strcmp(key, "directory") == 0 &&
+    } else if (!request.save_files && std::strcmp(key, "directory") == 0 &&
                std::strcmp(contents, "b") == 0) {
       int value = 0;
       result = sd_bus_message_read(message, "b", &value);
@@ -325,10 +330,10 @@ bool parse_options(sd_bus_message *message, PortalRequest &request) {
           return false;
         request.current_file_path.assign(path, size - 1U);
       }
-    } else if (std::strcmp(key, "filters") == 0 &&
+    } else if (!request.save_files && std::strcmp(key, "filters") == 0 &&
                std::strcmp(contents, "a(sa(us))") == 0) {
       result = parse_filter_list(message, request.filters) ? 1 : -EINVAL;
-    } else if (std::strcmp(key, "current_filter") == 0 &&
+    } else if (!request.save_files && std::strcmp(key, "current_filter") == 0 &&
                std::strcmp(contents, "(sa(us))") == 0) {
       request.has_current_filter =
           parse_current_filter(message, request.current_filter);
@@ -336,6 +341,16 @@ bool parse_options(sd_bus_message *message, PortalRequest &request) {
     } else if (std::strcmp(key, "choices") == 0 &&
                std::strcmp(contents, "a(ssa(ss)s)") == 0) {
       result = parse_portal_choices(message, request.choices) ? 1 : -EINVAL;
+    } else if (request.save_files && std::strcmp(key, "files") == 0 &&
+               std::strcmp(contents, "aay") == 0) {
+      if (request.has_save_filenames) {
+        result = -EINVAL;
+      } else {
+        const bool parsed = detail::parse_portal_save_files(
+            message, request.save_filenames);
+        request.has_save_filenames = parsed;
+        result = parsed ? 1 : -EINVAL;
+      }
     } else {
       result = sd_bus_message_skip(message, contents);
     }
@@ -472,14 +487,19 @@ public:
   }
 
   int open_file(sd_bus_message *message) {
-    return begin_file_request(message, false);
+    return begin_file_request(message, false, false);
   }
 
   int save_file(sd_bus_message *message) {
-    return begin_file_request(message, true);
+    return begin_file_request(message, true, false);
   }
 
-  int begin_file_request(sd_bus_message *message, bool save_file_request) {
+  int save_files(sd_bus_message *message) {
+    return begin_file_request(message, false, true);
+  }
+
+  int begin_file_request(sd_bus_message *message, bool save_file_request,
+                         bool save_files_request) {
     const char *handle = nullptr;
     const char *app_id = nullptr;
     const char *parent_window = nullptr;
@@ -488,10 +508,12 @@ public:
                                      &parent_window, &title);
     if (result < 0 || handle == nullptr || app_id == nullptr ||
         parent_window == nullptr || title == nullptr)
-      return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
-                         save_file_request
-                             ? "Malformed FileChooser.SaveFile request"
-                             : "Malformed FileChooser.OpenFile request");
+      return reply_error(
+          message, SD_BUS_ERROR_INVALID_ARGS,
+          save_files_request
+              ? "Malformed FileChooser.SaveFiles request"
+              : (save_file_request ? "Malformed FileChooser.SaveFile request"
+                                   : "Malformed FileChooser.OpenFile request"));
     if (!sd_bus_object_path_is_valid(handle) ||
         std::string_view(handle).rfind(kRequestPrefix, 0) != 0)
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
@@ -506,15 +528,18 @@ public:
       request->parent_window = parent_window;
       request->title = title;
       request->save_file = save_file_request;
+      request->save_files = save_files_request;
     } catch (const std::bad_alloc &) {
       return reply_error(message, SD_BUS_ERROR_NO_MEMORY,
                          "Unable to allocate chooser request");
     }
     if (!parse_options(message, *request))
-      return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
-                         save_file_request
-                             ? "Malformed FileChooser.SaveFile options"
-                             : "Malformed FileChooser.OpenFile options");
+      return reply_error(
+          message, SD_BUS_ERROR_INVALID_ARGS,
+          save_files_request
+              ? "Malformed FileChooser.SaveFiles options"
+              : (save_file_request ? "Malformed FileChooser.SaveFile options"
+                                   : "Malformed FileChooser.OpenFile options"));
     if (!select_initial_filter(*request))
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
                          "Too many file filters in request");
@@ -524,6 +549,11 @@ public:
     if (save_file_request && request->directory)
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
                          "SaveFile does not support directory selection");
+    if (save_files_request && !request->has_save_filenames)
+      return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
+                         "SaveFiles requires at least one valid file name");
+    if (save_files_request)
+      request->directory = true;
     if (save_file_request && !request->current_file_path.empty()) {
       gchar *folder = g_path_get_dirname(request->current_file_path.c_str());
       gchar *name = g_path_get_basename(request->current_file_path.c_str());
@@ -541,18 +571,23 @@ public:
     }
     if (request->title.empty()) {
       const char *fallback = plainroot_i18n_gettext_v1(
-          kDomain, save_file_request
-                       ? "Save file"
-                       : (request->directory
-                              ? "Choose a folder"
-                              : (request->multiple ? "Choose files"
-                                                   : "Choose a file")));
+          kDomain, save_files_request
+                       ? "Save files"
+                       : (save_file_request
+                              ? "Save file"
+                              : (request->directory
+                                     ? "Choose a folder"
+                                     : (request->multiple ? "Choose files"
+                                                          : "Choose a file"))));
       const char *english_fallback =
-          save_file_request ? "Save file"
-                            : (request->directory
-                                   ? "Choose a folder"
-                                   : (request->multiple ? "Choose files"
-                                                        : "Choose a file"));
+          save_files_request
+              ? "Save files"
+              : (save_file_request
+                     ? "Save file"
+                     : (request->directory
+                            ? "Choose a folder"
+                            : (request->multiple ? "Choose files"
+                                                 : "Choose a file")));
       request->title = fallback == nullptr ? english_fallback : fallback;
     }
     if (request->start_path.empty()) {
@@ -594,15 +629,35 @@ public:
               const std::vector<BrowserChoiceSelection> *choices = nullptr) {
     if (request.finished)
       return;
+    std::vector<std::string> save_paths;
+    const std::vector<std::string> *result_paths = &native_paths;
+    if (response == kResponseSuccess && request.save_files) {
+      if (native_paths.size() != 1U) {
+        response = kResponseError;
+      } else {
+        try {
+          auto resolved = detail::resolve_save_files(native_paths.front(),
+                                                     request.save_filenames);
+          if (resolved.status != detail::SaveFilesStatus::success) {
+            response = kResponseError;
+          } else {
+            save_paths = std::move(resolved.paths);
+            result_paths = &save_paths;
+          }
+        } catch (const std::bad_alloc &) {
+          response = kResponseError;
+        }
+      }
+    }
     if (response == kResponseSuccess) {
-      if (native_paths.empty()) {
+      if (result_paths->empty()) {
         response = kResponseError;
       }
       std::vector<std::string> uris;
       try {
         if (response == kResponseSuccess) {
-          uris.reserve(native_paths.size());
-          for (const std::string &native_path : native_paths) {
+          uris.reserve(result_paths->size());
+          for (const std::string &native_path : *result_paths) {
             std::string uri = native_path_to_uri(native_path);
             if (uri.empty()) {
               response = kResponseError;
@@ -615,7 +670,7 @@ public:
         response = kResponseError;
       }
       if (response == kResponseSuccess &&
-          uris.size() == native_paths.size() && !uris.empty()) {
+          uris.size() == result_paths->size() && !uris.empty()) {
         send_reply(request, response, uris, current_filter, choices);
         request.finished = true;
         unregister_request(request);
@@ -724,6 +779,7 @@ private:
                                     request.selected_filter_index);
     request.controller->set_choices(request.choices);
     request.controller->set_save_file(request.save_file);
+    request.controller->set_save_files(request.save_filenames);
     request.controller->set_initial_filename(request.current_name);
     request.controller->set_accept_label(request.accept_label);
     if (!request.controller->ready() || !request.controller->create_ui()) {
@@ -734,12 +790,15 @@ private:
     plainroot_toolkit_window_options_v1 options{};
     options.struct_size = sizeof(options);
     options.title = request.title.empty()
-                        ? (request.save_file
-                               ? "Save file"
-                               : (request.directory
-                                      ? "Choose a folder"
-                                      : (request.multiple ? "Choose files"
-                                                          : "Choose a file")))
+                        ? (request.save_files
+                               ? "Save files"
+                               : (request.save_file
+                                      ? "Save file"
+                                      : (request.directory
+                                             ? "Choose a folder"
+                                             : (request.multiple
+                                                    ? "Choose files"
+                                                    : "Choose a file"))))
                         : request.title.c_str();
     options.app_id = "org.plainroot.FileChooser";
     options.initial_width = 1000;
@@ -780,7 +839,8 @@ private:
     request.backend->finish(request,
                             accepted ? kResponseSuccess : kResponseCancelled,
                             native_paths, true,
-                            accepted ? current_filter : nullptr,
+                            accepted && !request.save_files ? current_filter
+                                                            : nullptr,
                             accepted ? &choices : nullptr);
   }
 
@@ -918,10 +978,8 @@ int save_file_method(sd_bus_message *message, void *user_data, sd_bus_error *) {
   return static_cast<PortalBackend *>(user_data)->save_file(message);
 }
 
-int unsupported_method(sd_bus_message *message, void *, sd_bus_error *) {
-  return sd_bus_reply_method_errorf(
-      message, SD_BUS_ERROR_NOT_SUPPORTED,
-      "This FileChooser operation is not implemented yet");
+int save_files_method(sd_bus_message *message, void *user_data, sd_bus_error *) {
+  return static_cast<PortalBackend *>(user_data)->save_files(message);
 }
 
 int close_request_method(sd_bus_message *message, void *user_data,

@@ -49,6 +49,7 @@ public:
                    int32_t selected_filter);
   void set_choices(std::vector<BrowserChoice> choices);
   void set_save_file(bool save_file);
+  void set_save_files(std::vector<std::string> filenames);
   void set_initial_filename(std::string filename);
   void set_accept_label(std::string label);
   void navigate(std::string path);

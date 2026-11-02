@@ -41,6 +41,18 @@ msgstr "سيتم إرجاع المجلد الحالي."
 msgid "Save file"
 msgstr "حفظ الملف"
 
+msgid "Save files"
+msgstr "حفظ الملفات"
+
+msgid "Files to save"
+msgstr "الملفات المطلوب حفظها"
+
+msgid "Existing or repeated names receive numbered variants."
+msgstr "ستُضاف أرقام إلى الأسماء الموجودة أو المكررة."
+
+msgid "The selected folder will be used to save these files."
+msgstr "سيُستخدم المجلد المحدد لحفظ هذه الملفات."
+
 msgid "Save"
 msgstr "حفظ"
 

@@ -41,6 +41,18 @@ msgstr "Будет возвращена текущая папка."
 msgid "Save file"
 msgstr "Сохранить файл"
 
+msgid "Save files"
+msgstr "Сохранить файлы"
+
+msgid "Files to save"
+msgstr "Файлы для сохранения"
+
+msgid "Existing or repeated names receive numbered variants."
+msgstr "К существующим или повторяющимся именам добавится номер."
+
+msgid "The selected folder will be used to save these files."
+msgstr "Выбранная папка будет использоваться для сохранения этих файлов."
+
 msgid "Save"
 msgstr "Сохранить"
 

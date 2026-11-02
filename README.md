@@ -34,12 +34,16 @@ The build also includes an unregistered `plainroot-filechooser-portal`
 prototype. It exports the portal FileChooser and Request interfaces through
 `sd-bus`, supports single-file, multiple-file, and directory `OpenFile`
 requests, and supports `SaveFile` requests with suggested names and overwrite
-confirmation. Multiple selection uses checkboxes and returns every selected
-file as a `file://` URI. Successful requests, request closure, and user
-cancellation are handled. Glob filters can select the visible file set, and
-the selected `current_filter` is returned with successful responses. Portal
-`choices` are rendered as adaptive dropdowns or boolean checkboxes and returned
-as selected ID/value pairs. Request parsing bounds group and option counts and
+confirmation. `SaveFiles` requests show the requested names, ask for a
+destination folder, and return ordered `file://` URIs with available names
+when requested names collide at selection time. The UI explains that existing
+or repeated names receive numbered variants; the portal does not create or
+reserve files. Multi-file `OpenFile` selection uses checkboxes and returns
+every selected file as a `file://` URI. Successful requests, request closure,
+and user cancellation are handled. Glob filters can select the visible file
+set, and the selected `current_filter` is returned with successful responses.
+Portal `choices` are rendered as adaptive dropdowns or boolean checkboxes and
+returned as selected ID/value pairs. Request parsing bounds group and option counts and
 string sizes, and rejects duplicate IDs or invalid initial selections. MIME
 filters use the shared MIME database's `globs2`, aliases, and subclass data,
 plus libmagic content sniffing for ambiguous or unmatched filenames. MIME
@@ -53,8 +57,9 @@ The modal hint does not enforce parent-event filtering, and parent destruction
 or handle invalidation now routes through the toolkit's normal window-close
 callback and cancels the portal request. X11 parent identifiers are ignored.
 The prototype is not advertised to the portal broker; live compositor/broker
-and multiple-file/filter/choice acceptance remain open. Keep GTK selected as
-the fallback until those capabilities and request lifecycle are validated.
+and multi-file, SaveFiles, filter, and choice acceptance remain open. Keep GTK
+selected as the fallback until those capabilities and request lifecycle are
+validated.
 
 Live removable-volume mount and SSHFS connect/disconnect acceptance are still
 pending; the current host does not have the `sshfs` executable installed.

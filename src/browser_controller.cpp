@@ -125,10 +125,13 @@ public:
     auto *page = plainroot_ui_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, kContentSpacing, 1.0F);
     const char *default_title =
-        select_directory_ ? "Choose a folder"
-                           : (save_file_ ? "Save file"
-                                         : (allow_multiple_ ? "Choose files"
-                                                            : "Choose a file"));
+        !save_files_.empty()
+            ? "Save files"
+            : (select_directory_ ? "Choose a folder"
+                                 : (save_file_ ? "Save file"
+                                               : (allow_multiple_
+                                                      ? "Choose files"
+                                                      : "Choose a file")));
     const std::string title_text = requested_title_.empty()
                                        ? tr(default_title)
                                        : requested_title_;
@@ -173,6 +176,36 @@ public:
     if (breadcrumb_strip_ != nullptr)
       (void)plainroot_ui_widget_set_text_direction_v1(breadcrumb_strip_,
                                                       PLAINROOT_UI_TEXT_LTR);
+
+    plainroot_ui_widget *save_files_panel = nullptr;
+    if (!save_files_.empty()) {
+      save_files_panel = plainroot_ui_box_create_v1(
+          context_, PLAINROOT_UI_AXIS_VERTICAL, 8.0F, 0.0F);
+      auto *files_heading = make_label("Files to save", 0.0F);
+      auto *files_note = make_label(
+          "Existing or repeated names receive numbered variants.", 0.0F);
+      auto *files_list = plainroot_ui_box_create_v1(
+          context_, PLAINROOT_UI_AXIS_VERTICAL, 4.0F, 0.0F);
+      if (save_files_panel == nullptr || files_heading == nullptr ||
+          files_note == nullptr || files_list == nullptr ||
+          !add(save_files_panel, files_heading) ||
+          !add(save_files_panel, files_note) ||
+          !add(save_files_panel, files_list))
+        return false;
+      for (const std::string &filename : save_files_) {
+        const std::string display_name = display_path(filename);
+        auto *filename_label = plainroot_ui_label_create_v1(
+            context_, display_name.c_str(),
+            static_cast<uint32_t>(display_name.size()),
+            PLAINROOT_UI_COLOR_ON_SURFACE_V3, 0.0F);
+        if (filename_label == nullptr ||
+            plainroot_ui_widget_set_text_direction_v1(
+                filename_label, PLAINROOT_UI_TEXT_LTR) !=
+                PLAINROOT_UI_RESULT_OK ||
+            !add(files_list, filename_label))
+          return false;
+      }
+    }
 
     auto *controls = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
@@ -229,11 +262,13 @@ public:
         kExpandedControlsWidth, 12.0F, 0.0F);
     const std::string initial_selection_summary =
         allow_multiple_ ? selection_summary()
-                        : tr(select_directory_
-                                 ? "The current folder will be returned."
-                                 : (save_file_
-                                        ? "Enter a name for the file to save."
-                                        : "No file selected"));
+                        : tr(!save_files_.empty()
+                                 ? "The selected folder will be used to save these files."
+                                 : (select_directory_
+                                        ? "The current folder will be returned."
+                                        : (save_file_
+                                               ? "Enter a name for the file to save."
+                                               : "No file selected")));
     selected_label_ = plainroot_ui_label_create_v1(
         context_, initial_selection_summary.data(),
         static_cast<uint32_t>(initial_selection_summary.size()),
@@ -244,8 +279,10 @@ public:
                           : PLAINROOT_UI_TEXT_LTR);
     auto *select = make_action_button(
         accept_label_.empty()
-            ? tr(select_directory_ ? "Select folder"
-                                   : (save_file_ ? "Save" : "Open"))
+            ? tr(!save_files_.empty()
+                     ? "Save"
+                     : (select_directory_ ? "Select folder"
+                                          : (save_file_ ? "Save" : "Open")))
             : accept_label_,
         &Impl::accept_activated);
     if (select != nullptr)
@@ -263,6 +300,7 @@ public:
         list_scroll_ == nullptr || entries_list_ == nullptr ||
         status_label_ == nullptr || footer == nullptr ||
         selected_label_ == nullptr || select == nullptr ||
+        (!save_files_.empty() && save_files_panel == nullptr) ||
         (show_filename_entry &&
          (filename_row == nullptr || filename_label == nullptr ||
           filename_field_ == nullptr)))
@@ -381,7 +419,9 @@ public:
     }
 
     if (!add(outer, padding) || !add(padding, page) || !add(page, title) ||
-        !add(page, location_row) || !add(location_row, location_actions) ||
+        !add(page, location_row) ||
+        (save_files_panel != nullptr && !add(page, save_files_panel)) ||
+        !add(location_row, location_actions) ||
         !add(location_actions, up) || !add(location_actions, home) ||
         (show_filename_entry &&
          (!add(page, filename_row) || !add(filename_row, filename_label) ||
@@ -465,6 +505,10 @@ public:
 
   void set_save_file(bool save_file) { save_file_ = save_file; }
 
+  void set_save_files(std::vector<std::string> filenames) {
+    save_files_ = std::move(filenames);
+  }
+
   void set_initial_filename(std::string filename) {
     initial_filename_ = std::move(filename);
     if (filename_field_ != nullptr)
@@ -510,10 +554,13 @@ private:
         update_selection_summary();
       } else {
         set_label(selected_label_,
-                  tr(select_directory_
-                         ? "The current folder will be returned."
-                         : (save_file_ ? "Enter a name for the file to save."
-                                       : "No file selected")));
+                  tr(!save_files_.empty()
+                         ? "The selected folder will be used to save these files."
+                         : (select_directory_
+                                ? "The current folder will be returned."
+                                : (save_file_
+                                       ? "Enter a name for the file to save."
+                                       : "No file selected"))));
       }
     }
     set_status(tr("Loading folder…"));
@@ -1579,6 +1626,7 @@ private:
   std::string current_path_;
   std::string search_query_;
   std::string initial_filename_;
+  std::vector<std::string> save_files_;
   std::string pending_save_path_;
   std::string selected_path_;
   std::vector<std::string> selected_paths_;
@@ -1658,6 +1706,11 @@ void BrowserController::set_choices(std::vector<BrowserChoice> choices) {
 void BrowserController::set_save_file(bool save_file) {
   if (impl_)
     impl_->set_save_file(save_file);
+}
+
+void BrowserController::set_save_files(std::vector<std::string> filenames) {
+  if (impl_)
+    impl_->set_save_files(std::move(filenames));
 }
 
 void BrowserController::set_initial_filename(std::string filename) {
