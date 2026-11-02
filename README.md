@@ -50,7 +50,8 @@ free of GIO. Portal parent identifiers and the `modal` option are forwarded to
 toolkit window creation. On Wayland, `xdg-foreign` v2 transient parenting and
 the optional testing `xdg-dialog-v1` presentation hint are used when available.
 The modal hint does not enforce parent-event filtering, and parent destruction
-is not yet tied to portal request closure. X11 parent identifiers are ignored.
+or handle invalidation now routes through the toolkit's normal window-close
+callback and cancels the portal request. X11 parent identifiers are ignored.
 The prototype is not advertised to the portal broker; live compositor/broker
 and multiple-file/filter/choice acceptance remain open. Keep GTK selected as
 the fallback until those capabilities and request lifecycle are validated.
