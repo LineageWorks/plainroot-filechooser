@@ -107,6 +107,9 @@ msgstr "الأماكن"
 msgid "Recent"
 msgstr "الملفات الأخيرة"
 
+msgid "Recently used"
+msgstr "الأحدث استخدامًا"
+
 msgid "No recent files."
 msgstr "لا توجد ملفات حديثة."
 

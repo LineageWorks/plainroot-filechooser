@@ -387,9 +387,15 @@ public:
     auto *descending_option = plainroot_ui_list_box_option_create_v1(
         context_, descending_label.c_str(),
         static_cast<uint32_t>(descending_label.size()), 1, 0.0F);
+    const std::string recent_sort_label = tr("Recently used");
+    recent_sort_option_ = plainroot_ui_list_box_option_create_v1(
+        context_, recent_sort_label.c_str(),
+        static_cast<uint32_t>(recent_sort_label.size()), 2, 0.0F);
     if (!add(sort_dropdown_, ascending_option) ||
-        !add(sort_dropdown_, descending_option))
+        !add(sort_dropdown_, descending_option) ||
+        !add(sort_dropdown_, recent_sort_option_))
       return false;
+    (void)plainroot_ui_widget_set_visible_v1(recent_sort_option_, 0U);
     initializing_sort_dropdown_ = true;
     const auto sort_result =
         plainroot_ui_dropdown_set_value_v1(sort_dropdown_, 0);
@@ -608,6 +614,11 @@ public:
     current_path_ = std::move(path);
     recent_mode_ = false;
     sort_order_ = detail::DirectorySortOrder::name_ascending;
+    if (recent_sort_option_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(recent_sort_option_, 0U);
+    initializing_sort_dropdown_ = true;
+    (void)plainroot_ui_dropdown_set_value_v1(sort_dropdown_, 0);
+    initializing_sort_dropdown_ = false;
     refresh_bookmark_button();
     new_folder_created_ = false;
     render_breadcrumbs();
@@ -719,6 +730,11 @@ private:
     auto &self = *static_cast<Impl *>(user_data);
     self.recent_mode_ = true;
     self.sort_order_ = detail::DirectorySortOrder::recent_first;
+    if (self.recent_sort_option_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(self.recent_sort_option_, 1U);
+    self.initializing_sort_dropdown_ = true;
+    (void)plainroot_ui_dropdown_set_value_v1(self.sort_dropdown_, 2);
+    self.initializing_sort_dropdown_ = false;
     self.render_breadcrumbs();
     self.request_directory_load(false);
   }
@@ -1075,11 +1091,14 @@ private:
     uint32_t has_value = 0;
     if (plainroot_ui_dropdown_get_value_v1(widget, &selected, &has_value) !=
             PLAINROOT_UI_RESULT_OK ||
-        has_value == 0 || (selected != 0 && selected != 1))
+        has_value == 0 || selected < 0 || selected > 2 ||
+        (selected == 2 && !self.recent_mode_))
       return;
     self.sort_order_ = selected == 0
                            ? detail::DirectorySortOrder::name_ascending
-                           : detail::DirectorySortOrder::name_descending;
+                           : (selected == 1
+                                  ? detail::DirectorySortOrder::name_descending
+                                  : detail::DirectorySortOrder::recent_first);
     self.schedule_render();
   }
 
@@ -2150,6 +2169,7 @@ private:
   plainroot_ui_widget *bookmark_button_ = nullptr;
   plainroot_ui_widget *filter_dropdown_ = nullptr;
   plainroot_ui_widget *sort_dropdown_ = nullptr;
+  plainroot_ui_widget *recent_sort_option_ = nullptr;
   plainroot_ui_widget *list_scroll_ = nullptr;
   plainroot_ui_widget *entries_list_ = nullptr;
   plainroot_ui_widget *status_label_ = nullptr;

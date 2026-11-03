@@ -106,6 +106,9 @@ msgstr "מקומות"
 msgid "Recent"
 msgstr "אחרונים"
 
+msgid "Recently used"
+msgstr "בשימוש לאחרונה"
+
 msgid "No recent files."
 msgstr "אין קבצים אחרונים."
 

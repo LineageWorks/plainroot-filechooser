@@ -106,6 +106,9 @@ msgstr "Orte"
 msgid "Recent"
 msgstr "Zuletzt verwendet"
 
+msgid "Recently used"
+msgstr "Zuletzt verwendet"
+
 msgid "No recent files."
 msgstr "Keine zuletzt verwendeten Dateien."
 

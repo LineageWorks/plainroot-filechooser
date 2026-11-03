@@ -107,6 +107,9 @@ msgstr "Места"
 msgid "Recent"
 msgstr "Недавние"
 
+msgid "Recently used"
+msgstr "Недавно использованные"
+
 msgid "No recent files."
 msgstr "Недавних файлов нет."
 
