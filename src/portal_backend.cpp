@@ -82,6 +82,7 @@ struct PortalBusSource {
   GSource source;
   PortalBackend *backend;
   gpointer fd_tag;
+  GIOCondition poll_events;
   gint64 deadline_usec;
 };
 
@@ -717,10 +718,11 @@ private:
     if (source == nullptr)
       return false;
     source->backend = this;
+    source->poll_events =
+        static_cast<GIOCondition>(G_IO_IN | G_IO_ERR | G_IO_HUP | G_IO_NVAL);
     source->deadline_usec = -1;
-    source->fd_tag = g_source_add_unix_fd(
-        reinterpret_cast<GSource *>(source), fd,
-        static_cast<GIOCondition>(G_IO_IN | G_IO_ERR | G_IO_HUP | G_IO_NVAL));
+    source->fd_tag = g_source_add_unix_fd(reinterpret_cast<GSource *>(source),
+                                          fd, source->poll_events);
     g_source_set_name(reinterpret_cast<GSource *>(source),
                       "plainroot-filechooser-portal-sd-bus");
     bus_source_ = reinterpret_cast<GSource *>(source);
@@ -1008,7 +1010,10 @@ gboolean bus_source_prepare(GSource *source, gint *timeout_milliseconds) {
     conditions = static_cast<GIOCondition>(conditions | G_IO_IN);
   if ((events & POLLOUT) != 0)
     conditions = static_cast<GIOCondition>(conditions | G_IO_OUT);
-  g_source_modify_unix_fd(source, watch->fd_tag, conditions);
+  if (conditions != watch->poll_events) {
+    g_source_modify_unix_fd(source, watch->fd_tag, conditions);
+    watch->poll_events = conditions;
+  }
   watch->deadline_usec = -1;
   if (deadline == UINT64_MAX) {
     *timeout_milliseconds = -1;
