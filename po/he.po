@@ -157,6 +157,12 @@ msgstr "לא ניתן לשמור את הסימניות."
 msgid "Loading folder…"
 msgstr "התיקייה נטענת…"
 
+msgid "Checking link…"
+msgstr "הקישור נבדק…"
+
+msgid "This item is no longer available."
+msgstr "פריט זה אינו זמין עוד."
+
 msgid "Search files"
 msgstr "חיפוש קבצים"
 

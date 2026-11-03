@@ -681,6 +681,12 @@ private:
     request_redraw();
   }
 
+  void inspect_symlink(const std::string &path) {
+    set_status(tr("Checking link…"));
+    loader_.inspect_symlink(path, generation_);
+    request_redraw();
+  }
+
   void set_folder_creation_controls_enabled(bool enabled) {
     const uint32_t value = enabled ? 1U : 0U;
     if (new_folder_button_ != nullptr)
@@ -1163,6 +1169,10 @@ private:
       action.controller->navigate(action.path);
       return;
     }
+    if (action.kind == PLAINROOT_CORE_FS_ENTRY_SYMLINK) {
+      action.controller->inspect_symlink(action.path);
+      return;
+    }
     if (action.controller->select_directory_) {
       action.controller->set_status(
           tr("Choose the current folder with Select folder."));
@@ -1585,6 +1595,21 @@ private:
     if (result.operation ==
         detail::DirectoryResult::Operation::CreateDirectory) {
       apply_create_folder_result(std::move(result));
+      return;
+    }
+    if (result.operation == detail::DirectoryResult::Operation::InspectSymlink) {
+      if (result.generation != generation_)
+        return;
+      if (result.result == PLAINROOT_CORE_FS_OK &&
+          (result.inspected_kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY ||
+           result.inspected_kind == PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE)) {
+        EntryAction action{this, std::move(result.path),
+                           result.inspected_kind};
+        entry_activated(&action, nullptr);
+      } else {
+        set_status(tr("This item is no longer available."));
+      }
+      request_redraw();
       return;
     }
     if (result.generation != generation_)

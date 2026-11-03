@@ -158,6 +158,12 @@ msgstr "تعذّر حفظ الإشارات المرجعية."
 msgid "Loading folder…"
 msgstr "جارٍ تحميل المجلد…"
 
+msgid "Checking link…"
+msgstr "جارٍ التحقق من الرابط…"
+
+msgid "This item is no longer available."
+msgstr "لم يعد هذا العنصر متاحًا."
+
 msgid "Search files"
 msgstr "البحث في الملفات"
 

@@ -157,6 +157,12 @@ msgstr "Lesezeichen können nicht gespeichert werden."
 msgid "Loading folder…"
 msgstr "Ordner wird geladen …"
 
+msgid "Checking link…"
+msgstr "Link wird überprüft …"
+
+msgid "This item is no longer available."
+msgstr "Dieses Element ist nicht mehr verfügbar."
+
 msgid "Search files"
 msgstr "Dateien durchsuchen"
 

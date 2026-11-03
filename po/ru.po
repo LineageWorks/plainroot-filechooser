@@ -158,6 +158,12 @@ msgstr "Не удалось сохранить закладки."
 msgid "Loading folder…"
 msgstr "Загрузка папки…"
 
+msgid "Checking link…"
+msgstr "Проверка ссылки…"
+
+msgid "This item is no longer available."
+msgstr "Этот объект больше недоступен."
+
 msgid "Search files"
 msgstr "Поиск файлов"
 

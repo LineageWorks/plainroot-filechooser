@@ -92,6 +92,29 @@ public:
     wake_worker();
   }
 
+  void inspect_symlink(std::string path, uint64_t generation) {
+    bool failed = false;
+    {
+      std::lock_guard lock(mutex_);
+      if (stopping_)
+        return;
+      failed = startup_failed_.load(std::memory_order_relaxed);
+      if (!failed)
+        jobs_.push_back({DirectoryResult::Operation::InspectSymlink,
+                         std::move(path), generation, 0, false, {}, {}});
+    }
+    if (failed) {
+      DirectoryResult result{};
+      result.operation = DirectoryResult::Operation::InspectSymlink;
+      result.generation = generation;
+      result.path = std::move(path);
+      result.result = PLAINROOT_CORE_FS_IO_ERROR;
+      publish(std::move(result));
+      return;
+    }
+    wake_worker();
+  }
+
   void request_recent(std::string path, uint64_t generation,
                       bool classify_mime) {
     {
@@ -247,6 +270,15 @@ private:
       if (listing != nullptr)
         plainroot_core_fs_listing_release_v1(listing);
     }
+    if (result == PLAINROOT_CORE_FS_OK &&
+        pending.job.operation == DirectoryResult::Operation::InspectSymlink) {
+      plainroot_core_fs_metadata_v1 metadata{};
+      metadata.struct_size = sizeof(metadata);
+      delivery.result = plainroot_core_fs_async_request_get_metadata_v1(
+          request, &metadata);
+      if (delivery.result == PLAINROOT_CORE_FS_OK)
+        delivery.inspected_kind = metadata.kind;
+    }
     pending.owner->publish(std::move(delivery));
     pending.completed = true;
   }
@@ -323,14 +355,19 @@ private:
     path.struct_size = sizeof(path);
     path.data = next->job.path.data();
     path.size = next->job.path.size();
-    const auto submitted =
-        next->job.operation == DirectoryResult::Operation::CreateDirectory
-            ? plainroot_core_fs_async_create_directory_v1(
-                  executor, &path, &Impl::completed, next.get(),
-                  &next->request)
-            : plainroot_core_fs_async_list_directory_v1(
-                  executor, &path, &Impl::completed, next.get(),
-                  &next->request);
+    plainroot_core_fs_result_v1 submitted = PLAINROOT_CORE_FS_INVALID_ARGUMENT;
+    if (next->job.operation == DirectoryResult::Operation::CreateDirectory) {
+      submitted = plainroot_core_fs_async_create_directory_v1(
+          executor, &path, &Impl::completed, next.get(), &next->request);
+    } else if (next->job.operation ==
+               DirectoryResult::Operation::InspectSymlink) {
+      submitted = plainroot_core_fs_async_stat_v1(
+          executor, &path, PLAINROOT_CORE_FS_STAT_FOLLOW_SYMLINKS,
+          &Impl::completed, next.get(), &next->request);
+    } else {
+      submitted = plainroot_core_fs_async_list_directory_v1(
+          executor, &path, &Impl::completed, next.get(), &next->request);
+    }
     if (submitted == PLAINROOT_CORE_FS_OK) {
       pending->push_back(std::move(next));
     } else {
@@ -479,6 +516,12 @@ void DirectoryLoader::create_directory(std::string path, uint64_t generation,
                                        uint64_t request_id) {
   if (impl_)
     impl_->create_directory(std::move(path), generation, request_id);
+}
+
+void DirectoryLoader::inspect_symlink(std::string path,
+                                      uint64_t generation) {
+  if (impl_)
+    impl_->inspect_symlink(std::move(path), generation);
 }
 
 void DirectoryLoader::request_recent(std::string path, uint64_t generation,

@@ -20,7 +20,13 @@ struct DirectoryEntry {
 };
 
 struct DirectoryResult {
-  enum class Operation { Listing, RecentListing, RecordRecent, CreateDirectory };
+  enum class Operation {
+    Listing,
+    RecentListing,
+    RecordRecent,
+    CreateDirectory,
+    InspectSymlink
+  };
 
   uint64_t generation = 0;
   uint64_t request_id = 0;
@@ -31,6 +37,8 @@ struct DirectoryResult {
   bool mime_classified = false;
   bool mime_database_available = false;
   Operation operation = Operation::Listing;
+  plainroot_core_fs_entry_kind_v1 inspected_kind =
+      PLAINROOT_CORE_FS_ENTRY_UNKNOWN;
 };
 
 class DirectoryLoader {
@@ -52,6 +60,7 @@ public:
                      std::string application_id);
   void create_directory(std::string path, uint64_t generation,
                         uint64_t request_id);
+  void inspect_symlink(std::string path, uint64_t generation);
   void stop();
 
 private:
