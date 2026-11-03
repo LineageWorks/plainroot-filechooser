@@ -7,6 +7,7 @@
 #include "open_filename.hpp"
 #include "storage_bridge.hpp"
 #include "storage_locations_view.hpp"
+#include "trace.hpp"
 
 #include <plainroot/i18n/i18n.h>
 #include <plainroot/ui/style.h>
@@ -942,6 +943,11 @@ private:
 
   static void accept_activated(void *user_data, plainroot_ui_widget *) {
     auto &self = *static_cast<Impl *>(user_data);
+    detail::trace(
+        "accept-activated save=%u save-files=%u multiple=%u directory=%u",
+        self.save_file_ ? 1U : 0U, self.save_files_.empty() ? 0U : 1U,
+        self.allow_multiple_ ? 1U : 0U,
+        self.select_directory_ ? 1U : 0U);
     if (self.save_file_) {
       self.accept_save_file();
       return;
@@ -1234,6 +1240,7 @@ private:
       return;
     if (paths.empty())
       return;
+    detail::trace("selection-complete paths=%zu", paths.size());
     finished_ = true;
     if (completion_ != nullptr) {
       const BrowserFilter *current_filter =

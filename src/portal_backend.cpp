@@ -3,6 +3,7 @@
 #include "browser_controller.hpp"
 #include "portal_choices.hpp"
 #include "save_files.hpp"
+#include "trace.hpp"
 #include "ui_context_factory.hpp"
 
 #include <plainroot/i18n/i18n.h>
@@ -453,6 +454,7 @@ public:
                  stderr);
       return 1;
     }
+    detail::trace("backend-ready");
 
     while (!stopping_) {
       result = process_bus();
@@ -464,9 +466,11 @@ public:
       discard_finished_requests();
       if (has_open_windows()) {
         app_running_ = true;
+        detail::trace("toolkit-loop-begin");
         result = plainroot_toolkit_application_run_v1(
             application_, error.data(), error.size());
         app_running_ = false;
+        detail::trace("toolkit-loop-end result=%d", result);
         if (result != PLAINROOT_TOOLKIT_RESULT_OK) {
           std::fprintf(stderr, "plainroot-filechooser-portal: %s\n",
                        error[0] == '\0' ? "chooser window failed"
@@ -501,6 +505,10 @@ public:
 
   int begin_file_request(sd_bus_message *message, bool save_file_request,
                          bool save_files_request) {
+    detail::trace("request-received kind=%s",
+                  save_files_request
+                      ? "save-files"
+                      : (save_file_request ? "save-file" : "open-file"));
     const char *handle = nullptr;
     const char *app_id = nullptr;
     const char *parent_window = nullptr;
@@ -612,12 +620,17 @@ public:
                          "Unable to register the portal request handle");
     }
     requests_.push_back(std::move(request));
+    detail::trace("request-queued kind=%s",
+                  save_files_request
+                      ? "save-files"
+                      : (save_file_request ? "save-file" : "open-file"));
     if (app_running_)
       schedule_pending_requests();
     return 1;
   }
 
   void request_close(PortalRequest &request) {
+    detail::trace("request-close");
     request.cancel_requested = true;
     if (app_running_)
       schedule_pending_requests();
@@ -630,6 +643,7 @@ public:
               const std::vector<BrowserChoiceSelection> *choices = nullptr) {
     if (request.finished)
       return;
+    detail::trace("finish-begin response=%u", response);
     std::vector<std::string> save_paths;
     const std::vector<std::string> *result_paths = &native_paths;
     if (response == kResponseSuccess && request.save_files) {
@@ -764,6 +778,7 @@ private:
   }
 
   void create_window(PortalRequest &request) {
+    detail::trace("window-create-begin");
     const char *language = plainroot_i18n_language_tag_v1();
     if (language == nullptr)
       language = "en";
@@ -830,6 +845,7 @@ private:
     }
     request.controller->set_window(request.window);
     request.controller->navigate(request.start_path);
+    detail::trace("window-create-end");
   }
 
   static void browser_completed(
@@ -837,6 +853,8 @@ private:
       const std::vector<std::string> &native_paths,
       const BrowserFilter *current_filter,
       const std::vector<BrowserChoiceSelection> &choices) {
+    detail::trace("browser-completed accepted=%u paths=%zu choices=%zu",
+                  accepted ? 1U : 0U, native_paths.size(), choices.size());
     auto &request = *static_cast<PortalRequest *>(user_data);
     request.backend->finish(request,
                             accepted ? kResponseSuccess : kResponseCancelled,
@@ -848,6 +866,7 @@ private:
 
   static int window_close_requested(void *user_data,
                                     plainroot_toolkit_window *) {
+    detail::trace("window-close-requested");
     auto &request = *static_cast<PortalRequest *>(user_data);
     request.backend->finish(request, kResponseCancelled, {}, false);
     return 1;
@@ -878,6 +897,8 @@ private:
       result = sd_bus_message_close_container(reply);
     if (result >= 0)
       result = sd_bus_send(bus_, reply, nullptr);
+    detail::trace("response-sent response=%u uris=%zu result=%d", response,
+                  uris.size(), result);
     sd_bus_message_unref(reply);
     if (result < 0)
       report_bus_error("unable to send chooser response", result);
