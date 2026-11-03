@@ -1973,14 +1973,37 @@ private:
                                        context_, PLAINROOT_UI_AXIS_VERTICAL,
                                        2.0F, 1.0F);
       plainroot_ui_widget *control = nullptr;
-      if (allow_multiple_ &&
-          entry->kind != PLAINROOT_CORE_FS_ENTRY_DIRECTORY) {
+      plainroot_ui_widget *entry_content = nullptr;
+      const bool is_directory =
+          entry->kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY;
+      const bool selectable =
+          allow_multiple_ && (select_directory_ ? is_directory : !is_directory);
+      if (selectable) {
         const bool selected =
             std::find(selected_paths_.begin(), selected_paths_.end(),
                       action->path) != selected_paths_.end();
         control = plainroot_ui_checkbox_create_v1(
             context_, label.c_str(), static_cast<uint32_t>(label.size()),
             selected ? 1U : 0U, 1.0F, &Impl::selection_changed, action.get());
+        entry_content = control;
+        if (control != nullptr && select_directory_) {
+          const std::string open_label = tr("Open");
+          auto *open_button = plainroot_ui_button_create_v1(
+              context_, open_label.c_str(),
+              static_cast<uint32_t>(open_label.size()), 1.0F,
+              &Impl::entry_activated, action.get());
+          auto *selection_row = plainroot_ui_box_create_v1(
+              context_, PLAINROOT_UI_AXIS_HORIZONTAL, 2.0F, 1.0F);
+          if (open_button == nullptr || selection_row == nullptr ||
+              plainroot_ui_button_set_style_v1(
+                  open_button, PLAINROOT_UI_BUTTON_STYLE_TEXT) !=
+                  PLAINROOT_UI_RESULT_OK ||
+              !add(selection_row, control) || !add(selection_row, open_button)) {
+            entry_content = nullptr;
+          } else {
+            entry_content = selection_row;
+          }
+        }
       } else {
         control = plainroot_ui_button_create_v1(
             context_, label.c_str(), static_cast<uint32_t>(label.size()), 1.0F,
@@ -1990,8 +2013,9 @@ private:
                 control, PLAINROOT_UI_BUTTON_STYLE_TEXT) !=
                 PLAINROOT_UI_RESULT_OK)
           control = nullptr;
+        entry_content = control;
       }
-      bool row_ready = control != nullptr && row != nullptr;
+      bool row_ready = entry_content != nullptr && row != nullptr;
       if (row_ready && recent_content != nullptr) {
         auto *location = plainroot_ui_label_create_v1(
             context_, entry->path.c_str(),
@@ -2000,10 +2024,10 @@ private:
         if (location != nullptr)
           (void)plainroot_ui_widget_set_text_direction_v1(
               location, PLAINROOT_UI_TEXT_LTR);
-        row_ready = location != nullptr && add(recent_content, control) &&
+        row_ready = location != nullptr && add(recent_content, entry_content) &&
                     add(recent_content, location) && add(row, recent_content);
       } else if (row_ready) {
-        row_ready = add(row, control);
+        row_ready = add(row, entry_content);
       }
       if (!row_ready || !add(entries_list_, row))
         continue;

@@ -519,9 +519,9 @@ public:
     if (!select_initial_filter(*request))
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
                          "Too many file filters in request");
-    if (request->multiple && (save_file_request || request->directory))
+    if (request->multiple && save_file_request)
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
-                         "Multiple selection cannot be combined with save or folder selection");
+                         "Multiple selection cannot be combined with SaveFile");
     if (save_file_request && request->directory)
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
                          "SaveFile does not support directory selection");
