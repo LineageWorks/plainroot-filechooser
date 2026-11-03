@@ -10,7 +10,7 @@ fi
 
 build_option() {
   meson introspect --buildoptions "$build_dir" |
-    python3 -c 'import json,sys; name=sys.argv[1]; options=json.load(sys.stdin); print(next(str(o["value"]).lower() for o in options if o["name"] == name))' "$1"
+    python3 -c 'import json,sys; name=sys.argv[1]; options=json.load(sys.stdin); value=next(o["value"] for o in options if o["name"] == name); print(str(value).lower() if isinstance(value,bool) else value)' "$1"
 }
 
 option_before=$(build_option portal_registration)
