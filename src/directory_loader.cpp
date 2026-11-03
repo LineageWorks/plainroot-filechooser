@@ -51,7 +51,8 @@ public:
           return job.operation == DirectoryResult::Operation::Listing;
         });
         jobs_.push_back({DirectoryResult::Operation::Listing,
-                         std::move(path), generation, 0, classify_mime});
+                         std::move(path), generation, 0, classify_mime, {},
+                         {}});
       }
     }
     if (failed) {
@@ -75,7 +76,8 @@ public:
       failed = startup_failed_.load(std::memory_order_relaxed);
       if (!failed)
         jobs_.push_back({DirectoryResult::Operation::CreateDirectory,
-                         std::move(path), generation, request_id, false});
+                         std::move(path), generation, request_id, false, {},
+                         {}});
     }
     if (failed) {
       DirectoryResult result{};
@@ -102,7 +104,7 @@ public:
                job.operation == DirectoryResult::Operation::RecentListing;
       });
       jobs_.push_back({DirectoryResult::Operation::RecentListing,
-                       std::move(path), generation, 0, classify_mime});
+                       std::move(path), generation, 0, classify_mime, {}, {}});
     }
     wake_worker();
   }
@@ -298,10 +300,12 @@ private:
         entry.path = std::move(file.path);
         entry.sort_timestamp = file.visited_unix_seconds;
         struct stat metadata {};
-        if (stat(entry.path.c_str(), &metadata) == 0)
-          entry.kind = S_ISDIR(metadata.st_mode)
-                           ? PLAINROOT_CORE_FS_ENTRY_DIRECTORY
-                           : PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE;
+        if (stat(entry.path.c_str(), &metadata) != 0 ||
+            (!S_ISDIR(metadata.st_mode) && !S_ISREG(metadata.st_mode)))
+          continue;
+        entry.kind = S_ISDIR(metadata.st_mode)
+                         ? PLAINROOT_CORE_FS_ENTRY_DIRECTORY
+                         : PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE;
         if (job.classify_mime && result.mime_database_available &&
             entry.kind == PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE)
           entry.mime_types = mime_database_->types_for_file(entry.path,

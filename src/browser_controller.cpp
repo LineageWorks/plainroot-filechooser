@@ -1993,8 +1993,10 @@ private:
           !mime_database_available_) {
         set_status(tr("MIME type filtering is unavailable on this system."));
       } else if (visible.empty()) {
-        set_status(search_query_.empty() ? tr("This folder is empty.")
-                                         : tr("No matching files."));
+        set_status(search_query_.empty()
+                       ? tr(recent_mode_ ? "No recent files."
+                                         : "This folder is empty.")
+                       : tr("No matching files."));
       } else {
         set_status("");
       }
