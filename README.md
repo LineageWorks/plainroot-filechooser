@@ -91,8 +91,9 @@ pass.
 
 Storaged's local-volume operation passed live systemd read/write mount and
 normal-unmount acceptance on `/dev/sdb1` on 2026-11-03, including a user
-write/read/delete check. Mounting, browsing, and unmounting that removable
-volume through this chooser UI remain to be accepted. SSHFS is installed, and
+write/read/delete check. On 2026-11-03, the user also confirmed that mounting,
+browsing, and unmounting the removable volume through this chooser UI
+succeeded. SSHFS is installed, and
 a strict-host-key SFTP handshake to the active localhost `sshd` succeeds. A
 direct host-session SSHFS mount failed at FUSE setup with `Operation not
 permitted`; `/dev/fuse` is present, but `fusermount3` is not setuid. The
