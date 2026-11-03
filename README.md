@@ -71,12 +71,12 @@ callback and cancels the portal request. X11 parent identifiers are ignored.
 With portal registration enabled, the staged backend is discoverable when the
 portal broker starts with the staged data directory and `PlainrootDE` desktop
 configuration. One direct live `OpenFile` request to the unregistered backend
-returned a selected file URI. A separate private-session broker request routed
-`OpenFile` to the running Plainroot backend and created its chooser window;
-the short-lived caller then disconnected and the request closed. Activation
-through the installed service, a completed selection through the broker,
-and multi-file, SaveFiles, filter, and choice acceptance remain open. Do not
-enable registration in a desktop session until those checks pass.
+returned a selected file URI. A separate persistent caller in a private
+portal-broker session selected `AGENTS.md` through the Plainroot window and
+received response code 0 with its file URI. The backend was started manually;
+activation through the installed service and multi-file, SaveFiles, filter,
+and choice acceptance remain open. Do not enable registration in a desktop
+session until those checks pass.
 
 Live removable-volume mount and SSHFS connect/disconnect acceptance are still
 pending. SSHFS is installed, and localhost SSH and SFTP work; a temporary
