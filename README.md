@@ -74,9 +74,11 @@ configuration. One direct live `OpenFile` request to the unregistered backend
 returned a selected file URI. A separate persistent caller in a private
 portal-broker session selected `AGENTS.md` through the Plainroot window and
 received response code 0 with its file URI. The backend was started manually;
-activation through the installed service and multi-file, SaveFiles, filter,
-and choice acceptance remain open. Do not enable registration in a desktop
-session until those checks pass.
+a second private-bus run activated it through a temporary D-Bus service
+descriptor whose `Exec` path pointed at the build-tree binary, then completed
+the same selection. Activation through the installed user systemd service and
+multi-file, SaveFiles, filter, and choice acceptance remain open. Do not enable
+registration in a desktop session until those checks pass.
 
 Live removable-volume mount and SSHFS connect/disconnect acceptance are still
 pending. SSHFS is installed, and localhost SSH and SFTP work; a temporary
