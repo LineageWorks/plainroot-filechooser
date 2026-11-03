@@ -101,6 +101,27 @@ msgstr "Вверх"
 msgid "Home"
 msgstr "Домашняя папка"
 
+msgid "Places"
+msgstr "Места"
+
+msgid "Desktop"
+msgstr "Рабочий стол"
+
+msgid "Documents"
+msgstr "Документы"
+
+msgid "Downloads"
+msgstr "Загрузки"
+
+msgid "Music"
+msgstr "Музыка"
+
+msgid "Pictures"
+msgstr "Изображения"
+
+msgid "Videos"
+msgstr "Видео"
+
 msgid "Loading folder…"
 msgstr "Загрузка папки…"
 

@@ -101,6 +101,27 @@ msgstr "أعلى"
 msgid "Home"
 msgstr "المجلد الرئيسي"
 
+msgid "Places"
+msgstr "الأماكن"
+
+msgid "Desktop"
+msgstr "سطح المكتب"
+
+msgid "Documents"
+msgstr "المستندات"
+
+msgid "Downloads"
+msgstr "التنزيلات"
+
+msgid "Music"
+msgstr "الموسيقى"
+
+msgid "Pictures"
+msgstr "الصور"
+
+msgid "Videos"
+msgstr "مقاطع الفيديو"
+
 msgid "Loading folder…"
 msgstr "جارٍ تحميل المجلد…"
 

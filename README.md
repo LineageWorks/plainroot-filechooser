@@ -19,7 +19,9 @@ must stay free of GIO.
 The `plainroot-filechooser-browser` executable is an integration prototype for
 the local browser UI. It uses `plainroot-toolkit` for its window and widgets and
 `plainroot-core` asynchronous filesystem listing for directory navigation.
-The current folder path uses clickable ancestor breadcrumbs. Search is applied
+The location controls include Home and a Places dropdown populated from
+configured XDG user folders that currently exist. The current folder path uses
+clickable ancestor breadcrumbs. Search is applied
 to the displayed listing, hidden entries can be shown, and
 the listing supports locale-aware, natural filename ordering in either
 direction while keeping directories first. Single-file open and save modes

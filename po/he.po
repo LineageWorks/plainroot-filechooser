@@ -100,6 +100,27 @@ msgstr "למעלה"
 msgid "Home"
 msgstr "תיקיית הבית"
 
+msgid "Places"
+msgstr "מקומות"
+
+msgid "Desktop"
+msgstr "שולחן העבודה"
+
+msgid "Documents"
+msgstr "מסמכים"
+
+msgid "Downloads"
+msgstr "הורדות"
+
+msgid "Music"
+msgstr "מוזיקה"
+
+msgid "Pictures"
+msgstr "תמונות"
+
+msgid "Videos"
+msgstr "סרטונים"
+
 msgid "Loading folder…"
 msgstr "התיקייה נטענת…"
 

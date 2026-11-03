@@ -119,7 +119,13 @@ public:
     size_t index = 0;
   };
 
+  struct Place {
+    std::string label;
+    std::string path;
+  };
+
   bool create_ui() {
+    initialize_places();
     auto *root = plainroot_ui_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, 0.0F, 1.0F);
     auto *outer =
@@ -166,10 +172,18 @@ public:
     auto *location_row = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
         kExpandedControlsWidth, 8.0F, 0.0F);
-    auto *location_actions = plainroot_ui_box_create_v1(
-        context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
+    auto *location_actions = plainroot_ui_adaptive_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
+        420.0F, 8.0F, 0.0F);
     auto *up = make_button("Up", &Impl::up_activated);
     auto *home = make_button("Home", &Impl::home_activated);
+    const std::string places_hint = tr("Places");
+    places_dropdown_ = places_.empty()
+                           ? nullptr
+                           : plainroot_ui_dropdown_create_v1(
+                                 context_, places_hint.c_str(),
+                                 static_cast<uint32_t>(places_hint.size()),
+                                 0.0F, &Impl::place_changed, this);
     new_folder_button_ =
         make_button("New folder", &Impl::new_folder_activated);
     breadcrumb_scroll_ =
@@ -324,6 +338,7 @@ public:
         page == nullptr || footer_padding == nullptr ||
         title == nullptr || location_row == nullptr ||
         location_actions == nullptr || up == nullptr || home == nullptr ||
+        (!places_.empty() && places_dropdown_ == nullptr) ||
         new_folder_button_ == nullptr || new_folder_form_ == nullptr ||
         new_folder_actions == nullptr || new_folder_field_ == nullptr ||
         new_folder_create_button_ == nullptr ||
@@ -377,6 +392,16 @@ public:
     initializing_sort_dropdown_ = false;
     if (sort_result != PLAINROOT_UI_RESULT_OK)
       return false;
+
+    for (size_t index = 0; index < places_.size(); ++index) {
+      const Place &place = places_[index];
+      auto *option = plainroot_ui_list_box_option_create_v1(
+          context_, place.label.c_str(),
+          static_cast<uint32_t>(place.label.size()),
+          static_cast<int32_t>(index), 0.0F);
+      if (option == nullptr || !add(places_dropdown_, option))
+        return false;
+    }
 
     plainroot_ui_widget *choices_panel = nullptr;
     choice_widgets_.assign(choices_.size(), nullptr);
@@ -460,6 +485,8 @@ public:
         (save_files_panel != nullptr && !add(page, save_files_panel)) ||
         !add(location_row, location_actions) ||
         !add(location_actions, up) || !add(location_actions, home) ||
+        (places_dropdown_ != nullptr &&
+         !add(location_actions, places_dropdown_)) ||
         !add(location_actions, new_folder_button_) ||
         !add(page, new_folder_form_) ||
         !add(new_folder_form_, new_folder_field_) ||
@@ -671,6 +698,46 @@ private:
     auto &self = *static_cast<Impl *>(user_data);
     const char *home = std::getenv("HOME");
     self.navigate(home != nullptr && home[0] == '/' ? home : "/");
+  }
+
+  void initialize_places() {
+    places_.clear();
+    const struct {
+      const char *label;
+      GUserDirectory directory;
+    } user_directories[] = {
+        {"Desktop", G_USER_DIRECTORY_DESKTOP},
+        {"Documents", G_USER_DIRECTORY_DOCUMENTS},
+        {"Downloads", G_USER_DIRECTORY_DOWNLOAD},
+        {"Music", G_USER_DIRECTORY_MUSIC},
+        {"Pictures", G_USER_DIRECTORY_PICTURES},
+        {"Videos", G_USER_DIRECTORY_VIDEOS},
+    };
+
+    for (const auto &entry : user_directories) {
+      const char *path = g_get_user_special_dir(entry.directory);
+      if (path == nullptr || path[0] != '/' ||
+          !g_file_test(path, G_FILE_TEST_IS_DIR))
+        continue;
+      const bool already_added = std::any_of(
+          places_.begin(), places_.end(), [path](const Place &place) {
+            return place.path == path;
+          });
+      if (!already_added)
+        places_.push_back({tr(entry.label), path});
+    }
+  }
+
+  static void place_changed(void *user_data, plainroot_ui_widget *widget) {
+    auto &self = *static_cast<Impl *>(user_data);
+    int32_t selected = -1;
+    uint32_t has_value = 0;
+    if (plainroot_ui_dropdown_get_value_v1(widget, &selected, &has_value) !=
+            PLAINROOT_UI_RESULT_OK ||
+        has_value == 0U || selected < 0 ||
+        static_cast<size_t>(selected) >= self.places_.size())
+      return;
+    self.navigate(self.places_[static_cast<size_t>(selected)].path);
   }
 
   static void new_folder_activated(void *user_data, plainroot_ui_widget *) {
@@ -1829,6 +1896,7 @@ private:
   std::vector<BrowserFilter> filters_;
   std::vector<BrowserChoice> choices_;
   std::vector<BrowserChoiceSelection> choice_selections_;
+  std::vector<Place> places_;
   std::string status_error_;
   std::vector<detail::DirectoryEntry> entries_;
   std::vector<plainroot_ui_widget *> rows_;
@@ -1847,6 +1915,7 @@ private:
   plainroot_ui_widget *filename_field_ = nullptr;
   plainroot_ui_widget *search_field_ = nullptr;
   plainroot_ui_widget *hidden_switch_ = nullptr;
+  plainroot_ui_widget *places_dropdown_ = nullptr;
   plainroot_ui_widget *filter_dropdown_ = nullptr;
   plainroot_ui_widget *sort_dropdown_ = nullptr;
   plainroot_ui_widget *list_scroll_ = nullptr;

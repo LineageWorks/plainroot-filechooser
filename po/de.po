@@ -100,6 +100,27 @@ msgstr "Nach oben"
 msgid "Home"
 msgstr "Persönlicher Ordner"
 
+msgid "Places"
+msgstr "Orte"
+
+msgid "Desktop"
+msgstr "Schreibtisch"
+
+msgid "Documents"
+msgstr "Dokumente"
+
+msgid "Downloads"
+msgstr "Downloads"
+
+msgid "Music"
+msgstr "Musik"
+
+msgid "Pictures"
+msgstr "Bilder"
+
+msgid "Videos"
+msgstr "Videos"
+
 msgid "Loading folder…"
 msgstr "Ordner wird geladen …"
 
