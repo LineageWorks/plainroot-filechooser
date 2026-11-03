@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.freedesktop.impl.portal.desktop.plainroot
+Exec=@LIBEXECDIR@/plainroot-filechooser-portal
+SystemdService=plainroot-filechooser-portal.service

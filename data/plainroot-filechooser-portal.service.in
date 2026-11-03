@@ -1,0 +1,11 @@
+[Unit]
+Description=Plainroot FileChooser portal backend
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=org.freedesktop.impl.portal.desktop.plainroot
+ExecStart=@LIBEXECDIR@/plainroot-filechooser-portal
+Restart=on-failure
+Slice=session.slice

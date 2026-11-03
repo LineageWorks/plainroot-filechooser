@@ -1,9 +1,17 @@
 # Plainroot FileChooser
 
-`plainroot-filechooser` is the Plainroot XDG FileChooser backend and browser
-project. It will provide a native portal backend while Plainroot applications
-continue to call the toolkit's XDG portal client. It must not call that client
-from its backend process, and Plainroot's build and runtime dependency closure
+`plainroot-filechooser` provides the Plainroot XDG FileChooser backend and
+browser. Plainroot applications continue to call the toolkit's XDG portal
+client; the backend must not call that client from its own process. Portal
+registration is an explicit Meson opt-in (`-Dportal_registration=true`) and
+remains disabled by default until live broker behavior and GTK capability
+parity are accepted. When enabled, the build installs the FileChooser portal
+descriptor, D-Bus and systemd user activation, and a
+`plainrootde-portals.conf` that prefers Plainroot for FileChooser while
+keeping Hyprland and GTK as defaults for other interfaces. The PlainrootDE
+session must set `XDG_CURRENT_DESKTOP=PlainrootDE:Hyprland` for that
+desktop-specific configuration to take precedence. The current host's Hyprland
+session is not reconfigured. Plainroot's build and runtime dependency closure
 must stay free of GIO.
 
 ## Current slice
@@ -34,8 +42,8 @@ directory asynchronously through `plainroot-core`, so slow mounted filesystems
 do not block the chooser. It rejects path components, reports collisions and
 filesystem errors, then refreshes the current listing.
 
-The build also includes an unregistered `plainroot-filechooser-portal`
-prototype. It exports the portal FileChooser and Request interfaces through
+The build also includes the `plainroot-filechooser-portal` backend. It exports
+the portal FileChooser and Request interfaces through
 `sd-bus`, supports single-file, multiple-file, and directory `OpenFile`
 requests, and supports `SaveFile` requests with suggested names and overwrite
 confirmation. `SaveFiles` requests show the requested names, ask for a
@@ -60,10 +68,11 @@ the optional testing `xdg-dialog-v1` presentation hint are used when available.
 The modal hint does not enforce parent-event filtering, and parent destruction
 or handle invalidation now routes through the toolkit's normal window-close
 callback and cancels the portal request. X11 parent identifiers are ignored.
-The prototype is not advertised to the portal broker; live compositor/broker
-and multi-file, SaveFiles, filter, and choice acceptance remain open. Keep GTK
-selected as the fallback until those capabilities and request lifecycle are
-validated.
+With portal registration enabled, the staged backend is discoverable when the
+portal broker starts with the staged data directory and `PlainrootDE` desktop
+configuration. Live broker activation and multi-file, SaveFiles, filter, and
+choice acceptance remain open. Do not enable the registration option in a
+desktop session until those acceptance checks pass.
 
 Live removable-volume mount and SSHFS connect/disconnect acceptance are still
 pending; the current host does not have the `sshfs` executable installed.

@@ -81,8 +81,47 @@ executable(
   ],
   link_with: filechooser_common,
   dependencies: common_dependencies + [systemd_dep],
+  install_dir: get_option('libexecdir'),
   install: true,
 )
+
+portal_service_config = configuration_data()
+portal_service_config.set(
+  'LIBEXECDIR',
+  join_paths(get_option('prefix'), get_option('libexecdir')),
+)
+portal_dbus_service = configure_file(
+  input: 'data/org.freedesktop.impl.portal.desktop.plainroot.service.in',
+  output: 'org.freedesktop.impl.portal.desktop.plainroot.service',
+  configuration: portal_service_config,
+)
+portal_user_service = configure_file(
+  input: 'data/plainroot-filechooser-portal.service.in',
+  output: 'plainroot-filechooser-portal.service',
+  configuration: portal_service_config,
+)
+if get_option('portal_registration')
+  install_data(
+    'data/plainroot.portal',
+    install_dir: get_option('datadir') / 'xdg-desktop-portal/portals',
+  )
+  install_data(
+    portal_dbus_service,
+    install_dir: get_option('datadir') / 'dbus-1/services',
+  )
+  install_data(
+    portal_user_service,
+    install_dir: get_option('prefix') / 'lib/systemd/user',
+  )
+  install_data(
+    'data/plainrootde-portals.conf',
+    install_dir: get_option('datadir') / 'xdg-desktop-portal',
+  )
+else
+  # Keep the prototype out of the desktop's active portal set until its live
+  # broker behavior and GTK capability parity have been accepted.
+  message('Portal registration is disabled; use -Dportal_registration=true to install it')
+endif
 
 directory_sort_test = executable(
   'filechooser-directory-sort-test',

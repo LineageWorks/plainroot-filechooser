@@ -1,0 +1,6 @@
+option(
+  'portal_registration',
+  type: 'boolean',
+  value: false,
+  description: 'Install Plainroot XDG FileChooser portal registration and activation files',
+)
