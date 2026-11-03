@@ -45,6 +45,20 @@ int main() {
   assert(position(descending, "file10.txt") <
          position(descending, "file2.txt"));
 
+  auto recent_entries = entries;
+  recent_entries[0].sort_timestamp = 20;
+  recent_entries[1].sort_timestamp = 40;
+  recent_entries[2].sort_timestamp = 10;
+  std::vector<const DirectoryEntry *> recent_input;
+  for (const DirectoryEntry &entry : recent_entries)
+    recent_input.push_back(&entry);
+  const auto recent =
+      sort_directory_entries(recent_input, DirectorySortOrder::recent_first);
+  assert(recent.size() == entries.size());
+  assert(recent[0]->name == "folder10");
+  assert(recent[1]->name == "file10.txt");
+  assert(recent[2]->name == "file2.txt");
+
   const std::vector<const DirectoryEntry *> with_null{nullptr, &entries[0]};
   assert(sort_directory_entries(with_null, DirectorySortOrder::name_ascending)
              .size() == 1U);

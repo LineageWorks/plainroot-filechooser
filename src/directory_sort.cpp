@@ -44,7 +44,12 @@ sort_directory_entries(const std::vector<const DirectoryEntry *> &entries,
 
   const bool ascending = order == DirectorySortOrder::name_ascending;
   std::stable_sort(keys.begin(), keys.end(),
-                   [ascending](const SortKey &left, const SortKey &right) {
+                   [ascending, order](const SortKey &left, const SortKey &right) {
+                     if (order == DirectorySortOrder::recent_first &&
+                         left.entry->sort_timestamp !=
+                             right.entry->sort_timestamp)
+                       return left.entry->sort_timestamp >
+                              right.entry->sort_timestamp;
                      const bool left_directory = is_directory(*left.entry);
                      const bool right_directory = is_directory(*right.entry);
                      if (left_directory != right_directory)

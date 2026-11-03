@@ -9,6 +9,7 @@ namespace plainroot::filechooser::detail {
 enum class DirectorySortOrder {
   name_ascending,
   name_descending,
+  recent_first,
 };
 
 std::vector<const DirectoryEntry *>

@@ -607,6 +607,7 @@ public:
       (void)plainroot_ui_widget_set_visible_v1(new_folder_form_, 0U);
     current_path_ = std::move(path);
     recent_mode_ = false;
+    sort_order_ = detail::DirectorySortOrder::name_ascending;
     refresh_bookmark_button();
     new_folder_created_ = false;
     render_breadcrumbs();
@@ -717,6 +718,7 @@ private:
   static void recent_activated(void *user_data, plainroot_ui_widget *) {
     auto &self = *static_cast<Impl *>(user_data);
     self.recent_mode_ = true;
+    self.sort_order_ = detail::DirectorySortOrder::recent_first;
     self.render_breadcrumbs();
     self.request_directory_load(false);
   }
