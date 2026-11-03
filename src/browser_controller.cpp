@@ -1491,14 +1491,15 @@ private:
   }
 
   void complete_selection(const std::vector<std::string> &paths) {
-    for (const std::string &path : paths)
-      (void)detail::record_recent_file(
-          std::string(g_get_user_data_dir()) + "/recently-used.xbel", path,
-          "Plainroot FileChooser");
     if (finished_)
       return;
     if (paths.empty())
       return;
+    const char *data_directory = g_get_user_data_dir();
+    loader_.record_recent(
+        paths, std::string(data_directory == nullptr ? "" : data_directory) +
+                   "/recently-used.xbel",
+        "Plainroot FileChooser");
     detail::trace("selection-complete paths=%zu", paths.size());
     finished_ = true;
     if (completion_ != nullptr) {

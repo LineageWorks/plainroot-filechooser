@@ -20,7 +20,7 @@ struct DirectoryEntry {
 };
 
 struct DirectoryResult {
-  enum class Operation { Listing, RecentListing, CreateDirectory };
+  enum class Operation { Listing, RecentListing, RecordRecent, CreateDirectory };
 
   uint64_t generation = 0;
   uint64_t request_id = 0;
@@ -47,6 +47,8 @@ public:
   void request(std::string path, uint64_t generation,
                bool classify_mime = false);
   void request_recent(std::string xbel_path, uint64_t generation);
+  void record_recent(std::vector<std::string> paths, std::string xbel_path,
+                     std::string application_id);
   void create_directory(std::string path, uint64_t generation,
                         uint64_t request_id);
   void stop();

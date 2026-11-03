@@ -106,6 +106,24 @@ public:
     wake_worker();
   }
 
+  void record_recent(std::vector<std::string> paths, std::string xbel_path,
+                     std::string application_id) {
+    {
+      std::lock_guard lock(mutex_);
+      if (stopping_)
+        return;
+      for (auto &path : paths) {
+        Job job{};
+        job.operation = DirectoryResult::Operation::RecordRecent;
+        job.path = std::move(path);
+        job.secondary_path = xbel_path;
+        job.application_id = application_id;
+        jobs_.push_back(std::move(job));
+      }
+    }
+    wake_worker();
+  }
+
   void stop() {
     {
       std::lock_guard lock(mutex_);
@@ -131,6 +149,8 @@ private:
     uint64_t generation = 0;
     uint64_t request_id = 0;
     bool classify_mime = false;
+    std::string secondary_path;
+    std::string application_id;
   };
 
   struct Pending {
@@ -254,6 +274,11 @@ private:
 
   void submit_job(plainroot_core_fs_async_executor *executor, Job job,
                   std::vector<std::unique_ptr<Pending>> *pending) {
+    if (job.operation == DirectoryResult::Operation::RecordRecent) {
+      (void)record_recent_file(job.secondary_path, job.path,
+                               job.application_id);
+      return;
+    }
     if (job.operation == DirectoryResult::Operation::RecentListing) {
       DirectoryResult result{};
       result.operation = job.operation;
@@ -375,8 +400,13 @@ private:
       if ((descriptors[0].revents & POLLIN) != 0) {
         drain_notifications();
         auto jobs = take_jobs(&stopping);
-        if (stopping)
+        if (stopping) {
+          for (Job &job : jobs) {
+            if (job.operation == DirectoryResult::Operation::RecordRecent)
+              submit_job(executor, std::move(job), &pending);
+          }
           break;
+        }
         for (Job &job : jobs) {
           if (job.operation == DirectoryResult::Operation::Listing) {
             for (const auto &existing : pending) {
@@ -442,6 +472,14 @@ void DirectoryLoader::create_directory(std::string path, uint64_t generation,
 void DirectoryLoader::request_recent(std::string path, uint64_t generation) {
   if (impl_)
     impl_->request_recent(std::move(path), generation);
+}
+
+void DirectoryLoader::record_recent(std::vector<std::string> paths,
+                                    std::string xbel_path,
+                                    std::string application_id) {
+  if (impl_)
+    impl_->record_recent(std::move(paths), std::move(xbel_path),
+                         std::move(application_id));
 }
 
 void DirectoryLoader::stop() {
