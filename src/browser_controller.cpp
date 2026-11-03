@@ -1903,7 +1903,8 @@ private:
       if (!matches_selected_filter(entry))
         continue;
       if (!folded_query.empty()) {
-        const std::string shown = display_path(entry.name);
+        const std::string shown = display_path(
+            entry.path.empty() ? entry.name : entry.name + " " + entry.path);
         gchar *folded = g_utf8_casefold(shown.c_str(), -1);
         const bool matches =
             folded != nullptr && std::string_view(folded).find(folded_query) !=
@@ -1926,6 +1927,11 @@ private:
                                          : entry->path;
       action->kind = entry->kind;
       auto *row = plainroot_ui_list_item_create_v1(context_, 1.0F);
+      auto *recent_content = entry->path.empty()
+                                 ? nullptr
+                                 : plainroot_ui_box_create_v1(
+                                       context_, PLAINROOT_UI_AXIS_VERTICAL,
+                                       2.0F, 1.0F);
       plainroot_ui_widget *control = nullptr;
       if (allow_multiple_ &&
           entry->kind != PLAINROOT_CORE_FS_ENTRY_DIRECTORY) {
@@ -1945,8 +1951,21 @@ private:
                 PLAINROOT_UI_RESULT_OK)
           control = nullptr;
       }
-      if (control == nullptr || row == nullptr || !add(row, control) ||
-          !add(entries_list_, row))
+      bool row_ready = control != nullptr && row != nullptr;
+      if (row_ready && recent_content != nullptr) {
+        auto *location = plainroot_ui_label_create_v1(
+            context_, entry->path.c_str(),
+            static_cast<uint32_t>(entry->path.size()),
+            PLAINROOT_UI_COLOR_ON_SURFACE_VARIANT_V3, 0.0F);
+        if (location != nullptr)
+          (void)plainroot_ui_widget_set_text_direction_v1(
+              location, PLAINROOT_UI_TEXT_LTR);
+        row_ready = location != nullptr && add(recent_content, control) &&
+                    add(recent_content, location) && add(row, recent_content);
+      } else if (row_ready) {
+        row_ready = add(row, control);
+      }
+      if (!row_ready || !add(entries_list_, row))
         continue;
       rows_.push_back(row);
       actions_.push_back(std::move(action));
