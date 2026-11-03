@@ -15,7 +15,7 @@ namespace plainroot::filechooser {
 
 class BrowserController {
 public:
-  using CompletionFn = void (*)(void *user_data, bool accepted,
+  using CompletionFn = void (*)(void *user_data, bool accepted, bool writable,
                                 const std::vector<std::string> &native_paths,
                                 const BrowserFilter *current_filter,
                                 const std::vector<BrowserChoiceSelection>
@@ -39,6 +39,7 @@ public:
   void set_filters(std::vector<BrowserFilter> filters,
                    int32_t selected_filter);
   void set_choices(std::vector<BrowserChoice> choices);
+  void set_allow_read_only(bool allow_read_only);
   void set_save_file(bool save_file);
   void set_save_files(std::vector<std::string> filenames);
   void set_initial_filename(std::string filename);

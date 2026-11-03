@@ -30,6 +30,8 @@ struct ClientState {
   std::vector<std::string> uris;
   bool has_filter = false;
   bool has_choices = false;
+  bool has_writable = false;
+  bool writable = false;
 };
 
 int open_file(sd_bus_message *message, void *user_data, sd_bus_error *) {
@@ -106,6 +108,15 @@ int response_received(sd_bus_message *message, void *user_data,
       }
       if (state.error == 0 && sd_bus_message_exit_container(message) < 0)
         state.error = -EBADMSG;
+    } else if (std::strcmp(key, "writable") == 0) {
+      int value = 0;
+      if (std::strcmp(contents, "b") != 0 ||
+          sd_bus_message_read(message, "b", &value) < 0) {
+        state.error = -EBADMSG;
+      } else {
+        state.has_writable = true;
+        state.writable = value != 0;
+      }
     } else {
       if (std::strcmp(key, "current_filter") == 0) {
         state.has_filter = std::strcmp(contents, "(sa(us))") == 0;
@@ -195,9 +206,11 @@ bool complete_request(sd_bus *server, sd_bus *client,
                       uint32_t response, const std::vector<std::string> &uris,
                       const plainroot::filechooser::BrowserFilter *filter,
                       const std::vector<plainroot::filechooser::BrowserChoiceSelection>
-                          *choices) {
+                          *choices,
+                      bool writable = true) {
   const int sent = plainroot::filechooser::send_portal_response(
-      server, server_state.pending_call, response, uris, filter, choices);
+      server, server_state.pending_call, response, uris, filter, choices,
+      writable);
   sd_bus_message_unref(server_state.pending_call);
   server_state.pending_call = nullptr;
   if (sent < 0 || sd_bus_flush(server) < 0)
@@ -235,11 +248,23 @@ int main() {
   assert(accepted.uris.size() == 1U);
   assert(accepted.uris.front() == "file:///tmp/Plainroot%20notes.txt");
   assert(accepted.has_filter && accepted.has_choices);
+  assert(accepted.has_writable && accepted.writable);
+  reply_slot = sd_bus_slot_unref(reply_slot);
+
+  ClientState read_only;
+  assert(begin_request(server, client, read_only, server_state, &reply_slot));
+  assert(server_state.call_count == 2U);
+  assert(complete_request(server, client, read_only, server_state, 0U,
+                          {"file:///tmp/Plainroot%20notes.txt"}, nullptr,
+                          nullptr, false));
+  assert(read_only.error == 0);
+  assert(read_only.response == 0U);
+  assert(read_only.has_writable && !read_only.writable);
   reply_slot = sd_bus_slot_unref(reply_slot);
 
   ClientState cancelled;
   assert(begin_request(server, client, cancelled, server_state, &reply_slot));
-  assert(server_state.call_count == 2U);
+  assert(server_state.call_count == 3U);
   assert(!cancelled.completed);
   assert(complete_request(server, client, cancelled, server_state, 1U, {},
                           nullptr, nullptr));
@@ -247,6 +272,7 @@ int main() {
   assert(cancelled.response == 1U);
   assert(cancelled.uris.empty());
   assert(!cancelled.has_filter && !cancelled.has_choices);
+  assert(!cancelled.has_writable);
 
   reply_slot = sd_bus_slot_unref(reply_slot);
   service_slot = sd_bus_slot_unref(service_slot);

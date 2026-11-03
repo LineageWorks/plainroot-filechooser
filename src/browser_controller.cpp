@@ -409,7 +409,7 @@ public:
 
     plainroot_ui_widget *choices_panel = nullptr;
     choice_widgets_.assign(choices_.size(), nullptr);
-    if (!choices_.empty()) {
+    if (!choices_.empty() || allow_read_only_) {
       choices_panel = plainroot_ui_box_create_v1(
           context_, PLAINROOT_UI_AXIS_VERTICAL, 8.0F, 0.0F);
       if (choices_panel == nullptr)
@@ -480,6 +480,15 @@ public:
           return false;
         choice_widgets_[index] = control;
         choice_actions_.push_back(std::move(action));
+      }
+      if (allow_read_only_) {
+        const std::string label = tr("Open files read-only");
+        read_only_checkbox_ = plainroot_ui_checkbox_create_v1(
+            context_, label.c_str(), static_cast<uint32_t>(label.size()), 0U,
+            0.0F, &Impl::read_only_changed, this);
+        if (read_only_checkbox_ == nullptr ||
+            !add(choices_panel, read_only_checkbox_))
+          return false;
       }
     }
 
@@ -578,6 +587,10 @@ public:
     }
   }
 
+  void set_allow_read_only(bool allow_read_only) {
+    allow_read_only_ = allow_read_only;
+  }
+
   void set_save_file(bool save_file) { save_file_ = save_file; }
 
   void set_save_files(std::vector<std::string> filenames) {
@@ -595,7 +608,7 @@ public:
   void cancel() {
     if (!finished_ && completion_ != nullptr) {
       finished_ = true;
-      completion_(completion_user_data_, false, {}, nullptr, {});
+      completion_(completion_user_data_, false, writable_, {}, nullptr, {});
     }
   }
 
@@ -1111,6 +1124,14 @@ private:
       self.choice_selections_[action.index].value = std::move(value);
   }
 
+  static void read_only_changed(void *user_data, plainroot_ui_widget *widget) {
+    auto &self = *static_cast<Impl *>(user_data);
+    uint32_t checked = 0U;
+    if (plainroot_ui_checkbox_get_checked_v1(widget, &checked) ==
+        PLAINROOT_UI_RESULT_OK)
+      self.writable_ = checked == 0U;
+  }
+
   static void filename_changed(void *user_data, plainroot_ui_widget *widget) {
     auto &self = *static_cast<Impl *>(user_data);
     const char *value = nullptr;
@@ -1534,7 +1555,7 @@ private:
         finished_ = false;
         return;
       }
-      completion_(completion_user_data_, true, paths, current_filter,
+      completion_(completion_user_data_, true, writable_, paths, current_filter,
                   selected_choices);
       return;
     }
@@ -2113,6 +2134,8 @@ private:
   bool select_directory_ = false;
   bool allow_multiple_ = false;
   bool save_file_ = false;
+  bool allow_read_only_ = false;
+  bool writable_ = true;
   bool finished_ = false;
   bool show_hidden_ = false;
   bool initializing_filter_dropdown_ = false;
@@ -2174,6 +2197,7 @@ private:
   plainroot_ui_widget *entries_list_ = nullptr;
   plainroot_ui_widget *status_label_ = nullptr;
   plainroot_ui_widget *selected_label_ = nullptr;
+  plainroot_ui_widget *read_only_checkbox_ = nullptr;
 };
 
 BrowserController::BrowserController(plainroot_toolkit_application *application,
@@ -2223,6 +2247,11 @@ void BrowserController::set_filters(std::vector<BrowserFilter> filters,
 void BrowserController::set_choices(std::vector<BrowserChoice> choices) {
   if (impl_)
     impl_->set_choices(std::move(choices));
+}
+
+void BrowserController::set_allow_read_only(bool allow_read_only) {
+  if (impl_)
+    impl_->set_allow_read_only(allow_read_only);
 }
 
 void BrowserController::set_save_file(bool save_file) {

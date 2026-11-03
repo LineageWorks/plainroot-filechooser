@@ -437,6 +437,9 @@ msgstr "لا تملك صلاحية إنشاء مجلد هنا."
 msgid "This location is read-only."
 msgstr "هذا الموقع للقراءة فقط."
 
+msgid "Open files read-only"
+msgstr "فتح الملفات للقراءة فقط"
+
 msgid "There is not enough space to create a folder."
 msgstr "لا توجد مساحة كافية لإنشاء مجلد."
 

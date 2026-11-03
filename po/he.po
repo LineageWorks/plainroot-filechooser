@@ -436,6 +436,9 @@ msgstr "אין לך הרשאה ליצור תיקייה כאן."
 msgid "This location is read-only."
 msgstr "המיקום הזה לקריאה בלבד."
 
+msgid "Open files read-only"
+msgstr "פתיחת קבצים לקריאה בלבד"
+
 msgid "There is not enough space to create a folder."
 msgstr "אין מספיק מקום ליצירת תיקייה."
 

@@ -436,6 +436,9 @@ msgstr "Sie haben keine Berechtigung, hier einen Ordner zu erstellen."
 msgid "This location is read-only."
 msgstr "Dieser Speicherort ist schreibgeschützt."
 
+msgid "Open files read-only"
+msgstr "Dateien schreibgeschützt öffnen"
+
 msgid "There is not enough space to create a folder."
 msgstr "Es ist nicht genug Speicherplatz vorhanden, um einen Ordner zu erstellen."
 

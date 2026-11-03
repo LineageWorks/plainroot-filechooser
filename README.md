@@ -61,8 +61,11 @@ every selected file as a `file://` URI. Successful requests, request closure,
 and user cancellation are handled. Glob filters can select the visible file
 set, and the selected `current_filter` is returned with successful responses.
 Portal `choices` are rendered as adaptive dropdowns or boolean checkboxes and
-returned as selected ID/value pairs. Request parsing bounds group and option counts and
-string sizes, and rejects duplicate IDs or invalid initial selections. MIME
+returned as selected ID/value pairs. `OpenFile` requests also offer an
+“Open files read-only” checkbox. Its state is returned as the portal `writable`
+boolean, defaulting to true when the checkbox remains unchecked. Request
+parsing bounds group and option counts and string sizes, and rejects duplicate
+IDs or invalid initial selections. MIME
 filters use the shared MIME database's `globs2`, aliases, and subclass data,
 plus libmagic content sniffing for ambiguous or unmatched filenames. MIME
 classification runs on the directory worker and is requested only when the

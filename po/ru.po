@@ -437,6 +437,9 @@ msgstr "У вас нет разрешения создавать папки в �
 msgid "This location is read-only."
 msgstr "Это расположение доступно только для чтения."
 
+msgid "Open files read-only"
+msgstr "Открывать файлы только для чтения"
+
 msgid "There is not enough space to create a folder."
 msgstr "Недостаточно места для создания папки."
 

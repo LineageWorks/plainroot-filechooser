@@ -607,7 +607,8 @@ public:
               const std::vector<std::string> &native_paths,
               bool close_window,
               const BrowserFilter *current_filter = nullptr,
-              const std::vector<BrowserChoiceSelection> *choices = nullptr) {
+              const std::vector<BrowserChoiceSelection> *choices = nullptr,
+              bool writable = true) {
     if (request.finished)
       return;
     detail::trace("finish-begin response=%u", response);
@@ -653,7 +654,7 @@ public:
       }
       if (response == kResponseSuccess &&
           uris.size() == result_paths->size() && !uris.empty()) {
-        send_reply(request, response, uris, current_filter, choices);
+        send_reply(request, response, uris, current_filter, choices, writable);
         request.finished = true;
         unregister_request(request);
         if (close_window && request.window != nullptr)
@@ -759,6 +760,8 @@ private:
     request.controller->set_title(request.title);
     request.controller->set_select_directory(request.directory);
     request.controller->set_allow_multiple(request.multiple);
+    request.controller->set_allow_read_only(
+        !request.save_file && !request.save_files && !request.directory);
     request.controller->set_filters(request.filters,
                                     request.selected_filter_index);
     request.controller->set_choices(request.choices);
@@ -816,7 +819,7 @@ private:
   }
 
   static void browser_completed(
-      void *user_data, bool accepted,
+      void *user_data, bool accepted, bool writable,
       const std::vector<std::string> &native_paths,
       const BrowserFilter *current_filter,
       const std::vector<BrowserChoiceSelection> &choices) {
@@ -828,7 +831,7 @@ private:
                             native_paths, true,
                             accepted && !request.save_files ? current_filter
                                                             : nullptr,
-                            accepted ? &choices : nullptr);
+                            accepted ? &choices : nullptr, writable);
   }
 
   static int window_close_requested(void *user_data,
@@ -842,11 +845,13 @@ private:
   void send_reply(PortalRequest &request, uint32_t response,
                   const std::vector<std::string> &uris,
                   const BrowserFilter *current_filter,
-                  const std::vector<BrowserChoiceSelection> *choices) {
+                  const std::vector<BrowserChoiceSelection> *choices,
+                  bool writable = true) {
     if (request.call == nullptr)
       return;
     const int result = send_portal_response(
-        bus_, request.call, response, uris, current_filter, choices);
+        bus_, request.call, response, uris, current_filter, choices,
+        writable);
     detail::trace("response-sent response=%u uris=%zu result=%d", response,
                   uris.size(), result);
     if (result < 0)

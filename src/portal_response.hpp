@@ -17,6 +17,7 @@ int send_portal_response(
     sd_bus *bus, sd_bus_message *call, uint32_t response,
     const std::vector<std::string> &uris,
     const BrowserFilter *current_filter,
-    const std::vector<BrowserChoiceSelection> *choices);
+    const std::vector<BrowserChoiceSelection> *choices,
+    bool writable);
 
 } // namespace plainroot::filechooser
