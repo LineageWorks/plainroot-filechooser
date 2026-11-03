@@ -120,6 +120,8 @@ public:
   };
 
   bool create_ui() {
+    auto *root = plainroot_ui_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_VERTICAL, 0.0F, 1.0F);
     auto *outer =
         plainroot_ui_vertical_scroll_area_create_v1(context_, 0, 0, 1.0F);
     auto *padding = plainroot_ui_padding_create_v1(
@@ -287,6 +289,8 @@ public:
     auto *footer = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
         kExpandedControlsWidth, 12.0F, 0.0F);
+    auto *footer_padding = plainroot_ui_padding_create_v1(
+        context_, kPagePadding, 8.0F, kPagePadding, kPagePadding, 0.0F);
     const std::string initial_selection_summary =
         allow_multiple_ ? selection_summary()
                         : tr(!save_files_.empty()
@@ -316,7 +320,8 @@ public:
       (void)plainroot_ui_button_set_style_v1(select,
                                              PLAINROOT_UI_BUTTON_STYLE_FILLED);
 
-    if (outer == nullptr || padding == nullptr || page == nullptr ||
+    if (root == nullptr || outer == nullptr || padding == nullptr ||
+        page == nullptr || footer_padding == nullptr ||
         title == nullptr || location_row == nullptr ||
         location_actions == nullptr || up == nullptr || home == nullptr ||
         new_folder_button_ == nullptr || new_folder_form_ == nullptr ||
@@ -449,7 +454,8 @@ public:
       }
     }
 
-    if (!add(outer, padding) || !add(padding, page) || !add(page, title) ||
+    if (!add(root, outer) || !add(root, footer_padding) ||
+        !add(outer, padding) || !add(padding, page) || !add(page, title) ||
         !add(page, location_row) ||
         (save_files_panel != nullptr && !add(page, save_files_panel)) ||
         !add(location_row, location_actions) ||
@@ -471,9 +477,9 @@ public:
         (choices_panel != nullptr && !add(page, choices_panel)) ||
         !add(page, storage_view_widget) || !add(page, list_scroll_) ||
         !add(list_scroll_, entries_list_) || !add(page, status_label_) ||
-        !add(page, footer) || !add(footer, selected_label_) ||
+        !add(footer_padding, footer) || !add(footer, selected_label_) ||
         !add(footer, select) ||
-        plainroot_ui_context_set_root_v1(context_, outer) !=
+        plainroot_ui_context_set_root_v1(context_, root) !=
             PLAINROOT_UI_RESULT_OK)
       return false;
 
