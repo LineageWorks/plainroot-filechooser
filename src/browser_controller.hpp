@@ -4,6 +4,7 @@
 #include <plainroot/ui/ui.h>
 
 #include "browser_choice.hpp"
+#include "browser_filter.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -11,16 +12,6 @@
 #include <vector>
 
 namespace plainroot::filechooser {
-
-struct BrowserFilterPattern {
-  uint32_t type = 0;
-  std::string pattern;
-};
-
-struct BrowserFilter {
-  std::string name;
-  std::vector<BrowserFilterPattern> patterns;
-};
 
 class BrowserController {
 public:

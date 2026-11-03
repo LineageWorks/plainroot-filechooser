@@ -2,6 +2,7 @@
 
 #include "browser_controller.hpp"
 #include "portal_choices.hpp"
+#include "portal_response.hpp"
 #include "save_files.hpp"
 #include "trace.hpp"
 #include "ui_context_factory.hpp"
@@ -209,42 +210,6 @@ bool select_initial_filter(PortalRequest &request) {
   return true;
 }
 
-bool append_filter_option(sd_bus_message *reply,
-                          const BrowserFilter &filter) {
-  int result = sd_bus_message_open_container(reply, SD_BUS_TYPE_DICT_ENTRY,
-                                              "sv");
-  if (result >= 0)
-    result = sd_bus_message_append(reply, "s", "current_filter");
-  if (result >= 0)
-    result = sd_bus_message_open_container(reply, SD_BUS_TYPE_VARIANT,
-                                            "(sa(us))");
-  if (result >= 0)
-    result = sd_bus_message_open_container(reply, SD_BUS_TYPE_STRUCT,
-                                            "sa(us)");
-  if (result >= 0)
-    result = sd_bus_message_append(reply, "s", filter.name.c_str());
-  if (result >= 0)
-    result = sd_bus_message_open_container(reply, SD_BUS_TYPE_ARRAY, "(us)");
-  for (const BrowserFilterPattern &pattern : filter.patterns) {
-    if (result >= 0)
-      result = sd_bus_message_open_container(reply, SD_BUS_TYPE_STRUCT, "us");
-    if (result >= 0)
-      result = sd_bus_message_append(reply, "us", pattern.type,
-                                     pattern.pattern.c_str());
-    if (result >= 0)
-      result = sd_bus_message_close_container(reply);
-  }
-  if (result >= 0)
-    result = sd_bus_message_close_container(reply);
-  if (result >= 0)
-    result = sd_bus_message_close_container(reply);
-  if (result >= 0)
-    result = sd_bus_message_close_container(reply);
-  if (result >= 0)
-    result = sd_bus_message_close_container(reply);
-  return result >= 0;
-}
-
 std::string native_path_to_uri(const std::string &path) {
   if (path.empty() || path.front() != '/')
     return {};
@@ -361,28 +326,6 @@ bool parse_options(sd_bus_message *message, PortalRequest &request) {
       return false;
   }
   return result >= 0 && sd_bus_message_exit_container(message) >= 0;
-}
-
-bool append_uris(sd_bus_message *reply,
-                 const std::vector<std::string> &uris) {
-  int result = sd_bus_message_open_container(reply, SD_BUS_TYPE_DICT_ENTRY,
-                                              "sv");
-  if (result >= 0)
-    result = sd_bus_message_append(reply, "s", "uris");
-  if (result >= 0)
-    result = sd_bus_message_open_container(reply, SD_BUS_TYPE_VARIANT, "as");
-  if (result >= 0)
-    result = sd_bus_message_open_container(reply, SD_BUS_TYPE_ARRAY, "s");
-  for (const std::string &uri : uris)
-    if (result >= 0)
-      result = sd_bus_message_append(reply, "s", uri.c_str());
-  if (result >= 0)
-    result = sd_bus_message_close_container(reply);
-  if (result >= 0)
-    result = sd_bus_message_close_container(reply);
-  if (result >= 0)
-    result = sd_bus_message_close_container(reply);
-  return result >= 0;
 }
 
 gboolean bus_source_prepare(GSource *source, gint *timeout_milliseconds);
@@ -878,28 +821,10 @@ private:
                   const std::vector<BrowserChoiceSelection> *choices) {
     if (request.call == nullptr)
       return;
-    sd_bus_message *reply = nullptr;
-    int result = sd_bus_message_new_method_return(request.call, &reply);
-    if (result >= 0)
-      result = sd_bus_message_append(reply, "u", response);
-    if (result >= 0)
-      result = sd_bus_message_open_container(reply, SD_BUS_TYPE_ARRAY, "{sv}");
-    if (result >= 0 && !uris.empty() && !append_uris(reply, uris))
-      result = -EINVAL;
-    if (result >= 0 && response == kResponseSuccess &&
-        current_filter != nullptr &&
-        !append_filter_option(reply, *current_filter))
-      result = -EINVAL;
-    if (result >= 0 && response == kResponseSuccess && choices != nullptr &&
-        !choices->empty() && !append_portal_choices(reply, *choices))
-      result = -EINVAL;
-    if (result >= 0)
-      result = sd_bus_message_close_container(reply);
-    if (result >= 0)
-      result = sd_bus_send(bus_, reply, nullptr);
+    const int result = send_portal_response(
+        bus_, request.call, response, uris, current_filter, choices);
     detail::trace("response-sent response=%u uris=%zu result=%d", response,
                   uris.size(), result);
-    sd_bus_message_unref(reply);
     if (result < 0)
       report_bus_error("unable to send chooser response", result);
     sd_bus_message_unref(request.call);

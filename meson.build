@@ -77,6 +77,7 @@ executable(
     'src/portal_main.cpp',
     'src/portal_backend.cpp',
     'src/portal_choices.cpp',
+    'src/portal_response.cpp',
     'src/save_files.cpp',
   ],
   link_with: filechooser_common,
@@ -195,6 +196,22 @@ test(
   'FileChooser portal SaveFiles contract',
   dbus_run_session,
   args: ['--', portal_save_files_test.full_path()],
+)
+
+portal_response_test = executable(
+  'filechooser-portal-response-test',
+  [
+    'tests/portal_response_test.cpp',
+    'src/portal_choices.cpp',
+    'src/portal_response.cpp',
+  ],
+  dependencies: [systemd_dep],
+  install: false,
+)
+test(
+  'FileChooser delayed portal response',
+  dbus_run_session,
+  args: ['--', portal_response_test.full_path()],
 )
 
 # The portal target is deliberately not registered by default. Its request
