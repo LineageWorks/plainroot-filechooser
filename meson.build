@@ -73,7 +73,7 @@ executable(
   install: true,
 )
 
-executable(
+portal_backend = executable(
   'plainroot-filechooser-portal',
   [
     'src/portal_main.cpp',
@@ -234,6 +234,20 @@ portal_limits_test = executable(
   install: false,
 )
 test('FileChooser portal request size limits', portal_limits_test)
+
+portal_request_limits_test = executable(
+  'filechooser-portal-request-limits-test',
+  'tests/portal_request_limits_test.cpp',
+  dependencies: [systemd_dep],
+  install: false,
+)
+test(
+  'FileChooser backend rejects oversized portal requests',
+  dbus_run_session,
+  args: ['--', portal_request_limits_test.full_path(),
+         portal_backend.full_path()],
+  timeout: 20,
+)
 
 # The portal target is deliberately not registered by default. Its request
 # lifecycle and FileChooser parity must be validated before a portals.conf
