@@ -15,7 +15,9 @@ session is not reconfigured. Plainroot's build and runtime dependency closure
 must stay free of GIO. An opt-in `DESTDIR` install was verified in a disposable
 staging root; all registration and activation files landed at their configured
 `/usr` paths. This did not change the active desktop configuration or verify
-broker routing, which remains a live acceptance gate.
+broker routing, which remains a live acceptance gate. A default `DESTDIR`
+install was also checked and contained neither portal registration nor
+activation files.
 
 ## Current slice
 
