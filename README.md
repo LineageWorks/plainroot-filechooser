@@ -94,9 +94,11 @@ pending. SSHFS is installed, and a strict-host-key SFTP handshake to the active
 localhost `sshd` succeeds. A direct read-only `localhost:/tmp` SSHFS mount was
 retried on 2026-11-03 and failed at FUSE setup with `Operation not permitted`
 even outside the Plainroot service; `/dev/fuse` is present, but
-`fusermount3` is not setuid. The temporary mount directory was removed and no
-mount remains. The current host runtime therefore cannot complete FUSE mount
-acceptance.
+`fusermount3` is not setuid. A subsequent direct read-only SSHFS mount inside a
+disposable unprivileged user and mount namespace read `/etc/os-release` via
+`localhost:/etc` and unmounted cleanly. This verifies direct SSHFS file access
+in that namespace, but not the `plainroot-networkd` transient-unit path or
+chooser access to a managed mount. The USB volume remained unmounted.
 
 The browser accepts an optional absolute starting directory. Directory names
 remain native byte paths for navigation and selection; names that are not valid
