@@ -368,6 +368,9 @@ msgstr "تعذّر بدء خدمة تركيب الشبكة."
 msgid "Could not connect to the SFTP server."
 msgstr "تعذّر الاتصال بخادم SFTP."
 
+msgid "The network location could not be mounted. Check the server, host key, login, and FUSE availability."
+msgstr "تعذّر تركيب موقع الشبكة. تحقّق من الخادم ومفتاح المضيف وطريقة تسجيل الدخول وتوفّر FUSE."
+
 msgid "Could not disconnect the network location."
 msgstr "تعذّر قطع الاتصال بموقع الشبكة."
 

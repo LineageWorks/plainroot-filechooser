@@ -368,6 +368,9 @@ msgstr "Не удалось запустить службу сетевого м�
 msgid "Could not connect to the SFTP server."
 msgstr "Не удалось подключиться к серверу SFTP."
 
+msgid "The network location could not be mounted. Check the server, host key, login, and FUSE availability."
+msgstr "Не удалось подключить сетевое расположение. Проверьте сервер, ключ узла, способ входа и доступность FUSE."
+
 msgid "Could not disconnect the network location."
 msgstr "Не удалось отключить сетевое расположение."
 

@@ -1791,6 +1791,8 @@ private:
       return "Unable to start the network mount service.";
     case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_CONNECTION_FAILED:
       return "Could not connect to the SFTP server.";
+    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_MOUNT_FAILED:
+      return "The network location could not be mounted. Check the server, host key, login, and FUSE availability.";
     case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_UNMOUNT_FAILED:
       return "Could not disconnect the network location.";
     case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_CANCELLED:

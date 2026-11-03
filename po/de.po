@@ -367,6 +367,9 @@ msgstr "Der Netzwerk-Einhängedienst kann nicht gestartet werden."
 msgid "Could not connect to the SFTP server."
 msgstr "Die Verbindung zum SFTP-Server ist fehlgeschlagen."
 
+msgid "The network location could not be mounted. Check the server, host key, login, and FUSE availability."
+msgstr "Der Netzwerkort konnte nicht eingebunden werden. Prüfen Sie Server, Hostschlüssel, Anmeldung und FUSE-Verfügbarkeit."
+
 msgid "Could not disconnect the network location."
 msgstr "Der Netzwerkort konnte nicht getrennt werden."
 
