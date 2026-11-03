@@ -31,6 +31,7 @@ browser_sources = [
   'src/directory_sort.cpp',
   'src/directory_loader.cpp',
   'src/mime_database.cpp',
+  'src/recent_files.cpp',
   'src/open_filename.cpp',
   'src/storage_bridge.cpp',
   'src/storage_locations_view.cpp',
@@ -156,6 +157,18 @@ mime_database_test = executable(
   install: false,
 )
 test('FileChooser MIME database', mime_database_test)
+
+recent_files_test = executable(
+  'filechooser-recent-files-test',
+  [
+    'tests/recent_files_test.cpp',
+    'src/recent_files.cpp',
+    'src/bookmarks.cpp',
+  ],
+  dependencies: [core_dep, glib_dep],
+  install: false,
+)
+test('FileChooser XBEL recent files', recent_files_test)
 
 open_filename_test = executable(
   'filechooser-open-filename-test',
