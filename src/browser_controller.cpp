@@ -712,9 +712,7 @@ private:
   static void up_activated(void *user_data, plainroot_ui_widget *) {
     auto &self = *static_cast<Impl *>(user_data);
     if (self.recent_mode_) {
-      self.recent_mode_ = false;
-      self.render_breadcrumbs();
-      self.request_directory_load(false);
+      self.navigate(self.current_path_);
       return;
     }
     self.navigate(parent_path(self.current_path_));
