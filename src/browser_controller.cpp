@@ -6,6 +6,7 @@
 #include "directory_sort.hpp"
 #include "mime_database.hpp"
 #include "open_filename.hpp"
+#include "portal_selection_mode.hpp"
 #include "recent_files.hpp"
 #include "storage_bridge.hpp"
 #include "storage_locations_view.hpp"
@@ -1976,8 +1977,8 @@ private:
       plainroot_ui_widget *entry_content = nullptr;
       const bool is_directory =
           entry->kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY;
-      const bool selectable =
-          allow_multiple_ && (select_directory_ ? is_directory : !is_directory);
+      const bool selectable = detail::entry_is_multi_selectable(
+          allow_multiple_, select_directory_, is_directory);
       if (selectable) {
         const bool selected =
             std::find(selected_paths_.begin(), selected_paths_.end(),

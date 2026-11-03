@@ -3,6 +3,7 @@
 #include "browser_controller.hpp"
 #include "portal_choices.hpp"
 #include "portal_limits.hpp"
+#include "portal_selection_mode.hpp"
 #include "portal_response.hpp"
 #include "save_files.hpp"
 #include "trace.hpp"
@@ -519,12 +520,12 @@ public:
     if (!select_initial_filter(*request))
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
                          "Too many file filters in request");
-    if (request->multiple && save_file_request)
+    if (!detail::portal_selection_mode_valid(
+            save_file_request, request->multiple, request->directory))
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
-                         "Multiple selection cannot be combined with SaveFile");
-    if (save_file_request && request->directory)
-      return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
-                         "SaveFile does not support directory selection");
+                         request->multiple
+                             ? "Multiple selection cannot be combined with SaveFile"
+                             : "SaveFile does not support directory selection");
     if (save_files_request && !request->has_save_filenames)
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
                          "SaveFiles requires at least one valid file name");
