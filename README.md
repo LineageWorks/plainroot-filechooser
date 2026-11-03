@@ -89,16 +89,19 @@ with GTK, or Editor document replacement when a document is already open. Do
 not enable registration in a desktop session until the remaining parity gates
 pass.
 
-Live removable-volume mount and SSHFS connect/disconnect acceptance are still
-pending. SSHFS is installed, and a strict-host-key SFTP handshake to the active
-localhost `sshd` succeeds. A direct read-only `localhost:/tmp` SSHFS mount was
-retried on 2026-11-03 and failed at FUSE setup with `Operation not permitted`
-even outside the Plainroot service; `/dev/fuse` is present, but
-`fusermount3` is not setuid. A subsequent direct read-only SSHFS mount inside a
-disposable unprivileged user and mount namespace read `/etc/os-release` via
-`localhost:/etc` and unmounted cleanly. This verifies direct SSHFS file access
-in that namespace, but not the `plainroot-networkd` transient-unit path or
-chooser access to a managed mount. The USB volume remained unmounted.
+Storaged's local-volume operation passed live systemd read/write mount and
+normal-unmount acceptance on `/dev/sdb1` on 2026-11-03, including a user
+write/read/delete check. Mounting, browsing, and unmounting that removable
+volume through this chooser UI remain to be accepted. SSHFS is installed, and
+a strict-host-key SFTP handshake to the active localhost `sshd` succeeds. A
+direct host-session SSHFS mount failed at FUSE setup with `Operation not
+permitted`; `/dev/fuse` is present, but `fusermount3` is not setuid. The
+production `plainroot-networkd` service mounted `localhost:/etc`, read
+`/etc/os-release`, and disconnected cleanly in an isolated user and mount
+namespace using a fake user-systemd manager. A live host user-systemd transient
+unit also exercised failure cleanup, but successful host-session SSHFS
+mounting and chooser access to a managed network mount remain open. The USB
+volume is currently left unmounted after the live Storaged acceptance.
 
 The browser accepts an optional absolute starting directory. Directory names
 remain native byte paths for navigation and selection; names that are not valid
