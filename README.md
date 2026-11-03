@@ -90,9 +90,11 @@ remain open. Do not enable registration in a desktop session until those
 checks pass.
 
 Live removable-volume mount and SSHFS connect/disconnect acceptance are still
-pending. SSHFS is installed, and localhost SSH and SFTP work; a temporary
-read-only SSHFS mount failed at FUSE setup with `Operation not permitted` in
-the agent execution environment. No mount was left behind.
+pending. SSHFS is installed, and a strict-host-key SFTP handshake to the active
+localhost `sshd` succeeds. A direct read-only `localhost:/tmp` SSHFS mount
+fails at FUSE setup with `Operation not permitted` even outside the Plainroot
+service; the temporary mount directory was removed and no mount remains. The
+current host runtime therefore cannot complete FUSE mount acceptance.
 
 The browser accepts an optional absolute starting directory. Directory names
 remain native byte paths for navigation and selection; names that are not valid
