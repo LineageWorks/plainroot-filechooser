@@ -228,6 +228,13 @@ test(
   args: ['--', portal_response_test.full_path()],
 )
 
+portal_limits_test = executable(
+  'filechooser-portal-limits-test',
+  'tests/portal_limits_test.cpp',
+  install: false,
+)
+test('FileChooser portal request size limits', portal_limits_test)
+
 # The portal target is deliberately not registered by default. Its request
 # lifecycle and FileChooser parity must be validated before a portals.conf
 # preference can route applications to it.

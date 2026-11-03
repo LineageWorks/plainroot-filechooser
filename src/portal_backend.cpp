@@ -2,6 +2,7 @@
 
 #include "browser_controller.hpp"
 #include "portal_choices.hpp"
+#include "portal_limits.hpp"
 #include "portal_response.hpp"
 #include "save_files.hpp"
 #include "trace.hpp"
@@ -116,7 +117,8 @@ const sd_bus_vtable kRequestVtable[] = {
 };
 
 bool parse_filter_patterns(sd_bus_message *message,
-                           std::vector<BrowserFilterPattern> &patterns) {
+                           std::vector<BrowserFilterPattern> &patterns,
+                           size_t &total_patterns) {
   int result = sd_bus_message_enter_container(message, SD_BUS_TYPE_ARRAY,
                                                "(us)");
   if (result < 0)
@@ -130,14 +132,17 @@ bool parse_filter_patterns(sd_bus_message *message,
     if (result < 0 || pattern == nullptr || (type != 0U && type != 1U) ||
         std::strlen(pattern) > kMaximumPatternLength ||
         patterns.size() >= kMaximumPatternsPerFilter ||
+        !detail::another_filter_pattern_allowed(total_patterns) ||
         sd_bus_message_exit_container(message) < 0)
       return false;
     patterns.push_back({type, pattern});
+    ++total_patterns;
   }
   return result >= 0 && sd_bus_message_exit_container(message) >= 0;
 }
 
-bool parse_filter(sd_bus_message *message, BrowserFilter &filter) {
+bool parse_filter(sd_bus_message *message, BrowserFilter &filter,
+                  size_t &total_patterns) {
   int result = sd_bus_message_enter_container(message, SD_BUS_TYPE_STRUCT,
                                                "sa(us)");
   if (result <= 0)
@@ -146,7 +151,8 @@ bool parse_filter(sd_bus_message *message, BrowserFilter &filter) {
   const char *name = nullptr;
   result = sd_bus_message_read(message, "s", &name);
   if (result < 0 || name == nullptr ||
-      !parse_filter_patterns(message, filter.patterns) ||
+      !detail::portal_text_within_limit(name) ||
+      !parse_filter_patterns(message, filter.patterns, total_patterns) ||
       sd_bus_message_exit_container(message) < 0)
     return false;
   filter.name = name;
@@ -154,7 +160,8 @@ bool parse_filter(sd_bus_message *message, BrowserFilter &filter) {
 }
 
 bool parse_filter_list(sd_bus_message *message,
-                       std::vector<BrowserFilter> &filters) {
+                       std::vector<BrowserFilter> &filters,
+                       size_t &total_patterns) {
   int result = sd_bus_message_enter_container(message, SD_BUS_TYPE_ARRAY,
                                                "(sa(us))");
   if (result < 0)
@@ -169,15 +176,17 @@ bool parse_filter_list(sd_bus_message *message,
       break;
     if (result < 0 || type != SD_BUS_TYPE_STRUCT || contents == nullptr ||
         std::strcmp(contents, "sa(us)") != 0 ||
-        filters.size() >= kMaximumFilters || !parse_filter(message, filter))
+        filters.size() >= kMaximumFilters ||
+        !parse_filter(message, filter, total_patterns))
       return false;
     filters.push_back(std::move(filter));
   }
   return sd_bus_message_exit_container(message) >= 0;
 }
 
-bool parse_current_filter(sd_bus_message *message, BrowserFilter &filter) {
-  return parse_filter(message, filter);
+bool parse_current_filter(sd_bus_message *message, BrowserFilter &filter,
+                          size_t &total_patterns) {
+  return parse_filter(message, filter, total_patterns);
 }
 
 bool filters_equal(const BrowserFilter &left, const BrowserFilter &right) {
@@ -224,6 +233,7 @@ std::string native_path_to_uri(const std::string &path) {
 }
 
 bool parse_options(sd_bus_message *message, PortalRequest &request) {
+  size_t total_filter_patterns = 0U;
   int result = sd_bus_message_enter_container(message, SD_BUS_TYPE_ARRAY,
                                                "{sv}");
   if (result < 0)
@@ -263,25 +273,31 @@ bool parse_options(sd_bus_message *message, PortalRequest &request) {
                std::strcmp(contents, "s") == 0) {
       const char *value = nullptr;
       result = sd_bus_message_read(message, "s", &value);
-      if (result >= 0 && value != nullptr)
+      if (result >= 0 && value != nullptr &&
+          detail::portal_text_within_limit(value))
         request.accept_label = value;
+      else if (result >= 0)
+        result = -EINVAL;
     } else if (std::strcmp(key, "current_name") == 0 &&
                std::strcmp(contents, "s") == 0) {
       const char *value = nullptr;
       result = sd_bus_message_read(message, "s", &value);
-      if (result >= 0 && value != nullptr)
+      if (result >= 0 && value != nullptr &&
+          detail::portal_text_within_limit(value))
         request.current_name = value;
+      else if (result >= 0)
+        result = -EINVAL;
     } else if (std::strcmp(key, "current_folder") == 0 &&
                std::strcmp(contents, "ay") == 0) {
       const void *bytes = nullptr;
       size_t size = 0;
       result = sd_bus_message_read_array(message, SD_BUS_TYPE_BYTE, &bytes,
                                          &size);
-      if (result >= 0 && size > 0U && bytes != nullptr) {
+      if (result >= 0 && size > 0U &&
+          !detail::native_path_payload_valid(bytes, size))
+        return false;
+      if (result >= 0 && size > 0U) {
         const auto *path = static_cast<const char *>(bytes);
-        if (path[size - 1U] != '\0' || path[0] != '/' ||
-            std::memchr(path, '\0', size - 1U) != nullptr)
-          return false;
         request.start_path.assign(path, size - 1U);
       }
     } else if (std::strcmp(key, "current_file") == 0 &&
@@ -290,20 +306,24 @@ bool parse_options(sd_bus_message *message, PortalRequest &request) {
       size_t size = 0;
       result = sd_bus_message_read_array(message, SD_BUS_TYPE_BYTE, &bytes,
                                          &size);
-      if (result >= 0 && size > 0U && bytes != nullptr) {
+      if (result >= 0 && size > 0U &&
+          !detail::native_path_payload_valid(bytes, size))
+        return false;
+      if (result >= 0 && size > 0U) {
         const auto *path = static_cast<const char *>(bytes);
-        if (path[size - 1U] != '\0' || path[0] != '/' ||
-            std::memchr(path, '\0', size - 1U) != nullptr)
-          return false;
         request.current_file_path.assign(path, size - 1U);
       }
     } else if (!request.save_files && std::strcmp(key, "filters") == 0 &&
                std::strcmp(contents, "a(sa(us))") == 0) {
-      result = parse_filter_list(message, request.filters) ? 1 : -EINVAL;
+      result = parse_filter_list(message, request.filters,
+                                 total_filter_patterns)
+                   ? 1
+                   : -EINVAL;
     } else if (!request.save_files && std::strcmp(key, "current_filter") == 0 &&
                std::strcmp(contents, "(sa(us))") == 0) {
       request.has_current_filter =
-          parse_current_filter(message, request.current_filter);
+          parse_current_filter(message, request.current_filter,
+                               total_filter_patterns);
       result = request.has_current_filter ? 1 : -EINVAL;
     } else if (std::strcmp(key, "choices") == 0 &&
                std::strcmp(contents, "a(ssa(ss)s)") == 0) {
@@ -459,7 +479,11 @@ public:
     int result = sd_bus_message_read(message, "osss", &handle, &app_id,
                                      &parent_window, &title);
     if (result < 0 || handle == nullptr || app_id == nullptr ||
-        parent_window == nullptr || title == nullptr)
+        parent_window == nullptr || title == nullptr ||
+        !detail::portal_text_within_limit(handle) ||
+        !detail::portal_text_within_limit(app_id) ||
+        !detail::portal_text_within_limit(parent_window) ||
+        !detail::portal_text_within_limit(title))
       return reply_error(
           message, SD_BUS_ERROR_INVALID_ARGS,
           save_files_request
