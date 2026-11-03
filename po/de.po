@@ -121,6 +121,24 @@ msgstr "Bilder"
 msgid "Videos"
 msgstr "Videos"
 
+msgid "Bookmark folder"
+msgstr "Ordner als Lesezeichen speichern"
+
+msgid "Remove bookmark"
+msgstr "Lesezeichen entfernen"
+
+msgid "No places available"
+msgstr "Keine Orte verfügbar"
+
+msgid "Bookmark added."
+msgstr "Lesezeichen hinzugefügt."
+
+msgid "Bookmark removed."
+msgstr "Lesezeichen entfernt."
+
+msgid "Unable to save bookmarks."
+msgstr "Lesezeichen können nicht gespeichert werden."
+
 msgid "Loading folder…"
 msgstr "Ordner wird geladen …"
 

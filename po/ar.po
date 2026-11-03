@@ -122,6 +122,24 @@ msgstr "الصور"
 msgid "Videos"
 msgstr "مقاطع الفيديو"
 
+msgid "Bookmark folder"
+msgstr "إضافة المجلد إلى الإشارات المرجعية"
+
+msgid "Remove bookmark"
+msgstr "إزالة الإشارة المرجعية"
+
+msgid "No places available"
+msgstr "لا توجد أماكن متاحة"
+
+msgid "Bookmark added."
+msgstr "أُضيفت الإشارة المرجعية."
+
+msgid "Bookmark removed."
+msgstr "أُزيلت الإشارة المرجعية."
+
+msgid "Unable to save bookmarks."
+msgstr "تعذّر حفظ الإشارات المرجعية."
+
 msgid "Loading folder…"
 msgstr "جارٍ تحميل المجلد…"
 

@@ -25,6 +25,7 @@ threads_dep = dependency('threads')
 systemd_dep = dependency('libsystemd')
 
 browser_sources = [
+  'src/bookmarks.cpp',
   'src/browser_controller.cpp',
   'src/directory_breadcrumbs.cpp',
   'src/directory_sort.cpp',

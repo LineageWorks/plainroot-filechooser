@@ -1,5 +1,6 @@
 #include "browser_controller.hpp"
 
+#include "bookmarks.hpp"
 #include "directory_breadcrumbs.hpp"
 #include "directory_loader.hpp"
 #include "directory_sort.hpp"
@@ -178,12 +179,12 @@ public:
     auto *up = make_button("Up", &Impl::up_activated);
     auto *home = make_button("Home", &Impl::home_activated);
     const std::string places_hint = tr("Places");
-    places_dropdown_ = places_.empty()
-                           ? nullptr
-                           : plainroot_ui_dropdown_create_v1(
-                                 context_, places_hint.c_str(),
-                                 static_cast<uint32_t>(places_hint.size()),
-                                 0.0F, &Impl::place_changed, this);
+    places_dropdown_ = plainroot_ui_dropdown_create_v1(
+        context_, places_hint.c_str(),
+        static_cast<uint32_t>(places_hint.size()), 0.0F,
+        &Impl::place_changed, this);
+    bookmark_button_ =
+        make_button("Bookmark folder", &Impl::bookmark_activated);
     new_folder_button_ =
         make_button("New folder", &Impl::new_folder_activated);
     breadcrumb_scroll_ =
@@ -338,7 +339,7 @@ public:
         page == nullptr || footer_padding == nullptr ||
         title == nullptr || location_row == nullptr ||
         location_actions == nullptr || up == nullptr || home == nullptr ||
-        (!places_.empty() && places_dropdown_ == nullptr) ||
+        places_dropdown_ == nullptr || bookmark_button_ == nullptr ||
         new_folder_button_ == nullptr || new_folder_form_ == nullptr ||
         new_folder_actions == nullptr || new_folder_field_ == nullptr ||
         new_folder_create_button_ == nullptr ||
@@ -393,15 +394,9 @@ public:
     if (sort_result != PLAINROOT_UI_RESULT_OK)
       return false;
 
-    for (size_t index = 0; index < places_.size(); ++index) {
-      const Place &place = places_[index];
-      auto *option = plainroot_ui_list_box_option_create_v1(
-          context_, place.label.c_str(),
-          static_cast<uint32_t>(place.label.size()),
-          static_cast<int32_t>(index), 0.0F);
-      if (option == nullptr || !add(places_dropdown_, option))
-        return false;
-    }
+    if (!populate_place_options())
+      return false;
+    refresh_bookmark_button();
 
     plainroot_ui_widget *choices_panel = nullptr;
     choice_widgets_.assign(choices_.size(), nullptr);
@@ -485,8 +480,8 @@ public:
         (save_files_panel != nullptr && !add(page, save_files_panel)) ||
         !add(location_row, location_actions) ||
         !add(location_actions, up) || !add(location_actions, home) ||
-        (places_dropdown_ != nullptr &&
-         !add(location_actions, places_dropdown_)) ||
+        !add(location_actions, places_dropdown_) ||
+        !add(location_actions, bookmark_button_) ||
         !add(location_actions, new_folder_button_) ||
         !add(page, new_folder_form_) ||
         !add(new_folder_form_, new_folder_field_) ||
@@ -607,6 +602,7 @@ public:
     if (new_folder_form_ != nullptr)
       (void)plainroot_ui_widget_set_visible_v1(new_folder_form_, 0U);
     current_path_ = std::move(path);
+    refresh_bookmark_button();
     new_folder_created_ = false;
     render_breadcrumbs();
     if (!save_file_ && filename_field_ != nullptr) {
@@ -701,6 +697,11 @@ private:
   }
 
   void initialize_places() {
+    bookmarks_available_ = detail::read_gtk_bookmarks(bookmarks_);
+    rebuild_places_model();
+  }
+
+  void rebuild_places_model() {
     places_.clear();
     const struct {
       const char *label;
@@ -726,10 +727,154 @@ private:
       if (!already_added)
         places_.push_back({tr(entry.label), path});
     }
+
+    for (const detail::Bookmark &bookmark : bookmarks_) {
+      if (bookmark.path.empty())
+        continue;
+      const bool already_added = std::any_of(
+          places_.begin(), places_.end(), [&bookmark](const Place &place) {
+            return detail::canonical_local_path(place.path) == bookmark.path;
+          });
+      if (!already_added)
+        places_.push_back(
+            {detail::bookmark_display_name(bookmark), bookmark.path});
+    }
+  }
+
+  bool populate_place_options() {
+    if (places_dropdown_ == nullptr)
+      return false;
+    for (plainroot_ui_widget *option : place_option_widgets_) {
+      (void)plainroot_ui_widget_remove_child_v1(places_dropdown_, option);
+      (void)plainroot_ui_widget_destroy_subtree_v1(option);
+    }
+    place_option_widgets_.clear();
+
+    const auto add_option = [this](const std::string &label, int32_t value) {
+      auto *option = plainroot_ui_list_box_option_create_v1(
+          context_, label.c_str(), static_cast<uint32_t>(label.size()), value,
+          0.0F);
+      if (option == nullptr || !add(places_dropdown_, option))
+        return false;
+      place_option_widgets_.push_back(option);
+      return true;
+    };
+
+    if (places_.empty()) {
+      if (!add_option(tr("No places available"), 0) ||
+          plainroot_ui_widget_set_enabled_v1(places_dropdown_, 0U) !=
+              PLAINROOT_UI_RESULT_OK)
+        return false;
+    } else {
+      for (size_t index = 0; index < places_.size(); ++index) {
+        if (index > static_cast<size_t>(std::numeric_limits<int32_t>::max()) ||
+            !add_option(places_[index].label, static_cast<int32_t>(index)))
+          return false;
+      }
+      if (plainroot_ui_widget_set_enabled_v1(places_dropdown_, 1U) !=
+          PLAINROOT_UI_RESULT_OK)
+        return false;
+    }
+
+    size_t selected_index = 0;
+    if (!current_path_.empty()) {
+      const std::string current =
+          detail::canonical_local_path(current_path_);
+      const auto current_place = std::find_if(
+          places_.begin(), places_.end(), [&current](const Place &place) {
+            return detail::canonical_local_path(place.path) == current;
+          });
+      if (current_place != places_.end())
+        selected_index = static_cast<size_t>(
+            std::distance(places_.begin(), current_place));
+    }
+    initializing_places_dropdown_ = true;
+    const auto result = plainroot_ui_dropdown_set_value_v1(
+        places_dropdown_, static_cast<int32_t>(selected_index));
+    initializing_places_dropdown_ = false;
+    return result == PLAINROOT_UI_RESULT_OK;
+  }
+
+  bool current_path_is_bookmarked() const {
+    if (current_path_.empty())
+      return false;
+    const std::string current =
+        detail::canonical_local_path(current_path_);
+    return !current.empty() &&
+           std::any_of(bookmarks_.begin(), bookmarks_.end(),
+                       [&current](const detail::Bookmark &bookmark) {
+                         return bookmark.path == current;
+                       });
+  }
+
+  void refresh_bookmark_button() {
+    if (bookmark_button_ == nullptr)
+      return;
+    const bool bookmarked = current_path_is_bookmarked();
+    const std::string label =
+        tr(bookmarked ? "Remove bookmark" : "Bookmark folder");
+    set_label(bookmark_button_, label);
+    (void)plainroot_ui_widget_set_accessible_name_v1(
+        bookmark_button_, label.c_str(), static_cast<uint32_t>(label.size()));
+    const bool enabled = bookmarks_available_ && !current_path_.empty();
+    (void)plainroot_ui_widget_set_enabled_v1(bookmark_button_,
+                                             enabled ? 1U : 0U);
+  }
+
+  static void bookmark_activated(void *user_data, plainroot_ui_widget *) {
+    auto &self = *static_cast<Impl *>(user_data);
+    if (!self.bookmarks_available_ || self.current_path_.empty()) {
+      self.set_status(tr("Unable to save bookmarks."));
+      self.request_redraw();
+      return;
+    }
+
+    const std::string current =
+        detail::canonical_local_path(self.current_path_);
+    if (current.empty()) {
+      self.set_status(tr("Unable to save bookmarks."));
+      self.request_redraw();
+      return;
+    }
+
+    std::vector<detail::Bookmark> updated = self.bookmarks_;
+    const size_t original_size = updated.size();
+    std::erase_if(updated, [&current](const detail::Bookmark &bookmark) {
+      return bookmark.path == current;
+    });
+    const bool removing = original_size != updated.size();
+    if (!removing) {
+      detail::Bookmark bookmark;
+      if (!detail::make_local_bookmark(current, bookmark)) {
+        self.set_status(tr("Unable to save bookmarks."));
+        self.request_redraw();
+        return;
+      }
+      updated.push_back(std::move(bookmark));
+    }
+
+    if (!detail::write_gtk_bookmarks(updated)) {
+      self.set_status(tr("Unable to save bookmarks."));
+      self.request_redraw();
+      return;
+    }
+
+    self.bookmarks_ = std::move(updated);
+    self.rebuild_places_model();
+    if (!self.populate_place_options()) {
+      self.set_status(tr("Unable to save bookmarks."));
+      self.request_redraw();
+      return;
+    }
+    self.refresh_bookmark_button();
+    self.set_status(tr(removing ? "Bookmark removed." : "Bookmark added."));
+    self.request_redraw();
   }
 
   static void place_changed(void *user_data, plainroot_ui_widget *widget) {
     auto &self = *static_cast<Impl *>(user_data);
+    if (self.initializing_places_dropdown_)
+      return;
     int32_t selected = -1;
     uint32_t has_value = 0;
     if (plainroot_ui_dropdown_get_value_v1(widget, &selected, &has_value) !=
@@ -1873,6 +2018,7 @@ private:
   bool show_hidden_ = false;
   bool initializing_filter_dropdown_ = false;
   bool initializing_sort_dropdown_ = false;
+  bool initializing_places_dropdown_ = false;
   bool initializing_choice_controls_ = false;
   bool overwrite_dialog_open_ = false;
   bool overwrite_confirmed_ = false;
@@ -1881,6 +2027,7 @@ private:
   bool directory_loading_ = false;
   bool entries_mime_classified_ = false;
   bool mime_database_available_ = false;
+  bool bookmarks_available_ = true;
   int32_t selected_filter_index_ = -1;
   detail::DirectorySortOrder sort_order_ =
       detail::DirectorySortOrder::name_ascending;
@@ -1896,7 +2043,9 @@ private:
   std::vector<BrowserFilter> filters_;
   std::vector<BrowserChoice> choices_;
   std::vector<BrowserChoiceSelection> choice_selections_;
+  std::vector<detail::Bookmark> bookmarks_;
   std::vector<Place> places_;
+  std::vector<plainroot_ui_widget *> place_option_widgets_;
   std::string status_error_;
   std::vector<detail::DirectoryEntry> entries_;
   std::vector<plainroot_ui_widget *> rows_;
@@ -1916,6 +2065,7 @@ private:
   plainroot_ui_widget *search_field_ = nullptr;
   plainroot_ui_widget *hidden_switch_ = nullptr;
   plainroot_ui_widget *places_dropdown_ = nullptr;
+  plainroot_ui_widget *bookmark_button_ = nullptr;
   plainroot_ui_widget *filter_dropdown_ = nullptr;
   plainroot_ui_widget *sort_dropdown_ = nullptr;
   plainroot_ui_widget *list_scroll_ = nullptr;

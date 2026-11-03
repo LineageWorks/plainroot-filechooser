@@ -121,6 +121,24 @@ msgstr "תמונות"
 msgid "Videos"
 msgstr "סרטונים"
 
+msgid "Bookmark folder"
+msgstr "הוספת התיקייה לסימניות"
+
+msgid "Remove bookmark"
+msgstr "הסרת הסימנייה"
+
+msgid "No places available"
+msgstr "אין מיקומים זמינים"
+
+msgid "Bookmark added."
+msgstr "הסימנייה נוספה."
+
+msgid "Bookmark removed."
+msgstr "הסימנייה הוסרה."
+
+msgid "Unable to save bookmarks."
+msgstr "לא ניתן לשמור את הסימניות."
+
 msgid "Loading folder…"
 msgstr "התיקייה נטענת…"
 

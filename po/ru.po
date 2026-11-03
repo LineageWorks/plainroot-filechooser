@@ -122,6 +122,24 @@ msgstr "Изображения"
 msgid "Videos"
 msgstr "Видео"
 
+msgid "Bookmark folder"
+msgstr "Добавить папку в закладки"
+
+msgid "Remove bookmark"
+msgstr "Удалить закладку"
+
+msgid "No places available"
+msgstr "Нет доступных мест"
+
+msgid "Bookmark added."
+msgstr "Закладка добавлена."
+
+msgid "Bookmark removed."
+msgstr "Закладка удалена."
+
+msgid "Unable to save bookmarks."
+msgstr "Не удалось сохранить закладки."
+
 msgid "Loading folder…"
 msgstr "Загрузка папки…"
 
