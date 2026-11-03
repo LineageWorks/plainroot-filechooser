@@ -12,7 +12,10 @@ keeping Hyprland and GTK as defaults for other interfaces. The PlainrootDE
 session must set `XDG_CURRENT_DESKTOP=PlainrootDE:Hyprland` for that
 desktop-specific configuration to take precedence. The current host's Hyprland
 session is not reconfigured. Plainroot's build and runtime dependency closure
-must stay free of GIO.
+must stay free of GIO. An opt-in `DESTDIR` install was verified in a disposable
+staging root; all registration and activation files landed at their configured
+`/usr` paths. This did not change the active desktop configuration or verify
+broker routing, which remains a live acceptance gate.
 
 ## Current slice
 
