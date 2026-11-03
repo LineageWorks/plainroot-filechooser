@@ -104,6 +104,18 @@ msgstr "المجلد الرئيسي"
 msgid "Places"
 msgstr "الأماكن"
 
+msgid "Recent"
+msgstr "الملفات الأخيرة"
+
+msgid "No recent files."
+msgstr "لا توجد ملفات حديثة."
+
+msgid "Unable to read recent files."
+msgstr "تعذّرت قراءة الملفات الأخيرة."
+
+msgid "Unable to read recent files: %s"
+msgstr "تعذّرت قراءة الملفات الأخيرة: %s"
+
 msgid "Desktop"
 msgstr "سطح المكتب"
 

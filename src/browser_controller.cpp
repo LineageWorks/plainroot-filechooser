@@ -6,6 +6,7 @@
 #include "directory_sort.hpp"
 #include "mime_database.hpp"
 #include "open_filename.hpp"
+#include "recent_files.hpp"
 #include "storage_bridge.hpp"
 #include "storage_locations_view.hpp"
 #include "trace.hpp"
@@ -178,6 +179,7 @@ public:
         420.0F, 8.0F, 0.0F);
     auto *up = make_button("Up", &Impl::up_activated);
     auto *home = make_button("Home", &Impl::home_activated);
+    recent_button_ = make_button("Recent", &Impl::recent_activated);
     const std::string places_hint = tr("Places");
     places_dropdown_ = plainroot_ui_dropdown_create_v1(
         context_, places_hint.c_str(),
@@ -339,6 +341,7 @@ public:
         page == nullptr || footer_padding == nullptr ||
         title == nullptr || location_row == nullptr ||
         location_actions == nullptr || up == nullptr || home == nullptr ||
+        recent_button_ == nullptr ||
         places_dropdown_ == nullptr || bookmark_button_ == nullptr ||
         new_folder_button_ == nullptr || new_folder_form_ == nullptr ||
         new_folder_actions == nullptr || new_folder_field_ == nullptr ||
@@ -480,6 +483,7 @@ public:
         (save_files_panel != nullptr && !add(page, save_files_panel)) ||
         !add(location_row, location_actions) ||
         !add(location_actions, up) || !add(location_actions, home) ||
+        !add(location_actions, recent_button_) ||
         !add(location_actions, places_dropdown_) ||
         !add(location_actions, bookmark_button_) ||
         !add(location_actions, new_folder_button_) ||
@@ -602,6 +606,7 @@ public:
     if (new_folder_form_ != nullptr)
       (void)plainroot_ui_widget_set_visible_v1(new_folder_form_, 0U);
     current_path_ = std::move(path);
+    recent_mode_ = false;
     refresh_bookmark_button();
     new_folder_created_ = false;
     render_breadcrumbs();
@@ -637,8 +642,15 @@ private:
                                        : "No file selected"))));
       }
     }
-    set_status(tr("Loading folder…"));
-    loader_.request(current_path_, generation_, selected_filter_has_mime());
+    if (recent_mode_) {
+      set_status(tr("Loading recent files…"));
+      const gchar *data_directory = g_get_user_data_dir();
+      const std::string xbel = std::string(data_directory == nullptr ? "" : data_directory) + "/recently-used.xbel";
+      loader_.request_recent(xbel, generation_);
+    } else {
+      set_status(tr("Loading folder…"));
+      loader_.request(current_path_, generation_, selected_filter_has_mime());
+    }
     schedule_render();
     request_redraw();
   }
@@ -687,6 +699,12 @@ private:
 
   static void up_activated(void *user_data, plainroot_ui_widget *) {
     auto &self = *static_cast<Impl *>(user_data);
+    if (self.recent_mode_) {
+      self.recent_mode_ = false;
+      self.render_breadcrumbs();
+      self.request_directory_load(false);
+      return;
+    }
     self.navigate(parent_path(self.current_path_));
   }
 
@@ -694,6 +712,13 @@ private:
     auto &self = *static_cast<Impl *>(user_data);
     const char *home = std::getenv("HOME");
     self.navigate(home != nullptr && home[0] == '/' ? home : "/");
+  }
+
+  static void recent_activated(void *user_data, plainroot_ui_widget *) {
+    auto &self = *static_cast<Impl *>(user_data);
+    self.recent_mode_ = true;
+    self.render_breadcrumbs();
+    self.request_directory_load(false);
   }
 
   void initialize_places() {
@@ -1286,6 +1311,18 @@ private:
   }
 
   void render_breadcrumbs() {
+    if (recent_mode_) {
+      for (plainroot_ui_widget *widget : breadcrumb_widgets_) {
+        (void)plainroot_ui_widget_remove_child_v1(breadcrumb_strip_, widget);
+        (void)plainroot_ui_widget_destroy_subtree_v1(widget);
+      }
+      breadcrumb_widgets_.clear();
+      breadcrumb_actions_.clear();
+      auto *label = make_label("Recent", 0.0F);
+      if (label != nullptr && add(breadcrumb_strip_, label))
+        breadcrumb_widgets_.push_back(label);
+      return;
+    }
     if (breadcrumb_strip_ == nullptr)
       return;
 
@@ -1454,6 +1491,10 @@ private:
   }
 
   void complete_selection(const std::vector<std::string> &paths) {
+    for (const std::string &path : paths)
+      (void)detail::record_recent_file(
+          std::string(g_get_user_data_dir()) + "/recently-used.xbel", path,
+          "Plainroot FileChooser");
     if (finished_)
       return;
     if (paths.empty())
@@ -1516,19 +1557,35 @@ private:
         set_status(tr("Folder created."));
         new_folder_created_ = false;
       } else {
-        set_status(entries_.empty() ? tr("This folder is empty.") : "");
+        set_status(entries_.empty()
+                       ? tr(result.operation ==
+                                    detail::DirectoryResult::Operation::RecentListing
+                                ? "No recent files."
+                                : "This folder is empty.")
+                       : "");
       }
     } else {
       new_folder_created_ = false;
       entries_.clear();
       if (result.native_code == 0) {
-        status_error_ = tr("Unable to read this folder.");
+        const bool recent = result.operation ==
+                            detail::DirectoryResult::Operation::RecentListing;
+        status_error_ = tr(recent ? "Unable to read recent files."
+                                  : "Unable to read this folder.");
       } else {
         gchar *detail =
-            g_strdup_printf(tr("Unable to read this folder: %s").c_str(),
+            g_strdup_printf(tr(result.operation ==
+                                        detail::DirectoryResult::Operation::RecentListing
+                                    ? "Unable to read recent files: %s"
+                                    : "Unable to read this folder: %s").c_str(),
                             g_strerror(result.native_code));
         status_error_ =
-            detail == nullptr ? tr("Unable to read this folder.") : detail;
+            detail == nullptr
+                ? tr(result.operation ==
+                             detail::DirectoryResult::Operation::RecentListing
+                         ? "Unable to read recent files."
+                         : "Unable to read this folder.")
+                : detail;
         g_free(detail);
       }
       set_status(status_error_);
@@ -1862,7 +1919,8 @@ private:
         label += "/";
       auto action = std::make_unique<EntryAction>();
       action->controller = this;
-      action->path = join_path(current_path_, entry->name);
+      action->path = entry->path.empty() ? join_path(current_path_, entry->name)
+                                         : entry->path;
       action->kind = entry->kind;
       auto *row = plainroot_ui_list_item_create_v1(context_, 1.0F);
       plainroot_ui_widget *control = nullptr;
@@ -2025,6 +2083,7 @@ private:
   bool new_folder_created_ = false;
   bool folder_creation_pending_ = false;
   bool directory_loading_ = false;
+  bool recent_mode_ = false;
   bool entries_mime_classified_ = false;
   bool mime_database_available_ = false;
   bool bookmarks_available_ = true;
@@ -2065,6 +2124,7 @@ private:
   plainroot_ui_widget *search_field_ = nullptr;
   plainroot_ui_widget *hidden_switch_ = nullptr;
   plainroot_ui_widget *places_dropdown_ = nullptr;
+  plainroot_ui_widget *recent_button_ = nullptr;
   plainroot_ui_widget *bookmark_button_ = nullptr;
   plainroot_ui_widget *filter_dropdown_ = nullptr;
   plainroot_ui_widget *sort_dropdown_ = nullptr;

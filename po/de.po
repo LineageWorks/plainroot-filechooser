@@ -103,6 +103,18 @@ msgstr "Persönlicher Ordner"
 msgid "Places"
 msgstr "Orte"
 
+msgid "Recent"
+msgstr "Zuletzt verwendet"
+
+msgid "No recent files."
+msgstr "Keine zuletzt verwendeten Dateien."
+
+msgid "Unable to read recent files."
+msgstr "Zuletzt verwendete Dateien können nicht gelesen werden."
+
+msgid "Unable to read recent files: %s"
+msgstr "Zuletzt verwendete Dateien können nicht gelesen werden: %s"
+
 msgid "Desktop"
 msgstr "Schreibtisch"
 

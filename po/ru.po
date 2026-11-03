@@ -104,6 +104,18 @@ msgstr "Домашняя папка"
 msgid "Places"
 msgstr "Места"
 
+msgid "Recent"
+msgstr "Недавние"
+
+msgid "No recent files."
+msgstr "Недавних файлов нет."
+
+msgid "Unable to read recent files."
+msgstr "Не удалось прочитать недавние файлы."
+
+msgid "Unable to read recent files: %s"
+msgstr "Не удалось прочитать недавние файлы: %s"
+
 msgid "Desktop"
 msgstr "Рабочий стол"
 
