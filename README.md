@@ -131,6 +131,16 @@ After workspace setup, rebuild just this project with
 The browser requires the Wayland toolkit runtime. For a localized run, use the
 workspace's `run-localized.sh` helper with the generated `po` directory.
 
+To verify both the opt-in portal registration payload and the safe default
+install without modifying the host, run:
+
+```sh
+tests/run_portal_install_test.sh ../build/plainroot-filechooser
+```
+
+The script installs into temporary `DESTDIR` roots and restores the build's
+previous `portal_registration` option when it finishes.
+
 ## Design constraints
 
 - Use `plainroot-core` for filesystem access, `plainroot-storage-client` for
