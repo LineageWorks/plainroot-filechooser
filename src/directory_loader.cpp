@@ -90,7 +90,8 @@ public:
     wake_worker();
   }
 
-  void request_recent(std::string path, uint64_t generation) {
+  void request_recent(std::string path, uint64_t generation,
+                      bool classify_mime) {
     {
       std::lock_guard lock(mutex_);
       if (stopping_)
@@ -101,7 +102,7 @@ public:
                job.operation == DirectoryResult::Operation::RecentListing;
       });
       jobs_.push_back({DirectoryResult::Operation::RecentListing,
-                       std::move(path), generation, 0, false});
+                       std::move(path), generation, 0, classify_mime});
     }
     wake_worker();
   }
@@ -284,6 +285,9 @@ private:
       result.operation = job.operation;
       result.generation = job.generation;
       result.path = job.path;
+      result.mime_classified = job.classify_mime;
+      result.mime_database_available = mime_database_ != nullptr &&
+                                       mime_database_->available();
       std::vector<RecentFile> recent;
       result.result = load_recent_files(job.path, recent)
                           ? PLAINROOT_CORE_FS_OK
@@ -298,6 +302,10 @@ private:
           entry.kind = S_ISDIR(metadata.st_mode)
                            ? PLAINROOT_CORE_FS_ENTRY_DIRECTORY
                            : PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE;
+        if (job.classify_mime && result.mime_database_available &&
+            entry.kind == PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE)
+          entry.mime_types = mime_database_->types_for_file(entry.path,
+                                                            entry.name);
         result.entries.push_back(std::move(entry));
       }
       if (latest_generation_.load(std::memory_order_acquire) == job.generation)
@@ -469,9 +477,10 @@ void DirectoryLoader::create_directory(std::string path, uint64_t generation,
     impl_->create_directory(std::move(path), generation, request_id);
 }
 
-void DirectoryLoader::request_recent(std::string path, uint64_t generation) {
+void DirectoryLoader::request_recent(std::string path, uint64_t generation,
+                                     bool classify_mime) {
   if (impl_)
-    impl_->request_recent(std::move(path), generation);
+    impl_->request_recent(std::move(path), generation, classify_mime);
 }
 
 void DirectoryLoader::record_recent(std::vector<std::string> paths,

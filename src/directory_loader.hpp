@@ -46,7 +46,8 @@ public:
   bool ready() const;
   void request(std::string path, uint64_t generation,
                bool classify_mime = false);
-  void request_recent(std::string xbel_path, uint64_t generation);
+  void request_recent(std::string xbel_path, uint64_t generation,
+                      bool classify_mime = false);
   void record_recent(std::vector<std::string> paths, std::string xbel_path,
                      std::string application_id);
   void create_directory(std::string path, uint64_t generation,

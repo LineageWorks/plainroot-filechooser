@@ -658,7 +658,7 @@ private:
       set_status(tr("Loading recent files…"));
       const gchar *data_directory = g_get_user_data_dir();
       const std::string xbel = std::string(data_directory == nullptr ? "" : data_directory) + "/recently-used.xbel";
-      loader_.request_recent(xbel, generation_);
+      loader_.request_recent(xbel, generation_, selected_filter_has_mime());
     } else {
       set_status(tr("Loading folder…"));
       loader_.request(current_path_, generation_, selected_filter_has_mime());
