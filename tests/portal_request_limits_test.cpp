@@ -34,13 +34,13 @@ bool append_string_option(sd_bus_message *message, const char *key,
          sd_bus_message_close_container(message) >= 0;
 }
 
-bool append_folder_option(sd_bus_message *message, size_t size) {
+bool append_path_option(sd_bus_message *message, const char *key, size_t size) {
   std::vector<char> bytes(size, 'p');
   bytes[0] = '/';
   bytes.back() = '\0';
   return sd_bus_message_open_container(message, SD_BUS_TYPE_DICT_ENTRY,
                                        "sv") >= 0 &&
-         sd_bus_message_append(message, "s", "current_folder") >= 0 &&
+         sd_bus_message_append(message, "s", key) >= 0 &&
          sd_bus_message_open_container(message, SD_BUS_TYPE_VARIANT, "ay") >=
              0 &&
          sd_bus_message_append_array(message, SD_BUS_TYPE_BYTE, bytes.data(),
@@ -51,8 +51,12 @@ bool append_folder_option(sd_bus_message *message, size_t size) {
 
 bool append_filters_option(sd_bus_message *message, size_t filter_count,
                            size_t patterns_per_filter,
-                           size_t filter_name_size) {
+                           size_t filter_name_size,
+                           size_t pattern_size = 5U) {
   const std::string filter_name(filter_name_size, 'n');
+  const std::string pattern = pattern_size == 5U
+                                  ? "*.txt"
+                                  : std::string(pattern_size, 'p');
   if (sd_bus_message_open_container(message, SD_BUS_TYPE_DICT_ENTRY, "sv") <
           0 ||
       sd_bus_message_append(message, "s", "filters") < 0 ||
@@ -72,7 +76,7 @@ bool append_filters_option(sd_bus_message *message, size_t filter_count,
          ++pattern_index) {
       if (sd_bus_message_open_container(message, SD_BUS_TYPE_STRUCT, "us") <
               0 ||
-          sd_bus_message_append(message, "us", 0U, "*.txt") < 0 ||
+          sd_bus_message_append(message, "us", 0U, pattern.c_str()) < 0 ||
           sd_bus_message_close_container(message) < 0)
         return false;
     }
@@ -113,9 +117,13 @@ bool send_and_expect_invalid(sd_bus *bus, unsigned int sequence,
     valid = append_string_option(
         call, "current_name", std::string(option_size, 'n'));
   } else if (valid && option_key == "current_folder") {
-    valid = append_folder_option(call, option_size);
+    valid = append_path_option(call, "current_folder", option_size);
+  } else if (valid && option_key == "current_file") {
+    valid = append_path_option(call, "current_file", option_size);
   } else if (valid && option_key == "filter_name") {
     valid = append_filters_option(call, 1U, 1U, option_size);
+  } else if (valid && option_key == "pattern_length") {
+    valid = append_filters_option(call, 1U, 1U, 8U, option_size);
   } else if (valid && option_key == "pattern_count") {
     valid = append_filters_option(call, 5U, 256U, 8U);
   }
@@ -187,7 +195,13 @@ int main(int argc, char **argv) {
     passed = send_and_expect_invalid(bus, sequence++, "Open", "current_folder",
                                      65537U);
   if (passed)
+    passed = send_and_expect_invalid(bus, sequence++, "Open", "current_file",
+                                     65537U);
+  if (passed)
     passed = send_and_expect_invalid(bus, sequence++, "Open", "filter_name",
+                                     4097U);
+  if (passed)
+    passed = send_and_expect_invalid(bus, sequence++, "Open", "pattern_length",
                                      4097U);
   if (passed)
     passed = send_and_expect_invalid(bus, sequence++, "Open", "pattern_count",
