@@ -15,10 +15,12 @@ struct DirectoryEntry {
   std::string name;
   plainroot_core_fs_entry_kind_v1 kind = PLAINROOT_CORE_FS_ENTRY_UNKNOWN;
   std::vector<std::string> mime_types;
+  std::string path;
+  int64_t sort_timestamp = 0;
 };
 
 struct DirectoryResult {
-  enum class Operation { Listing, CreateDirectory };
+  enum class Operation { Listing, RecentListing, CreateDirectory };
 
   uint64_t generation = 0;
   uint64_t request_id = 0;
@@ -44,6 +46,7 @@ public:
   bool ready() const;
   void request(std::string path, uint64_t generation,
                bool classify_mime = false);
+  void request_recent(std::string xbel_path, uint64_t generation);
   void create_directory(std::string path, uint64_t generation,
                         uint64_t request_id);
   void stop();

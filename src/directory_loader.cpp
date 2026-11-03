@@ -1,6 +1,7 @@
 #include "directory_loader.hpp"
 
 #include "mime_database.hpp"
+#include "recent_files.hpp"
 
 #include <atomic>
 #include <cerrno>
@@ -12,6 +13,7 @@
 #include <poll.h>
 #include <thread>
 #include <utility>
+#include <sys/stat.h>
 
 #include <sys/eventfd.h>
 #include <unistd.h>
@@ -84,6 +86,22 @@ public:
       result.result = PLAINROOT_CORE_FS_IO_ERROR;
       publish(std::move(result));
       return;
+    }
+    wake_worker();
+  }
+
+  void request_recent(std::string path, uint64_t generation) {
+    {
+      std::lock_guard lock(mutex_);
+      if (stopping_)
+        return;
+      latest_generation_.store(generation, std::memory_order_release);
+      std::erase_if(jobs_, [](const Job &job) {
+        return job.operation == DirectoryResult::Operation::Listing ||
+               job.operation == DirectoryResult::Operation::RecentListing;
+      });
+      jobs_.push_back({DirectoryResult::Operation::RecentListing,
+                       std::move(path), generation, 0, false});
     }
     wake_worker();
   }
@@ -236,6 +254,31 @@ private:
 
   void submit_job(plainroot_core_fs_async_executor *executor, Job job,
                   std::vector<std::unique_ptr<Pending>> *pending) {
+    if (job.operation == DirectoryResult::Operation::RecentListing) {
+      DirectoryResult result{};
+      result.operation = job.operation;
+      result.generation = job.generation;
+      result.path = job.path;
+      std::vector<RecentFile> recent;
+      result.result = load_recent_files(job.path, recent)
+                          ? PLAINROOT_CORE_FS_OK
+                          : PLAINROOT_CORE_FS_IO_ERROR;
+      for (auto &file : recent) {
+        DirectoryEntry entry{};
+        entry.name = std::move(file.name);
+        entry.path = std::move(file.path);
+        entry.sort_timestamp = file.visited_unix_seconds;
+        struct stat metadata {};
+        if (stat(entry.path.c_str(), &metadata) == 0)
+          entry.kind = S_ISDIR(metadata.st_mode)
+                           ? PLAINROOT_CORE_FS_ENTRY_DIRECTORY
+                           : PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE;
+        result.entries.push_back(std::move(entry));
+      }
+      if (latest_generation_.load(std::memory_order_acquire) == job.generation)
+        publish(std::move(result));
+      return;
+    }
     auto next = std::make_unique<Pending>();
     next->owner = this;
     next->job = std::move(job);
@@ -394,6 +437,11 @@ void DirectoryLoader::create_directory(std::string path, uint64_t generation,
                                        uint64_t request_id) {
   if (impl_)
     impl_->create_directory(std::move(path), generation, request_id);
+}
+
+void DirectoryLoader::request_recent(std::string path, uint64_t generation) {
+  if (impl_)
+    impl_->request_recent(std::move(path), generation);
 }
 
 void DirectoryLoader::stop() {
