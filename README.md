@@ -76,25 +76,24 @@ or handle invalidation now routes through the toolkit's normal window-close
 callback and cancels the portal request. X11 parent identifiers are ignored.
 With portal registration enabled, the staged backend is discoverable when the
 portal broker starts with the staged data directory and `PlainrootDE` desktop
-configuration. One direct live `OpenFile` request to the unregistered backend
-returned a selected file URI. A separate persistent caller in a private
-portal-broker session selected `AGENTS.md` through the Plainroot window and
-received response code 0 with its file URI. The backend was started manually;
-a second private-bus run activated it through a temporary D-Bus service
-descriptor whose `Exec` path pointed at the build-tree binary, then completed
-the same selection. Further private-broker checks returned response code 0
-for selecting the current folder and for `SaveFile` with a suggested new name;
-the save target was not created. Activation through the installed user systemd
-service and multi-file, SaveFiles, filter, choice, and overwrite acceptance
-remain open. Do not enable registration in a desktop session until those
-checks pass.
+configuration. Private-broker checks have completed single-file and multiple
+file `OpenFile`, folder selection, `SaveFile` with both a suggested name and an
+existing `current_file`, overwrite confirmation, `SaveFiles`, glob and MIME
+filters, and enumerated choices. A live user-bus check also activated the
+staged backend through its user-systemd unit and stopped it cleanly. These
+checks do not yet establish installed desktop registration, visual parity
+with GTK, or Editor document replacement when a document is already open. Do
+not enable registration in a desktop session until the remaining parity gates
+pass.
 
 Live removable-volume mount and SSHFS connect/disconnect acceptance are still
 pending. SSHFS is installed, and a strict-host-key SFTP handshake to the active
-localhost `sshd` succeeds. A direct read-only `localhost:/tmp` SSHFS mount
-fails at FUSE setup with `Operation not permitted` even outside the Plainroot
-service; the temporary mount directory was removed and no mount remains. The
-current host runtime therefore cannot complete FUSE mount acceptance.
+localhost `sshd` succeeds. A direct read-only `localhost:/tmp` SSHFS mount was
+retried on 2026-11-03 and failed at FUSE setup with `Operation not permitted`
+even outside the Plainroot service; `/dev/fuse` is present, but
+`fusermount3` is not setuid. The temporary mount directory was removed and no
+mount remains. The current host runtime therefore cannot complete FUSE mount
+acceptance.
 
 The browser accepts an optional absolute starting directory. Directory names
 remain native byte paths for navigation and selection; names that are not valid
