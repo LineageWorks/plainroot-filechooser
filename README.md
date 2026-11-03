@@ -70,12 +70,15 @@ or handle invalidation now routes through the toolkit's normal window-close
 callback and cancels the portal request. X11 parent identifiers are ignored.
 With portal registration enabled, the staged backend is discoverable when the
 portal broker starts with the staged data directory and `PlainrootDE` desktop
-configuration. Live broker activation and multi-file, SaveFiles, filter, and
-choice acceptance remain open. Do not enable the registration option in a
-desktop session until those acceptance checks pass.
+configuration. One direct live `OpenFile` request to the unregistered backend
+returned a selected file URI. Broker activation and multi-file, SaveFiles,
+filter, and choice acceptance remain open. Do not enable the registration
+option in a desktop session until those acceptance checks pass.
 
 Live removable-volume mount and SSHFS connect/disconnect acceptance are still
-pending; the current host does not have the `sshfs` executable installed.
+pending. SSHFS is installed, and localhost SSH and SFTP work; a temporary
+read-only SSHFS mount failed at FUSE setup with `Operation not permitted` in
+the agent execution environment. No mount was left behind.
 
 The browser accepts an optional absolute starting directory. Directory names
 remain native byte paths for navigation and selection; names that are not valid
