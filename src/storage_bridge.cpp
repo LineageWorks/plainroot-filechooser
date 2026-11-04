@@ -274,6 +274,7 @@ void on_network_event(const plainroot_storage_network_event_v1 *event,
         update.request_id = event->request_id;
         update.request_kind = event->request_kind;
         update.result = event->result;
+        update.native_code = event->native_code;
         update.operation_id = copy_bytes(event->operation_id);
         update.mount_id = copy_bytes(event->mount_id);
         update.mount_path = copy_bytes(event->mount_path);

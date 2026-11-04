@@ -416,6 +416,9 @@ msgstr "Не удалось подключиться к серверу SFTP."
 msgid "The network location could not be mounted. Check the server, host key, login, and FUSE availability."
 msgstr "Не удалось подключить сетевое расположение. Проверьте сервер, ключ узла, способ входа и доступность FUSE."
 
+msgid "This session cannot mount FUSE locations. Check /dev/fuse access and the system's fusermount3 setup."
+msgstr "В этом сеансе нельзя подключать расположения FUSE. Проверьте доступ к /dev/fuse и настройку fusermount3 в системе."
+
 msgid "Could not disconnect the network location."
 msgstr "Не удалось отключить сетевое расположение."
 

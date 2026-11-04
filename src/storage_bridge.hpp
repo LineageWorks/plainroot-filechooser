@@ -59,6 +59,7 @@ struct NetworkOperationUpdate {
   uint32_t state = PLAINROOT_STORAGE_NETWORK_OPERATION_ACCEPTED;
   uint32_t error = PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_NONE;
   plainroot_storage_result_v1 result = PLAINROOT_STORAGE_OK;
+  int32_t native_code = 0;
   std::string operation_id;
   std::string mount_id;
   std::string mount_path;

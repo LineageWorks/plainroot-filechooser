@@ -416,6 +416,9 @@ msgstr "تعذّر الاتصال بخادم SFTP."
 msgid "The network location could not be mounted. Check the server, host key, login, and FUSE availability."
 msgstr "تعذّر تركيب موقع الشبكة. تحقّق من الخادم ومفتاح المضيف وطريقة تسجيل الدخول وتوفّر FUSE."
 
+msgid "This session cannot mount FUSE locations. Check /dev/fuse access and the system's fusermount3 setup."
+msgstr "لا يمكن لهذه الجلسة تركيب مواقع FUSE. تحقّق من إمكانية الوصول إلى ‎/dev/fuse‎ وإعداد ‎fusermount3‎ في النظام."
+
 msgid "Could not disconnect the network location."
 msgstr "تعذّر قطع الاتصال بموقع الشبكة."
 

@@ -69,6 +69,10 @@ offers disconnect only for network mounts owned by
 `plainroot-networkd`. Partial local snapshots suppress local volume operations.
 Local file browsing remains available when either storage service is
 unavailable. Closing the browser never unmounts a volume or network location.
+Networkd checks FUSE device and mount capability before accepting a connection;
+when the session cannot mount FUSE locations, the chooser gives a localized
+setup hint and leaves the endpoint form available for retry. Plainroot does not
+change `fusermount3` permissions.
 The window follows the active Plainroot appearance theme through the toolkit.
 The New folder action reveals an inline name field and creates exactly one
 directory asynchronously through `plainroot-core`, so slow mounted filesystems
@@ -149,9 +153,11 @@ about three seconds later. No mount or recent FileChooser core dump remained.
 During a later diagnostic, two monitored browser processes remained mapped and
 no FileChooser coredump was found. Direct Networkd connection attempts ended
 with `MOUNT_FAILED` while the helper was mode `0755`, and the mount snapshot
-remained empty. This did not reproduce a process crash, so the earlier report
-that the app terminated still needs clarification. The chooser now keeps the
-SFTP form open until the mount succeeds, making failed attempts retryable.
+remained empty. This did not reproduce a process crash. The user later
+clarified that a quick close may have been caused by the test agent; no visible
+error was observed, so the report is inconclusive and is not treated as a
+confirmed application crash. The chooser now keeps the SFTP form open until
+the mount succeeds, making failed attempts retryable.
 Browsing and disconnecting a chooser-initiated live mount remain unverified.
 
 Both the browser and portal backend support opt-in diagnostics with

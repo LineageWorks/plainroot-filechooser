@@ -415,6 +415,9 @@ msgstr "החיבור לשרת SFTP נכשל."
 msgid "The network location could not be mounted. Check the server, host key, login, and FUSE availability."
 msgstr "לא ניתן לעגן את מיקום הרשת. בדקו את השרת, מפתח המארח, פרטי הכניסה וזמינות FUSE."
 
+msgid "This session cannot mount FUSE locations. Check /dev/fuse access and the system's fusermount3 setup."
+msgstr "ההפעלה הזו אינה יכולה לעגן מיקומי FUSE. יש לבדוק את הגישה אל ‎/dev/fuse‎ ואת הגדרת ‎fusermount3‎ במערכת."
+
 msgid "Could not disconnect the network location."
 msgstr "לא ניתן לנתק את מיקום הרשת."
 

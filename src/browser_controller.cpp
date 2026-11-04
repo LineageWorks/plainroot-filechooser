@@ -2134,9 +2134,15 @@ private:
         return;
       if (update.result != PLAINROOT_STORAGE_OK) {
         storage_operation_pending_ = false;
-        set_storage_status(tr(update.result == PLAINROOT_STORAGE_NOT_READY
-                                  ? "Network service is unavailable."
-                                  : "Unable to start the network operation."));
+        if (update.result == PLAINROOT_STORAGE_NOT_SUPPORTED &&
+            update.native_code == ENODEV) {
+          set_storage_status(tr(
+              "This session cannot mount FUSE locations. Check /dev/fuse access and the system's fusermount3 setup."));
+        } else {
+          set_storage_status(tr(update.result == PLAINROOT_STORAGE_NOT_READY
+                                    ? "Network service is unavailable."
+                                    : "Unable to start the network operation."));
+        }
       } else {
         const bool disconnect =
             update.request_kind == PLAINROOT_STORAGE_NETWORK_REQUEST_DISCONNECT;

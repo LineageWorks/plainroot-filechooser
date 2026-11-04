@@ -415,6 +415,9 @@ msgstr "Die Verbindung zum SFTP-Server ist fehlgeschlagen."
 msgid "The network location could not be mounted. Check the server, host key, login, and FUSE availability."
 msgstr "Der Netzwerkort konnte nicht eingebunden werden. Prüfen Sie Server, Hostschlüssel, Anmeldung und FUSE-Verfügbarkeit."
 
+msgid "This session cannot mount FUSE locations. Check /dev/fuse access and the system's fusermount3 setup."
+msgstr "Diese Sitzung kann keine FUSE-Orte einbinden. Prüfen Sie den Zugriff auf /dev/fuse und die fusermount3-Konfiguration des Systems."
+
 msgid "Could not disconnect the network location."
 msgstr "Der Netzwerkort konnte nicht getrennt werden."
 
