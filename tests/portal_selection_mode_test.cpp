@@ -22,11 +22,15 @@ int main() {
   assert(!entry_is_multi_selectable(
       true, false, PLAINROOT_CORE_FS_ENTRY_DIRECTORY));
   assert(!entry_is_multi_selectable(
+      true, false, PLAINROOT_CORE_FS_ENTRY_OTHER));
+  assert(!entry_is_multi_selectable(
       false, true, PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE));
   assert(!entry_is_multi_selectable(
       true, true, PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE));
   assert(entry_is_multi_selectable(
       true, true, PLAINROOT_CORE_FS_ENTRY_DIRECTORY));
+  assert(!entry_is_multi_selectable(
+      true, true, PLAINROOT_CORE_FS_ENTRY_OTHER));
   assert(entry_is_multi_selectable(true, false,
                                    PLAINROOT_CORE_FS_ENTRY_SYMLINK));
   assert(entry_is_multi_selectable(true, true,

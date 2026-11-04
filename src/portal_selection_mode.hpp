@@ -13,10 +13,13 @@ constexpr bool entry_is_multi_selectable(bool allow_multiple,
                                          bool select_directories,
                                          plainroot_core_fs_entry_kind_v1 kind)
     noexcept {
-  return allow_multiple &&
-         (kind == PLAINROOT_CORE_FS_ENTRY_SYMLINK ||
-          select_directories ==
-              (kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY));
+  if (!allow_multiple)
+    return false;
+  if (kind == PLAINROOT_CORE_FS_ENTRY_SYMLINK)
+    return true;
+  return select_directories
+             ? kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY
+             : kind == PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE;
 }
 
 constexpr bool symlink_target_matches_selection(
