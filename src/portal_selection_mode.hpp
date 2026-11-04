@@ -4,6 +4,20 @@
 
 namespace plainroot::filechooser::detail {
 
+enum class PortalDefaultAcceptLabel {
+  select,
+  open,
+  save,
+};
+
+constexpr PortalDefaultAcceptLabel
+portal_default_accept_label(bool saving, bool multiple) noexcept {
+  if (saving)
+    return PortalDefaultAcceptLabel::save;
+  return multiple ? PortalDefaultAcceptLabel::open
+                  : PortalDefaultAcceptLabel::select;
+}
+
 constexpr bool portal_selection_mode_valid(bool save_file, bool multiple,
                                            bool directory) noexcept {
   return !save_file || (!multiple && !directory);

@@ -44,6 +44,9 @@ msgstr "Выберите папку"
 msgid "Select folder"
 msgstr "Выбрать папку"
 
+msgid "Select"
+msgstr "Выбрать"
+
 msgid "The current folder will be returned."
 msgstr "Будет возвращена текущая папка."
 

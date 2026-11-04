@@ -43,6 +43,9 @@ msgstr "Ordner auswählen"
 msgid "Select folder"
 msgstr "Ordner wählen"
 
+msgid "Select"
+msgstr "Auswählen"
+
 msgid "The current folder will be returned."
 msgstr "Der aktuelle Ordner wird zurückgegeben."
 

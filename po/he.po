@@ -43,6 +43,9 @@ msgstr "בחירת תיקייה"
 msgid "Select folder"
 msgstr "בחירת תיקייה"
 
+msgid "Select"
+msgstr "בחירה"
+
 msgid "The current folder will be returned."
 msgstr "התיקייה הנוכחית תוחזר."
 

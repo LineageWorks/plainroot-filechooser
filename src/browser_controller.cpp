@@ -353,14 +353,22 @@ public:
       (void)plainroot_ui_widget_set_text_direction_v1(selected_label_,
           allow_multiple_ ? PLAINROOT_UI_TEXT_DIRECTION_INHERIT
                           : PLAINROOT_UI_TEXT_LTR);
-    auto *select = make_action_button(
-        accept_label_.empty()
-            ? tr(!save_files_.empty()
-                     ? "Save"
-                     : (select_directory_ ? "Select folder"
-                                          : (save_file_ ? "Save" : "Open")))
-            : accept_label_,
-        &Impl::accept_activated);
+    std::string accept_label = accept_label_;
+    if (accept_label.empty()) {
+      switch (detail::portal_default_accept_label(
+          save_file_ || !save_files_.empty(), allow_multiple_)) {
+      case detail::PortalDefaultAcceptLabel::select:
+        accept_label = tr("Select");
+        break;
+      case detail::PortalDefaultAcceptLabel::open:
+        accept_label = tr("Open");
+        break;
+      case detail::PortalDefaultAcceptLabel::save:
+        accept_label = tr("Save");
+        break;
+      }
+    }
+    auto *select = make_action_button(accept_label, &Impl::accept_activated);
     if (select != nullptr)
       (void)plainroot_ui_button_set_style_v1(select,
                                              PLAINROOT_UI_BUTTON_STYLE_FILLED);
