@@ -61,6 +61,9 @@ checks both form buttons and activates Connect at phone portrait (390×844),
 phone landscape (844×390), tablet portrait (768×1024), tablet landscape
 (1024×768), and laptop (1366×768) sizes. It also checks mounted-share actions
 and disconnect confirmation within those widths.
+The form remains visible while Networkd processes an accepted connection and
+closes only after a successful mount event. If the request cannot start or the
+mount fails asynchronously, the endpoint fields remain available for retry.
 
 The build also includes the `plainroot-filechooser-portal` backend. It exports
 the portal FileChooser and Request interfaces through
@@ -124,9 +127,13 @@ is unmounted and was physically disconnected after the live Storaged
 acceptance. A follow-up chooser-initiated SFTP attempt on 2026-11-04 reached
 the transient SSHFS unit's `Started` state and then a normal Networkd unmount
 about three seconds later. No mount or recent FileChooser core dump remained.
-The user reported that the app terminated, but it is not yet confirmed whether
-only the chooser closed or its parent application exited. This attempt does
-not yet verify browsing the mounted path or chooser-driven disconnect.
+During a later diagnostic, two monitored browser processes remained mapped and
+no FileChooser coredump was found. Direct Networkd connection attempts ended
+with `MOUNT_FAILED` while the helper was mode `0755`, and the mount snapshot
+remained empty. This did not reproduce a process crash, so the earlier report
+that the app terminated still needs clarification. The chooser now keeps the
+SFTP form open until the mount succeeds, making failed attempts retryable.
+Browsing and disconnecting a chooser-initiated live mount remain unverified.
 
 Both the browser and portal backend support opt-in diagnostics with
 `PLAINROOT_FILECHOOSER_TRACE=1` in the process environment. They record portal
