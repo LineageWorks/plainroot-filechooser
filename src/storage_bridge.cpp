@@ -188,6 +188,42 @@ struct DispatchTask {
   std::shared_ptr<SharedState> state;
 };
 
+StorageCatalog merged_catalog(const SharedState &state) {
+  StorageCatalog merged = state.latest_catalog;
+  for (const NetworkMount &managed : state.managed_network_mounts) {
+    const auto existing = std::find_if(
+        merged.network_mounts.begin(), merged.network_mounts.end(),
+        [&](const NetworkMount &mount) {
+          return mount.target == managed.target;
+        });
+    if (existing == merged.network_mounts.end())
+      merged.network_mounts.push_back(managed);
+    else
+      *existing = managed;
+  }
+  return merged;
+}
+
+void notify_catalog(SharedState &state) {
+  if (!state.have_catalog || !state.catalog_handler)
+    return;
+  try {
+    state.catalog_handler(merged_catalog(state));
+  } catch (const std::bad_alloc &) {
+    try {
+      if (state.error_handler)
+        state.error_handler({PLAINROOT_STORAGE_OUT_OF_MEMORY, ENOMEM});
+    } catch (...) {
+    }
+  } catch (...) {
+    try {
+      if (state.error_handler)
+        state.error_handler({PLAINROOT_STORAGE_IO_ERROR, EIO});
+    } catch (...) {
+    }
+  }
+}
+
 void on_catalog(const plainroot_storage_client_snapshot *snapshot, uint32_t,
                 void *user_data) {
   auto &state = *static_cast<SharedState *>(user_data);
@@ -197,19 +233,7 @@ void on_catalog(const plainroot_storage_client_snapshot *snapshot, uint32_t,
     state.latest_catalog = copy_catalog(snapshot);
     state.latest_catalog.network_complete = state.network_snapshot_complete;
     state.have_catalog = true;
-    StorageCatalog merged = state.latest_catalog;
-    for (const NetworkMount &managed : state.managed_network_mounts) {
-      const auto existing = std::find_if(
-          merged.network_mounts.begin(), merged.network_mounts.end(),
-          [&](const NetworkMount &mount) {
-            return mount.target == managed.target;
-          });
-      if (existing == merged.network_mounts.end())
-        merged.network_mounts.push_back(managed);
-      else
-        *existing = managed;
-    }
-    state.catalog_handler(std::move(merged));
+    state.catalog_handler(merged_catalog(state));
   } catch (...) {
     try {
       if (state.error_handler)
@@ -226,6 +250,12 @@ void on_network_event(const plainroot_storage_network_event_v1 *event,
     return;
   try {
     if (event->type == PLAINROOT_STORAGE_NETWORK_EVENT_ERROR) {
+      if (event->result == PLAINROOT_STORAGE_NOT_READY) {
+        state.network_snapshot_complete = false;
+        state.managed_network_mounts.clear();
+        state.latest_catalog.network_complete = false;
+        notify_catalog(state);
+      }
       if (state.network_operation_handler) {
         NetworkOperationUpdate update{};
         update.type = event->type;
@@ -311,20 +341,8 @@ void on_network_event(const plainroot_storage_network_event_v1 *event,
     state.managed_network_mounts = std::move(mounts);
     state.network_snapshot_complete = true;
     if (state.have_catalog && state.catalog_handler) {
-      StorageCatalog merged = state.latest_catalog;
-      merged.network_complete = true;
-      for (const NetworkMount &managed : state.managed_network_mounts) {
-        const auto existing = std::find_if(
-            merged.network_mounts.begin(), merged.network_mounts.end(),
-            [&](const NetworkMount &mount) {
-              return mount.target == managed.target;
-            });
-        if (existing == merged.network_mounts.end())
-          merged.network_mounts.push_back(managed);
-        else
-          *existing = managed;
-      }
-      state.catalog_handler(std::move(merged));
+      state.latest_catalog.network_complete = true;
+      notify_catalog(state);
     }
   } catch (...) {
     try {
@@ -370,6 +388,13 @@ void run_dispatch(void *user_data) {
   if (state->client != nullptr) {
     const auto result = plainroot_storage_client_dispatch_v1(
         state->client, &on_catalog, state.get(), &dispatched, &error);
+    if (result == PLAINROOT_STORAGE_NOT_READY &&
+        !state->stopping.load(std::memory_order_acquire)) {
+      state->latest_catalog.complete = false;
+      state->latest_catalog.removable_volumes.clear();
+      state->have_catalog = true;
+      notify_catalog(*state);
+    }
     if (result != PLAINROOT_STORAGE_OK && state->error_handler &&
         !state->stopping.load(std::memory_order_acquire)) {
       try {
