@@ -8,6 +8,7 @@
 #include "mime_database.hpp"
 #include "network_operation_tracker.hpp"
 #include "open_filename.hpp"
+#include "portal_accept_label.hpp"
 #include "portal_selection_mode.hpp"
 #include "recent_files.hpp"
 #include "storage_bridge.hpp"
@@ -20,6 +21,7 @@
 #include <glib.h>
 
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <cstdint>
 #include <cstdio>
@@ -411,7 +413,8 @@ public:
           allow_multiple_ ? PLAINROOT_UI_TEXT_DIRECTION_INHERIT
                           : PLAINROOT_UI_TEXT_LTR);
     std::string accept_label = accept_label_;
-    if (accept_label.empty()) {
+    const bool default_accept_label = accept_label.empty();
+    if (default_accept_label) {
       switch (detail::portal_default_accept_label(
           save_file_ || !save_files_.empty(), allow_multiple_)) {
       case detail::PortalDefaultAcceptLabel::select:
@@ -425,7 +428,14 @@ public:
         break;
       }
     }
-    auto *select = make_action_button(accept_label, &Impl::accept_activated);
+    if (default_accept_label && !accept_label.empty())
+      accept_label.insert(0U, "_");
+    auto parsed_accept_label =
+        detail::parse_portal_accept_label(accept_label);
+    accept_label_display_ = std::move(parsed_accept_label.display_label);
+    accept_label_mnemonic_ = std::move(parsed_accept_label.mnemonic_utf8);
+    auto *select =
+        make_action_button(accept_label_display_, &Impl::accept_activated);
     if (select != nullptr)
       (void)plainroot_ui_button_set_style_v1(select,
                                              PLAINROOT_UI_BUTTON_STYLE_FILLED);
@@ -682,23 +692,42 @@ public:
         detail::trace("unable to register responsive storage layout");
       (void)plainroot_toolkit_window_set_ready_callback_v1(
           window_, &Impl::window_ready, this);
-      uint32_t key = 0;
-      uint32_t modifiers = 0;
-      const std::string description = tr("Enter a location");
+      std::array<plainroot_toolkit_shortcut_v1, 2> shortcuts{};
+      size_t shortcut_count = 0U;
+      const std::string location_description = tr("Enter a location");
+      uint32_t key = 0U;
+      uint32_t modifiers = 0U;
       if (plainroot_toolkit_shortcut_parse_v1("Ctrl+L", &key, &modifiers) ==
           PLAINROOT_TOOLKIT_RESULT_OK) {
-        plainroot_toolkit_shortcut_v1 shortcut{};
+        auto &shortcut = shortcuts[shortcut_count++];
         shortcut.struct_size = sizeof(shortcut);
         shortcut.action_id = "filechooser.enter-location";
-        shortcut.description = description.c_str();
+        shortcut.description = location_description.c_str();
         shortcut.key = key;
         shortcut.modifiers = modifiers;
         shortcut.callback = &Impl::location_shortcut;
         shortcut.user_data = this;
-        if (plainroot_toolkit_window_set_shortcuts_v1(window_, &shortcut, 1U) !=
-            PLAINROOT_TOOLKIT_RESULT_OK)
-          detail::trace("unable to register Ctrl+L location shortcut");
       }
+      if (!accept_label_mnemonic_.empty()) {
+        const std::string mnemonic_chord = "Alt+" + accept_label_mnemonic_;
+        if (plainroot_toolkit_shortcut_parse_v1(
+                mnemonic_chord.c_str(), &key, &modifiers) ==
+            PLAINROOT_TOOLKIT_RESULT_OK) {
+          auto &shortcut = shortcuts[shortcut_count++];
+          shortcut.struct_size = sizeof(shortcut);
+          shortcut.action_id = "filechooser.accept-mnemonic";
+          shortcut.description = accept_label_display_.c_str();
+          shortcut.key = key;
+          shortcut.modifiers = modifiers;
+          shortcut.callback = &Impl::accept_shortcut;
+          shortcut.user_data = this;
+        }
+      }
+      if (shortcut_count != 0U &&
+          plainroot_toolkit_window_set_shortcuts_v1(
+              window_, shortcuts.data(), shortcut_count) !=
+              PLAINROOT_TOOLKIT_RESULT_OK)
+        detail::trace("unable to register chooser keyboard shortcuts");
     }
   }
 
@@ -926,6 +955,12 @@ private:
                                 plainroot_toolkit_application *,
                                 plainroot_toolkit_window *, const char *) {
     static_cast<Impl *>(user_data)->toggle_location_entry();
+  }
+
+  static void accept_shortcut(void *user_data,
+                              plainroot_toolkit_application *,
+                              plainroot_toolkit_window *, const char *) {
+    accept_activated(user_data, nullptr);
   }
 
   static void location_go_activated(void *user_data, plainroot_ui_widget *) {
@@ -2769,6 +2804,8 @@ private:
   void *completion_user_data_ = nullptr;
   std::string requested_title_;
   std::string accept_label_;
+  std::string accept_label_display_;
+  std::string accept_label_mnemonic_;
   detail::DirectoryLoader loader_;
   std::unique_ptr<detail::StorageLocationsView> storage_view_;
   bool storage_catalog_complete_ = false;

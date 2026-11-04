@@ -36,6 +36,7 @@ browser_sources = [
   'src/mime_database.cpp',
   'src/recent_files.cpp',
   'src/open_filename.cpp',
+  'src/portal_accept_label.cpp',
   'src/storage_bridge.cpp',
   'src/storage_locations_view.cpp',
   'src/ui_context_factory.cpp',
@@ -281,6 +282,17 @@ portal_selection_mode_test = executable(
   install: false,
 )
 test('FileChooser portal selection modes', portal_selection_mode_test)
+
+portal_accept_label_test = executable(
+  'filechooser-portal-accept-label-test',
+  [
+    'tests/portal_accept_label_test.cpp',
+    'src/portal_accept_label.cpp',
+  ],
+  dependencies: [glib_dep],
+  install: false,
+)
+test('FileChooser portal accept-label mnemonics', portal_accept_label_test)
 
 directory_loader_symlink_test = executable(
   'filechooser-directory-loader-symlink-test',
