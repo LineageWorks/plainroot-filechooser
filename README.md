@@ -33,6 +33,11 @@ Finally, it restores the build option and removes the staged files. It does not
 register Plainroot in the current desktop session or verify interactive GTK
 parity.
 
+On 2026-11-05, the installed-payload routing check passed: the private broker
+selected Plainroot for `PlainrootDE:Hyprland`, selected GTK for plain Hyprland,
+and used GTK when the staged Plainroot descriptor was omitted. The check
+restored `portal_registration=false` and left the active desktop unchanged.
+
 ## Current slice
 
 The `plainroot-filechooser-browser` executable is an integration prototype for
