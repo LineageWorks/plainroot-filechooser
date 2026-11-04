@@ -57,9 +57,10 @@ do not block the chooser. It rejects path components, reports collisions and
 filesystem errors, then refreshes the current listing.
 The SFTP form actions and managed-share actions reflow into compact stacked
 rows when the available width is constrained. The storage-view regression
-checks the form, mounted-share actions, and disconnect confirmation at phone
-portrait (390×844), phone landscape (844×390), tablet portrait (768×1024),
-tablet landscape (1024×768), and laptop (1366×768) sizes.
+checks both form buttons and activates Connect at phone portrait (390×844),
+phone landscape (844×390), tablet portrait (768×1024), tablet landscape
+(1024×768), and laptop (1366×768) sizes. It also checks mounted-share actions
+and disconnect confirmation within those widths.
 
 The build also includes the `plainroot-filechooser-portal` backend. It exports
 the portal FileChooser and Request interfaces through

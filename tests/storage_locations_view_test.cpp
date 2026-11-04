@@ -160,10 +160,17 @@ int main() {
     return 1;
   }
 
-  for (const Viewport &viewport : viewports) {
+  size_t submitted_count = 0;
+  for (size_t index = 0; index < viewports.size(); ++index) {
+    const Viewport &viewport = viewports[index];
+    if (index != 0 && !require(click(context.get(), toggle),
+                               "reopen SFTP form at next viewport")) {
+      return 1;
+    }
     const auto *server = find_widget(root, "Server address");
     const auto *remote = find_widget(root, "Remote folder");
     const auto *connect = find_widget(root, "Connect");
+    const auto *cancel = find_widget(root, "Cancel");
     if (!require(layout(context.get(), viewport.width, viewport.height),
                  "layout SFTP form at device viewport") ||
         !require(fits_width(server, viewport.width),
@@ -171,21 +178,25 @@ int main() {
         !require(fits_width(remote, viewport.width),
                  "remote path field remains within viewport width") ||
         !require(fits_width(connect, viewport.width),
-                 "connect button remains within viewport width")) {
+                 "connect button remains within viewport width") ||
+        !require(fits_width(cancel, viewport.width),
+                 "cancel button remains within viewport width") ||
+        !require(set_text(server, "localhost"),
+                 "set server at device viewport") ||
+        !require(set_text(remote, "/etc"),
+                 "set remote folder at device viewport") ||
+        !require(click(context.get(), connect),
+                 "connect action activates at device viewport") ||
+        !require(submitted_host == "localhost" && submitted_path == "/etc",
+                 "connect action submits values at device viewport")) {
       std::cerr << "Failed SFTP form viewport: " << viewport.name << '\n';
       return 1;
     }
+    ++submitted_count;
   }
 
-  const auto *host = find_widget(root, "Server address");
-  const auto *remote_path = find_widget(root, "Remote folder");
-  const auto *connect = find_widget(root, "Connect");
-  if (!require(set_text(host, "localhost"), "set SFTP host") ||
-      !require(set_text(remote_path, "/etc"), "set remote folder") ||
-      !require(connect != nullptr, "Connect button is discoverable") ||
-      !require(click(context.get(), connect), "submit SFTP form and hide it") ||
-      !require(submitted_host == "localhost" && submitted_path == "/etc",
-               "submit the entered SFTP endpoint") ||
+  if (!require(submitted_count == viewports.size(),
+               "SFTP submit reached the callback at every viewport") ||
       !require(layout(context.get(), viewports.back().width,
                       viewports.back().height),
                "layout after hiding submitted SFTP form")) {
