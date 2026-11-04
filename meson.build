@@ -243,6 +243,21 @@ portal_selection_mode_test = executable(
 )
 test('FileChooser portal selection modes', portal_selection_mode_test)
 
+directory_loader_symlink_test = executable(
+  'filechooser-directory-loader-symlink-test',
+  [
+    'tests/directory_loader_symlink_test.cpp',
+    'src/bookmarks.cpp',
+    'src/directory_loader.cpp',
+    'src/mime_database.cpp',
+    'src/recent_files.cpp',
+  ],
+  dependencies: [core_dep, toolkit_dep, glib_dep, magic_dep, threads_dep],
+  install: false,
+)
+test('FileChooser asynchronous symlink target inspection',
+     directory_loader_symlink_test, timeout: 10)
+
 portal_request_limits_test = executable(
   'filechooser-portal-request-limits-test',
   'tests/portal_request_limits_test.cpp',
