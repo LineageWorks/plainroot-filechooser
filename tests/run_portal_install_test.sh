@@ -44,6 +44,17 @@ check_line() {
   fi
 }
 
+check_contents() {
+  local file="$1"
+  local expected="$stage_root/expected-contents"
+  cat > "$expected"
+  if ! cmp -s "$expected" "$stage_root$file"; then
+    printf 'Unexpected contents in %s:\n' "$file" >&2
+    diff -u "$expected" "$stage_root$file" >&2 || true
+    exit 1
+  fi
+}
+
 libexec_path=$(install_path libexecdir)
 data_path=$(install_path datadir)
 
@@ -69,8 +80,11 @@ check_line "$dbus_service" "Exec=$backend"
 check_line "$dbus_service" 'SystemdService=plainroot-filechooser-portal.service'
 check_line "$user_service" 'BusName=org.freedesktop.impl.portal.desktop.plainroot'
 check_line "$user_service" "ExecStart=$backend"
-check_line "$portals_config" 'default=hyprland;gtk;'
-check_line "$portals_config" 'org.freedesktop.impl.portal.FileChooser=plainroot;gtk;'
+check_contents "$portals_config" <<'EOF'
+[preferred]
+default=hyprland;gtk
+org.freedesktop.impl.portal.FileChooser=plainroot;gtk
+EOF
 
 printf 'Opt-in portal registration staging passed.\n'
 
