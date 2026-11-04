@@ -1893,6 +1893,16 @@ private:
             update.request_kind == PLAINROOT_STORAGE_NETWORK_REQUEST_DISCONNECT;
         set_storage_status(tr(disconnect ? "Disconnecting network location…"
                                          : "Connecting to SFTP location…"));
+        for (const detail::EarlyNetworkOperation &early :
+             network_operation_tracker_.take_matching_early_operations()) {
+          detail::NetworkOperationUpdate replay{};
+          replay.type = PLAINROOT_STORAGE_NETWORK_EVENT_OPERATION_CHANGED;
+          replay.operation_kind = early.operation_kind;
+          replay.state = early.state;
+          replay.error = early.error;
+          replay.operation_id = early.operation_id;
+          apply_network_operation(std::move(replay));
+        }
       }
       request_redraw();
       return;
@@ -1900,8 +1910,12 @@ private:
 
     if (update.type != PLAINROOT_STORAGE_NETWORK_EVENT_OPERATION_CHANGED)
       return;
-    if (!network_operation_tracker_.matches_operation(update.operation_id))
+    if (!network_operation_tracker_.matches_operation(update.operation_id)) {
+      network_operation_tracker_.observe_early_operation(
+          update.operation_id, update.operation_kind, update.state,
+          update.error);
       return;
+    }
     if (update.state == PLAINROOT_STORAGE_NETWORK_OPERATION_SUCCEEDED) {
       storage_operation_pending_ = false;
       network_operation_tracker_.reset();

@@ -25,11 +25,29 @@ int main() {
   CHECK(!tracker.complete_request(
       18U, PLAINROOT_STORAGE_NETWORK_REQUEST_CONNECT, PLAINROOT_STORAGE_OK,
       "other-operation"));
+  tracker.observe_early_operation(
+      "unrelated-operation", PLAINROOT_STORAGE_NETWORK_OPERATION_CONNECT,
+      PLAINROOT_STORAGE_NETWORK_OPERATION_FAILED,
+      PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_CONNECTION_FAILED);
+  tracker.observe_early_operation(
+      "chooser-operation", PLAINROOT_STORAGE_NETWORK_OPERATION_CONNECT,
+      PLAINROOT_STORAGE_NETWORK_OPERATION_CONNECTING,
+      PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_NONE);
+  tracker.observe_early_operation(
+      "chooser-operation", PLAINROOT_STORAGE_NETWORK_OPERATION_CONNECT,
+      PLAINROOT_STORAGE_NETWORK_OPERATION_FAILED,
+      PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_MOUNT_FAILED);
   CHECK(tracker.complete_request(
       17U, PLAINROOT_STORAGE_NETWORK_REQUEST_CONNECT, PLAINROOT_STORAGE_OK,
       "chooser-operation"));
   CHECK(!tracker.matches_operation("other-operation"));
   CHECK(tracker.matches_operation("chooser-operation"));
+  const auto early = tracker.take_matching_early_operations();
+  CHECK(early.size() == 2U);
+  CHECK(early[0].state == PLAINROOT_STORAGE_NETWORK_OPERATION_CONNECTING);
+  CHECK(early[1].state == PLAINROOT_STORAGE_NETWORK_OPERATION_FAILED);
+  CHECK(early[1].error ==
+        PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_MOUNT_FAILED);
 
   tracker.begin(21U, PLAINROOT_STORAGE_NETWORK_REQUEST_DISCONNECT);
   CHECK(tracker.complete_request(
