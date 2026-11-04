@@ -146,8 +146,9 @@ and the mount stayed active until Networkd explicitly disconnected it. The
 temporary FUSE helper permission change was restored to mode `0755`. This
 confirms browser access to an existing managed SSHFS mount; chooser-initiated
 SFTP connect/disconnect and persistent FUSE setup remain open. The USB volume
-is unmounted and was physically disconnected after the live Storaged
-acceptance. A follow-up chooser-initiated SFTP attempt on 2026-11-04 reached
+was unmounted and physically disconnected after the live Storaged acceptance,
+then reinserted for follow-up checks; it is currently unmounted. A follow-up
+chooser-initiated SFTP attempt on 2026-11-04 reached
 the transient SSHFS unit's `Started` state and then a normal Networkd unmount
 about three seconds later. No mount or recent FileChooser core dump remained.
 During a later diagnostic, two monitored browser processes remained mapped and
@@ -156,9 +157,12 @@ with `MOUNT_FAILED` while the helper was mode `0755`, and the mount snapshot
 remained empty. This did not reproduce a process crash. The user later
 clarified that a quick close may have been caused by the test agent; no visible
 error was observed, so the report is inconclusive and is not treated as a
-confirmed application crash. The chooser now keeps the SFTP form open until
-the mount succeeds, making failed attempts retryable.
-Browsing and disconnecting a chooser-initiated live mount remain unverified.
+confirmed application crash. A fresh workspace browser subsequently displayed
+the FUSE setup hint and stayed open after the user submitted `localhost:/etc`;
+`GetMounts` remained empty and no transient unit or mountpoint was created.
+The chooser keeps the SFTP form open until the mount succeeds, making failed
+attempts retryable. Successful chooser-initiated SFTP connect, browse, and
+disconnect remain unverified until the OS provides mount-capable FUSE.
 
 Both the browser and portal backend support opt-in diagnostics with
 `PLAINROOT_FILECHOOSER_TRACE=1` in the process environment. They record portal
