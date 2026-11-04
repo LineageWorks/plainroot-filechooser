@@ -104,10 +104,15 @@ direct host-session SSHFS mount failed at FUSE setup with `Operation not
 permitted`; `/dev/fuse` is present, but `fusermount3` is not setuid. The
 production `plainroot-networkd` service mounted `localhost:/etc`, read
 `/etc/os-release`, and disconnected cleanly in an isolated user and mount
-namespace using a fake user-systemd manager. A live host user-systemd transient
-unit also exercised failure cleanup, but successful host-session SSHFS
-mounting and chooser access to a managed network mount remain open. The USB
-volume is currently left unmounted after the live Storaged acceptance.
+namespace using a fake user-systemd manager. On 2026-11-04, a live host
+user-systemd Networkd mount of `localhost:/etc` was browsed through the
+FileChooser; `/etc/os-release` remained readable after closing the browser,
+and the mount stayed active until Networkd explicitly disconnected it. The
+temporary FUSE helper permission change was restored to mode `0755`. This
+confirms browser access to an existing managed SSHFS mount; chooser-initiated
+SFTP connect/disconnect and persistent FUSE setup remain open. The USB volume
+is unmounted and was physically disconnected after the live Storaged
+acceptance.
 
 The browser accepts an optional absolute starting directory. Directory names
 remain native byte paths for navigation and selection; names that are not valid
