@@ -10,6 +10,21 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+msgid "Size"
+msgstr "גודל"
+
+msgid "Type"
+msgstr "סוג"
+
+msgid "Modified"
+msgstr "שונה"
+
+msgid "Folder"
+msgstr "תיקייה"
+
+msgid "Unknown type"
+msgstr "סוג לא ידוע"
+
 msgid "Choose a file"
 msgstr "בחירת קובץ"
 

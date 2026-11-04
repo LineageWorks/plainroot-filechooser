@@ -3,6 +3,7 @@
 #include "bookmarks.hpp"
 #include "directory_breadcrumbs.hpp"
 #include "directory_loader.hpp"
+#include "directory_metadata_display.hpp"
 #include "directory_sort.hpp"
 #include "location_path.hpp"
 #include "mime_database.hpp"
@@ -111,6 +112,10 @@ bool is_metadata_sort(detail::DirectorySortOrder order) {
          order == detail::DirectorySortOrder::size_descending ||
          order == detail::DirectorySortOrder::modified_newest_first ||
          order == detail::DirectorySortOrder::modified_oldest_first;
+}
+
+bool needs_directory_metadata(detail::DirectorySortOrder order) {
+  return is_metadata_sort(order) || is_type_sort(order);
 }
 
 } // namespace
@@ -883,7 +888,7 @@ private:
     } else {
       set_status(tr("Loading folder…"));
       loader_.request(current_path_, generation_, classify_mime,
-                      is_metadata_sort(sort_order_));
+                      needs_directory_metadata(sort_order_));
     }
     schedule_render();
     request_redraw();
@@ -1497,7 +1502,7 @@ private:
       return;
     self.sort_order_ = static_cast<detail::DirectorySortOrder>(selected);
     if ((is_type_sort(self.sort_order_) && !self.entries_mime_classified_) ||
-        (is_metadata_sort(self.sort_order_) &&
+        (needs_directory_metadata(self.sort_order_) &&
          !self.entries_metadata_collected_)) {
       self.request_directory_load(true);
       return;
@@ -2526,17 +2531,29 @@ private:
       std::string label = display_path(entry->name);
       if (entry->kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY)
         label += "/";
+      const detail::DirectoryMetadataDisplay metadata_display =
+          detail::format_directory_metadata_display(
+              *entry, sort_order_, tr("Folder"), tr("Unknown type"));
+      std::string supporting_text;
+      if (!metadata_display.value.empty()) {
+        supporting_text = tr(metadata_display.label_message.c_str());
+        supporting_text += ": ";
+        supporting_text += display_path(metadata_display.value);
+      }
       auto action = std::make_unique<EntryAction>();
       action->controller = this;
       action->path = entry->path.empty() ? join_path(current_path_, entry->name)
                                          : entry->path;
       action->kind = entry->kind;
       auto *row = plainroot_ui_list_item_create_v1(context_, 1.0F);
-      auto *recent_content = entry->path.empty()
-                                 ? nullptr
-                                 : plainroot_ui_box_create_v1(
-                                       context_, PLAINROOT_UI_AXIS_VERTICAL,
-                                       2.0F, 1.0F);
+      const bool has_recent_path = !entry->path.empty();
+      const bool has_supporting_text = !supporting_text.empty();
+      auto *supporting_content = (has_recent_path || has_supporting_text)
+                                     ? plainroot_ui_box_create_v1(
+                                           context_,
+                                           PLAINROOT_UI_AXIS_VERTICAL,
+                                           2.0F, 1.0F)
+                                     : nullptr;
       plainroot_ui_widget *control = nullptr;
       plainroot_ui_widget *entry_content = nullptr;
       const bool is_symlink =
@@ -2582,16 +2599,26 @@ private:
         entry_content = control;
       }
       bool row_ready = entry_content != nullptr && row != nullptr;
-      if (row_ready && recent_content != nullptr) {
-        auto *location = plainroot_ui_label_create_v1(
-            context_, entry->path.c_str(),
-            static_cast<uint32_t>(entry->path.size()),
-            PLAINROOT_UI_COLOR_ON_SURFACE_VARIANT_V3, 0.0F);
-        if (location != nullptr)
-          (void)plainroot_ui_widget_set_text_direction_v1(
-              location, PLAINROOT_UI_TEXT_LTR);
-        row_ready = location != nullptr && add(recent_content, entry_content) &&
-                    add(recent_content, location) && add(row, recent_content);
+      if (row_ready && supporting_content != nullptr) {
+        row_ready = add(supporting_content, entry_content);
+        if (row_ready && has_recent_path) {
+          auto *location = plainroot_ui_label_create_v1(
+              context_, entry->path.c_str(),
+              static_cast<uint32_t>(entry->path.size()),
+              PLAINROOT_UI_COLOR_ON_SURFACE_VARIANT_V3, 0.0F);
+          if (location != nullptr)
+            (void)plainroot_ui_widget_set_text_direction_v1(
+                location, PLAINROOT_UI_TEXT_LTR);
+          row_ready = location != nullptr && add(supporting_content, location);
+        }
+        if (row_ready && has_supporting_text) {
+          auto *details = plainroot_ui_label_create_v1(
+              context_, supporting_text.c_str(),
+              static_cast<uint32_t>(supporting_text.size()),
+              PLAINROOT_UI_COLOR_ON_SURFACE_VARIANT_V3, 0.0F);
+          row_ready = details != nullptr && add(supporting_content, details);
+        }
+        row_ready = row_ready && add(row, supporting_content);
       } else if (row_ready) {
         row_ready = add(row, entry_content);
       }

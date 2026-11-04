@@ -29,6 +29,7 @@ browser_sources = [
   'src/bookmarks.cpp',
   'src/browser_controller.cpp',
   'src/directory_breadcrumbs.cpp',
+  'src/directory_metadata_display.cpp',
   'src/directory_sort.cpp',
   'src/directory_loader.cpp',
   'src/image_preview.cpp',
@@ -142,6 +143,17 @@ directory_sort_test = executable(
   install: false,
 )
 test('FileChooser directory sorting', directory_sort_test)
+
+directory_metadata_display_test = executable(
+  'filechooser-directory-metadata-display-test',
+  [
+    'tests/directory_metadata_display_test.cpp',
+    'src/directory_metadata_display.cpp',
+  ],
+  dependencies: [core_dep, toolkit_dep, glib_dep],
+  install: false,
+)
+test('FileChooser directory metadata display', directory_metadata_display_test)
 
 directory_breadcrumbs_test = executable(
   'filechooser-directory-breadcrumbs-test',
