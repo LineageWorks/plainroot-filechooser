@@ -100,6 +100,13 @@ public:
 
   void set_status(const std::string &status) { set_text(status_, status); }
 
+  void set_sftp_form_visible(bool visible) {
+    show_sftp_form_ = visible;
+    if (sftp_form_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(sftp_form_, visible ? 1 : 0);
+    set_text(sftp_toggle_, tr(visible ? "Hide SFTP form" : "Connect to SFTP"));
+  }
+
 private:
   using ButtonCallback = void (*)(void *, plainroot_ui_widget *);
 
@@ -204,12 +211,8 @@ private:
 
   static void toggle_sftp_activated(void *user_data, plainroot_ui_widget *) {
     auto &self = *static_cast<Impl *>(user_data);
-    self.show_sftp_form_ = !self.show_sftp_form_;
+    self.set_sftp_form_visible(!self.show_sftp_form_);
     trace("sftp-form visible=%u", self.show_sftp_form_ ? 1U : 0U);
-    (void)plainroot_ui_widget_set_visible_v1(
-        self.sftp_form_, self.show_sftp_form_ ? 1 : 0);
-    set_text(self.sftp_toggle_,
-             tr(self.show_sftp_form_ ? "Hide SFTP form" : "Connect to SFTP"));
     self.request_redraw();
   }
 
@@ -246,11 +249,6 @@ private:
                                   remote_path)
                             : PLAINROOT_STORAGE_NOT_READY;
     trace("sftp-submit result=%u", static_cast<unsigned>(result));
-    if (result == PLAINROOT_STORAGE_OK) {
-      self.show_sftp_form_ = false;
-      (void)plainroot_ui_widget_set_visible_v1(self.sftp_form_, 0);
-      set_text(self.sftp_toggle_, tr("Connect to SFTP"));
-    }
     self.request_redraw();
   }
 
@@ -469,6 +467,11 @@ void StorageLocationsView::set_catalog(StorageCatalog catalog) {
 void StorageLocationsView::set_status(const std::string &status) {
   if (impl_)
     impl_->set_status(status);
+}
+
+void StorageLocationsView::set_sftp_form_visible(bool visible) {
+  if (impl_)
+    impl_->set_sftp_form_visible(visible);
 }
 
 } // namespace plainroot::filechooser::detail

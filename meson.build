@@ -167,7 +167,7 @@ storage_locations_view_test = executable(
   dependencies: common_dependencies,
   install: false,
 )
-test('FileChooser hides SFTP form and applies network mount snapshots',
+test('FileChooser keeps SFTP form open until connection succeeds',
      storage_locations_view_test)
 
 image_preview_test = executable(

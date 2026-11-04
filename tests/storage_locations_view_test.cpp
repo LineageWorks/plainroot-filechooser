@@ -188,10 +188,6 @@ int main() {
   size_t submitted_count = 0;
   for (size_t index = 0; index < viewports.size(); ++index) {
     const Viewport &viewport = viewports[index];
-    if (index != 0 && !require(click(context.get(), toggle),
-                               "reopen SFTP form at next viewport")) {
-      return 1;
-    }
     const auto *server = find_widget(root, "Server address");
     const auto *remote = find_widget(root, "Remote folder");
     const auto *connect = find_widget(root, "Connect");
@@ -213,7 +209,10 @@ int main() {
         !require(click(context.get(), connect),
                  "connect action activates at device viewport") ||
         !require(submitted_host == "localhost" && submitted_path == "/etc",
-                 "connect action submits values at device viewport")) {
+                 "connect action submits values at device viewport") ||
+        !require(widget_bounds(const_cast<plainroot_ui_widget *>(connect))
+                         .height > 0.0F,
+                 "accepted connection keeps the form open while pending")) {
       std::cerr << "Failed SFTP form viewport: " << viewport.name << '\n';
       return 1;
     }
@@ -224,7 +223,13 @@ int main() {
                "SFTP submit reached the callback at every viewport") ||
       !require(layout(context.get(), viewports.back().width,
                       viewports.back().height),
-               "layout after hiding submitted SFTP form")) {
+               "layout while SFTP connection is pending")) {
+    return 1;
+  }
+  view.set_sftp_form_visible(false);
+  if (!require(layout(context.get(), viewports.back().width,
+                      viewports.back().height),
+               "layout after a successful connection closes the form")) {
     return 1;
   }
 

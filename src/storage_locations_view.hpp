@@ -33,6 +33,7 @@ public:
   plainroot_ui_widget *create();
   void set_catalog(StorageCatalog catalog);
   void set_status(const std::string &status);
+  void set_sftp_form_visible(bool visible);
 
 private:
   class Impl;

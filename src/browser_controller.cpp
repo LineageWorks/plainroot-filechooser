@@ -1933,6 +1933,8 @@ private:
       network_operation_tracker_.reset();
       const bool disconnect =
           update.operation_kind == PLAINROOT_STORAGE_NETWORK_OPERATION_DISCONNECT;
+      if (!disconnect && storage_view_ != nullptr)
+        storage_view_->set_sftp_form_visible(false);
       set_storage_status(tr(disconnect ? "Network location disconnected."
                                        : "Network location connected."));
       if (storage_bridge_ != nullptr)
