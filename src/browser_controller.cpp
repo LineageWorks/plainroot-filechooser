@@ -2073,6 +2073,9 @@ private:
                             : storage_bridge_->connect_sftp(
                                   host, username, port, remote_path,
                                   &request_id);
+    detail::trace("sftp-connect-request result=%u request=%llu",
+                  static_cast<unsigned>(result),
+                  static_cast<unsigned long long>(request_id));
     if (result == PLAINROOT_STORAGE_OK) {
       storage_operation_pending_ = true;
       network_operation_tracker_.begin(
@@ -2098,6 +2101,9 @@ private:
                             ? PLAINROOT_STORAGE_NOT_READY
                             : storage_bridge_->disconnect_network(
                                   id, &request_id);
+    detail::trace("sftp-disconnect-request result=%u request=%llu",
+                  static_cast<unsigned>(result),
+                  static_cast<unsigned long long>(request_id));
     if (result == PLAINROOT_STORAGE_OK) {
       storage_operation_pending_ = true;
       network_operation_tracker_.begin(

@@ -1,4 +1,5 @@
 #include "storage_locations_view.hpp"
+#include "trace.hpp"
 
 #include <plainroot/i18n/i18n.h>
 
@@ -203,6 +204,7 @@ private:
   static void toggle_sftp_activated(void *user_data, plainroot_ui_widget *) {
     auto &self = *static_cast<Impl *>(user_data);
     self.show_sftp_form_ = !self.show_sftp_form_;
+    trace("sftp-form visible=%u", self.show_sftp_form_ ? 1U : 0U);
     (void)plainroot_ui_widget_set_visible_v1(
         self.sftp_form_, self.show_sftp_form_ ? 1 : 0);
     set_text(self.sftp_toggle_,
@@ -214,6 +216,7 @@ private:
     auto &self = *static_cast<Impl *>(user_data);
     std::string host = field_value(self.host_field_);
     if (host.empty()) {
+      trace("sftp-submit rejected=empty-host");
       self.set_status(tr("Enter a server name or address."));
       self.request_redraw();
       return;
@@ -227,6 +230,7 @@ private:
           port_text.data(), port_text.data() + port_text.size(), parsed_port);
       if (error != std::errc{} || end != port_text.data() + port_text.size() ||
           parsed_port == 0 || parsed_port > 65535U) {
+        trace("sftp-submit rejected=invalid-port");
         self.set_status(tr("Enter a valid port from 1 to 65535."));
         self.request_redraw();
         return;
@@ -234,11 +238,13 @@ private:
       port = static_cast<uint16_t>(parsed_port);
     }
     const std::string remote_path = field_value(self.remote_path_field_);
+    trace("sftp-submit begin");
     const auto result = self.actions_.connect_sftp
                             ? self.actions_.connect_sftp(
                                   std::move(host), username, port,
                                   remote_path)
                             : PLAINROOT_STORAGE_NOT_READY;
+    trace("sftp-submit result=%u", static_cast<unsigned>(result));
     if (result == PLAINROOT_STORAGE_OK) {
       self.show_sftp_form_ = false;
       (void)plainroot_ui_widget_set_visible_v1(self.sftp_form_, 0);

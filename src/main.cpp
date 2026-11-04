@@ -1,4 +1,5 @@
 #include "browser_controller.hpp"
+#include "trace.hpp"
 #include "ui_context_factory.hpp"
 
 #include <plainroot/i18n/i18n.h>
@@ -117,8 +118,11 @@ int main(int argc, char **argv) {
   controller.set_window(window);
   controller.navigate(std::move(start_path));
 
+  plainroot::filechooser::detail::trace("browser-loop-begin");
   const auto run_result = plainroot_toolkit_application_run_v1(
       application, error.data(), error.size());
+  plainroot::filechooser::detail::trace("browser-loop-end result=%u",
+                                       static_cast<unsigned>(run_result));
   controller.shutdown();
   (void)plainroot_toolkit_window_destroy(window);
   plainroot_toolkit_application_destroy(application);
