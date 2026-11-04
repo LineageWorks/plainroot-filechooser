@@ -14,15 +14,21 @@ desktop-specific configuration to take precedence. The current host's Hyprland
 session is not reconfigured. Plainroot's build and runtime dependency closure
 must stay free of GIO. An opt-in `DESTDIR` install was verified in a disposable
 staging root; all registration and activation files landed at their configured
-`/usr` paths. This did not change the active desktop configuration or verify
-broker routing, which remains a live acceptance gate. A default `DESTDIR`
-install was also checked and contained neither portal registration nor
-activation files.
+`/usr` paths. A default `DESTDIR` install was also checked and contained
+neither portal registration nor activation files. The active desktop
+configuration is not changed by these checks.
 
 Run `just check-filechooser-portal-routing` to verify Plainroot-first selection
 and GTK fallback in an isolated D-Bus session with temporary XDG directories.
 This checks broker routing without changing host portal configuration; it does
 not open an interactive chooser or replace live desktop acceptance.
+
+Run `just check-filechooser-installed-routing` to repeat those routing checks
+using the opt-in staged install payload. It temporarily enables
+`portal_registration` in the Meson build, installs into a temporary `DESTDIR`,
+starts private broker sessions for Plainroot selection and GTK fallback, then
+restores the build option and removes the staged files. It does not register
+Plainroot in the current desktop session or verify interactive GTK parity.
 
 ## Current slice
 
