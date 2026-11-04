@@ -144,10 +144,15 @@ user-systemd Networkd mount of `localhost:/etc` was browsed through the
 FileChooser; `/etc/os-release` remained readable after closing the browser,
 and the mount stayed active until Networkd explicitly disconnected it. The
 temporary FUSE helper permission change was restored to mode `0755`. This
-confirms browser access to an existing managed SSHFS mount; chooser-initiated
-SFTP connect/disconnect and persistent FUSE setup remain open. The USB volume
-was unmounted and physically disconnected after the live Storaged acceptance,
-then reinserted for follow-up checks; it is currently unmounted. A follow-up
+confirms browser access to an existing managed SSHFS mount. Later on
+2026-11-04, the rebuilt chooser connected to `localhost:/etc`, displayed
+`os-release`, and disconnected the managed share with the helper temporarily
+set to root-owned mode `04755`; the helper was restored to `0755`. Persistent
+FUSE setup remains open. The USB was also physically removed during a Storaged
+mounted-filesystem read; the read returned an I/O error and complete catalog
+snapshots dropped the device and mount. After reinsertion, the probe checksum
+matched, the test file was removed, and the volume was normally unmounted. The
+USB is currently present and unmounted. A follow-up
 chooser-initiated SFTP attempt on 2026-11-04 reached
 the transient SSHFS unit's `Started` state and then a normal Networkd unmount
 about three seconds later. No mount or recent FileChooser core dump remained.
@@ -161,13 +166,11 @@ confirmed application crash. A fresh workspace browser subsequently displayed
 the FUSE setup hint and stayed open after the user submitted `localhost:/etc`;
 `GetMounts` remained empty and no transient unit or mountpoint was created.
 The chooser keeps the SFTP form open until the mount succeeds, making failed
-attempts retryable. Successful chooser-initiated SFTP connect, browse, and
-disconnect remain unverified until the OS provides mount-capable FUSE. The
-rebuilt Networkd's positive FUSE path was also verified directly on 2026-11-04
-with the helper temporarily set to root-owned `4755`: it mounted
-`localhost:/etc`, allowed reading `/etc/os-release`, and disconnected normally.
-The helper was restored to `0755`; this direct service check does not yet prove
-the successful path through the chooser UI.
+attempts retryable. The rebuilt Networkd's positive FUSE path was also verified
+directly on 2026-11-04 with the helper temporarily set to root-owned `4755`:
+it mounted `localhost:/etc`, allowed reading `/etc/os-release`, and
+disconnected normally. The helper was restored to `0755` after both the direct
+service and chooser UI checks.
 
 Both the browser and portal backend support opt-in diagnostics with
 `PLAINROOT_FILECHOOSER_TRACE=1` in the process environment. They record portal
@@ -178,10 +181,9 @@ the backend is activated by D-Bus or systemd, set the variable in that
 backend's environment rather than only in the requesting application's
 environment.
 
-The USB was physically disconnected after the earlier Storaged acceptance,
-then reinserted for follow-up checks. It remains unmounted; the latest host
-catalog still enumerates `/dev/sdb1`, so a new physical-removal event has not
-yet been verified.
+Storaged's physical-removal acceptance completed on 2026-11-04. The USB was
+removed during a bounded read from a mounted VFAT probe file, then reinserted;
+the current catalog enumerates `/dev/sdb1` and Storaged reports it unmounted.
 
 The browser accepts an optional absolute starting directory. Directory names
 remain native byte paths for navigation and selection; names that are not valid
