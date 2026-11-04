@@ -26,6 +26,9 @@ msgstr "Папка"
 msgid "Unknown type"
 msgstr "Неизвестный тип"
 
+msgid "Show file details"
+msgstr "Показать сведения о файлах"
+
 msgid "Choose a file"
 msgstr "Выберите файл"
 

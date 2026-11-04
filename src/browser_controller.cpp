@@ -47,8 +47,9 @@ constexpr float kPagePadding = 16.0F;
 constexpr float kContentSpacing = 16.0F;
 constexpr float kCompactWindowWidth = 600.0F;
 constexpr float kShortWindowHeight = 480.0F;
-constexpr float kCompactControlsWidth = 720.0F;
+constexpr float kCompactControlsWidth = 1000.0F;
 constexpr float kCompactFilenameWidth = 640.0F;
+constexpr float kExpandedMetadataRowWidth = 840.0F;
 constexpr float kLocationActionsHorizontalWidth = 800.0F;
 constexpr float kLocationRowHorizontalWidth = 960.0F;
 /* Content panes use the wider breakpoint; short action rows wrap earlier so
@@ -340,6 +341,11 @@ public:
         context_, hidden_label.c_str(),
         static_cast<uint32_t>(hidden_label.size()), 0, 0.0F,
         &Impl::hidden_changed, this);
+    const std::string details_label = tr("Show file details");
+    details_switch_ = plainroot_ui_switch_create_v1(
+        context_, details_label.c_str(),
+        static_cast<uint32_t>(details_label.size()), 0, 0.0F,
+        &Impl::details_changed, this);
     if (filters_.size() > 1U) {
       const std::string filter_hint = tr("Filter files");
       filter_dropdown_ = plainroot_ui_dropdown_create_v1(
@@ -484,6 +490,7 @@ public:
         breadcrumb_scroll_ == nullptr ||
         breadcrumb_strip_ == nullptr || controls == nullptr ||
         search_field_ == nullptr || hidden_switch_ == nullptr ||
+        details_switch_ == nullptr ||
         sort_dropdown_ == nullptr ||
         (filters_.size() > 1U && filter_dropdown_ == nullptr) ||
         browser_body_ == nullptr || list_scroll_ == nullptr ||
@@ -662,6 +669,7 @@ public:
         (filename_before_browser && !add(page, filename_row)) ||
         !add(page, controls) ||
         !add(controls, search_field_) || !add(controls, hidden_switch_) ||
+        !add(controls, details_switch_) ||
         !add(controls, sort_dropdown_) ||
         (filter_dropdown_ != nullptr && !add(controls, filter_dropdown_)) ||
         (choices_panel != nullptr && !add(page, choices_panel)) ||
@@ -865,7 +873,7 @@ private:
     mime_database_available_ = false;
     entries_metadata_collected_ = false;
     const bool classify_mime = selected_filter_has_mime() ||
-                               is_type_sort(sort_order_);
+                               is_type_sort(sort_order_) || details_visible_;
     if (!preserve_selection) {
       if (allow_multiple_) {
         update_selection_summary();
@@ -888,7 +896,8 @@ private:
     } else {
       set_status(tr("Loading folder…"));
       loader_.request(current_path_, generation_, classify_mime,
-                      needs_directory_metadata(sort_order_));
+                      details_visible_ ||
+                          needs_directory_metadata(sort_order_));
     }
     schedule_render();
     request_redraw();
@@ -1466,6 +1475,24 @@ private:
     self.schedule_render();
   }
 
+  static void details_changed(void *user_data, plainroot_ui_widget *widget) {
+    auto &self = *static_cast<Impl *>(user_data);
+    if (self.initializing_details_switch_)
+      return;
+    uint32_t checked = 0;
+    if (plainroot_ui_switch_get_checked_v1(widget, &checked) !=
+        PLAINROOT_UI_RESULT_OK)
+      return;
+    self.details_visible_ = checked != 0U;
+    if (self.details_visible_ &&
+        (!self.entries_metadata_collected_ ||
+         !self.entries_mime_classified_)) {
+      self.request_directory_load(true);
+      return;
+    }
+    self.schedule_render();
+  }
+
   static void filter_changed(void *user_data, plainroot_ui_widget *widget) {
     auto &self = *static_cast<Impl *>(user_data);
     if (self.initializing_filter_dropdown_)
@@ -1501,7 +1528,16 @@ private:
          !self.recent_mode_))
       return;
     self.sort_order_ = static_cast<detail::DirectorySortOrder>(selected);
-    if ((is_type_sort(self.sort_order_) && !self.entries_mime_classified_) ||
+    if (needs_directory_metadata(self.sort_order_)) {
+      self.details_visible_ = true;
+      self.initializing_details_switch_ = true;
+      const auto details_result = plainroot_ui_switch_set_checked_v1(
+          self.details_switch_, 1U);
+      self.initializing_details_switch_ = false;
+      if (details_result != PLAINROOT_UI_RESULT_OK)
+        return;
+    }
+    if ((self.details_visible_ && !self.entries_mime_classified_) ||
         (needs_directory_metadata(self.sort_order_) &&
          !self.entries_metadata_collected_)) {
       self.request_directory_load(true);
@@ -2531,15 +2567,11 @@ private:
       std::string label = display_path(entry->name);
       if (entry->kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY)
         label += "/";
-      const detail::DirectoryMetadataDisplay metadata_display =
-          detail::format_directory_metadata_display(
-              *entry, sort_order_, tr("Folder"), tr("Unknown type"));
-      std::string supporting_text;
-      if (!metadata_display.value.empty()) {
-        supporting_text = tr(metadata_display.label_message.c_str());
-        supporting_text += ": ";
-        supporting_text += display_path(metadata_display.value);
-      }
+      const std::vector<detail::DirectoryMetadataDisplay> metadata_displays =
+          details_visible_
+              ? detail::format_directory_metadata_displays(
+                    *entry, tr("Folder"), tr("Unknown type"))
+              : std::vector<detail::DirectoryMetadataDisplay>{};
       auto action = std::make_unique<EntryAction>();
       action->controller = this;
       action->path = entry->path.empty() ? join_path(current_path_, entry->name)
@@ -2547,13 +2579,6 @@ private:
       action->kind = entry->kind;
       auto *row = plainroot_ui_list_item_create_v1(context_, 1.0F);
       const bool has_recent_path = !entry->path.empty();
-      const bool has_supporting_text = !supporting_text.empty();
-      auto *supporting_content = (has_recent_path || has_supporting_text)
-                                     ? plainroot_ui_box_create_v1(
-                                           context_,
-                                           PLAINROOT_UI_AXIS_VERTICAL,
-                                           2.0F, 1.0F)
-                                     : nullptr;
       plainroot_ui_widget *control = nullptr;
       plainroot_ui_widget *entry_content = nullptr;
       const bool is_symlink =
@@ -2598,9 +2623,30 @@ private:
           control = nullptr;
         entry_content = control;
       }
-      bool row_ready = entry_content != nullptr && row != nullptr;
-      if (row_ready && supporting_content != nullptr) {
-        row_ready = add(supporting_content, entry_content);
+      const bool has_metadata = !metadata_displays.empty();
+      const bool needs_entry_column = has_recent_path || has_metadata;
+      auto *row_layout = needs_entry_column
+                             ? plainroot_ui_adaptive_box_create_v1(
+                                   context_, PLAINROOT_UI_AXIS_VERTICAL,
+                                   PLAINROOT_UI_AXIS_HORIZONTAL,
+                                   kExpandedMetadataRowWidth, 8.0F, 1.0F)
+                             : nullptr;
+      auto *entry_column = needs_entry_column
+                               ? plainroot_ui_box_create_v1(
+                                     context_, PLAINROOT_UI_AXIS_VERTICAL,
+                                     2.0F, 1.0F)
+                               : nullptr;
+      auto *metadata_column = has_metadata
+                                  ? plainroot_ui_box_create_v1(
+                                        context_, PLAINROOT_UI_AXIS_VERTICAL,
+                                        4.0F, 1.0F)
+                                  : nullptr;
+      bool row_ready = entry_content != nullptr && row != nullptr &&
+                       (!needs_entry_column ||
+                        (row_layout != nullptr && entry_column != nullptr)) &&
+                       (!has_metadata || metadata_column != nullptr);
+      if (row_ready && needs_entry_column) {
+        row_ready = add(entry_column, entry_content);
         if (row_ready && has_recent_path) {
           auto *location = plainroot_ui_label_create_v1(
               context_, entry->path.c_str(),
@@ -2609,16 +2655,41 @@ private:
           if (location != nullptr)
             (void)plainroot_ui_widget_set_text_direction_v1(
                 location, PLAINROOT_UI_TEXT_LTR);
-          row_ready = location != nullptr && add(supporting_content, location);
+          row_ready = location != nullptr && add(entry_column, location);
         }
-        if (row_ready && has_supporting_text) {
-          auto *details = plainroot_ui_label_create_v1(
-              context_, supporting_text.c_str(),
-              static_cast<uint32_t>(supporting_text.size()),
-              PLAINROOT_UI_COLOR_ON_SURFACE_VARIANT_V3, 0.0F);
-          row_ready = details != nullptr && add(supporting_content, details);
+        if (row_ready && has_metadata) {
+          for (const detail::DirectoryMetadataDisplay &metadata :
+               metadata_displays) {
+            const std::string label = tr(metadata.label_message.c_str());
+            const std::string value_text = display_path(metadata.value);
+            auto *field = plainroot_ui_box_create_v1(
+                context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
+            auto *field_label = plainroot_ui_label_create_v1(
+                context_, label.c_str(), static_cast<uint32_t>(label.size()),
+                PLAINROOT_UI_COLOR_ON_SURFACE_VARIANT_V3, 0.0F);
+            auto *value = plainroot_ui_label_create_v1(
+                context_, value_text.c_str(),
+                static_cast<uint32_t>(value_text.size()),
+                PLAINROOT_UI_COLOR_ON_SURFACE_V3, 1.0F);
+            if (value != nullptr && metadata.value_is_ltr)
+              (void)plainroot_ui_widget_set_text_direction_v1(
+                  value, PLAINROOT_UI_TEXT_LTR);
+            if (field_label != nullptr)
+              (void)plainroot_ui_label_set_typography_v1(
+                  field_label, PLAINROOT_UI_LABEL_BODY_SMALL);
+            if (value != nullptr)
+              (void)plainroot_ui_label_set_typography_v1(
+                  value, PLAINROOT_UI_LABEL_BODY_SMALL);
+            row_ready = field != nullptr && field_label != nullptr &&
+                        value != nullptr && add(field, field_label) &&
+                        add(field, value) && add(metadata_column, field);
+            if (!row_ready)
+              break;
+          }
         }
-        row_ready = row_ready && add(row, supporting_content);
+        row_ready = row_ready && add(row_layout, entry_column) &&
+                    (!has_metadata || add(row_layout, metadata_column)) &&
+                    add(row, row_layout);
       } else if (row_ready) {
         row_ready = add(row, entry_content);
       }
@@ -2874,8 +2945,10 @@ private:
   bool writable_ = true;
   bool finished_ = false;
   bool show_hidden_ = false;
+  bool details_visible_ = false;
   bool initializing_filter_dropdown_ = false;
   bool initializing_sort_dropdown_ = false;
+  bool initializing_details_switch_ = false;
   bool initializing_places_dropdown_ = false;
   bool initializing_choice_controls_ = false;
   bool overwrite_dialog_open_ = false;
@@ -2936,6 +3009,7 @@ private:
   plainroot_ui_widget *filename_field_ = nullptr;
   plainroot_ui_widget *search_field_ = nullptr;
   plainroot_ui_widget *hidden_switch_ = nullptr;
+  plainroot_ui_widget *details_switch_ = nullptr;
   plainroot_ui_widget *places_dropdown_ = nullptr;
   plainroot_ui_widget *recent_button_ = nullptr;
   plainroot_ui_widget *bookmark_button_ = nullptr;

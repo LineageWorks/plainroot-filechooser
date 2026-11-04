@@ -25,6 +25,9 @@ msgstr "תיקייה"
 msgid "Unknown type"
 msgstr "סוג לא ידוע"
 
+msgid "Show file details"
+msgstr "הצגת פרטי קבצים"
+
 msgid "Choose a file"
 msgstr "בחירת קובץ"
 

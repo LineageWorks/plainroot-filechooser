@@ -2,10 +2,25 @@
 
 #include <cassert>
 #include <string>
+#include <vector>
 
 using plainroot::filechooser::detail::DirectoryEntry;
-using plainroot::filechooser::detail::DirectorySortOrder;
-using plainroot::filechooser::detail::format_directory_metadata_display;
+using plainroot::filechooser::detail::DirectoryMetadataDisplay;
+using plainroot::filechooser::detail::format_directory_metadata_displays;
+
+namespace {
+
+const DirectoryMetadataDisplay *find_field(
+    const std::vector<DirectoryMetadataDisplay> &fields,
+    const std::string &label) {
+  for (const DirectoryMetadataDisplay &field : fields) {
+    if (field.label_message == label)
+      return &field;
+  }
+  return nullptr;
+}
+
+} // namespace
 
 int main() {
   DirectoryEntry file{};
@@ -16,45 +31,54 @@ int main() {
   file.metadata_available = true;
   file.mime_types = {"text/markdown"};
 
-  const auto size = format_directory_metadata_display(
-      file, DirectorySortOrder::size_ascending, "Folder", "Unknown type");
-  assert(size.label_message == "Size");
-  assert(!size.value.empty());
-
-  const auto type = format_directory_metadata_display(
-      file, DirectorySortOrder::type_ascending, "Folder", "Unknown type");
-  assert(type.label_message == "Type");
-  assert(type.value == "text/markdown");
-
-  const auto modified = format_directory_metadata_display(
-      file, DirectorySortOrder::modified_newest_first, "Folder",
-      "Unknown type");
-  assert(modified.label_message == "Modified");
-  assert(!modified.value.empty());
+  const auto file_fields = format_directory_metadata_displays(
+      file, "Folder", "Unknown type");
+  assert(file_fields.size() == 3U);
+  const auto *size = find_field(file_fields, "Size");
+  assert(size != nullptr && !size->value.empty() && size->value_is_ltr);
+  const auto *type = find_field(file_fields, "Type");
+  assert(type != nullptr && type->value == "text/markdown" &&
+         type->value_is_ltr);
+  const auto *modified = find_field(file_fields, "Modified");
+  assert(modified != nullptr && !modified->value.empty() &&
+         modified->value_is_ltr);
 
   DirectoryEntry extension_only{};
   extension_only.name = "notes.md";
   extension_only.kind = PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE;
-  const auto fallback_type = format_directory_metadata_display(
-      extension_only, DirectorySortOrder::type_ascending, "Folder",
-      "Unknown type");
-  assert(fallback_type.value == "md");
+  const auto fallback_fields = format_directory_metadata_displays(
+      extension_only, "Folder", "Unknown type");
+  assert(fallback_fields.size() == 1U);
+  const auto *fallback_type = find_field(fallback_fields, "Type");
+  assert(fallback_type != nullptr && fallback_type->value == "md" &&
+         fallback_type->value_is_ltr);
+
+  DirectoryEntry extensionless{};
+  extensionless.name = "README";
+  extensionless.kind = PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE;
+  const auto unknown_fields = format_directory_metadata_displays(
+      extensionless, "Folder", "Unknown type");
+  const auto *unknown_type = find_field(unknown_fields, "Type");
+  assert(unknown_type != nullptr && unknown_type->value == "Unknown type" &&
+         !unknown_type->value_is_ltr);
 
   DirectoryEntry directory{};
   directory.name = "documents";
   directory.kind = PLAINROOT_CORE_FS_ENTRY_DIRECTORY;
   directory.metadata_available = true;
-  const auto folder = format_directory_metadata_display(
-      directory, DirectorySortOrder::size_ascending, "Folder",
-      "Unknown type");
-  assert(folder.label_message == "Type");
-  assert(folder.value == "Folder");
+  const auto folder_fields = format_directory_metadata_displays(
+      directory, "Folder", "Unknown type");
+  assert(folder_fields.size() == 2U);
+  assert(find_field(folder_fields, "Size") == nullptr);
+  const auto *folder_type = find_field(folder_fields, "Type");
+  assert(folder_type != nullptr && folder_type->value == "Folder" &&
+         !folder_type->value_is_ltr);
+  assert(find_field(folder_fields, "Modified") != nullptr);
 
-  const auto unavailable = format_directory_metadata_display(
-      extension_only, DirectorySortOrder::size_ascending, "Folder",
-      "Unknown type");
-  assert(unavailable.label_message.empty());
-  assert(unavailable.value.empty());
+  const auto unavailable_fields = format_directory_metadata_displays(
+      extension_only, "Folder", "Unknown type");
+  assert(find_field(unavailable_fields, "Size") == nullptr);
+  assert(find_field(unavailable_fields, "Modified") == nullptr);
 
   return 0;
 }

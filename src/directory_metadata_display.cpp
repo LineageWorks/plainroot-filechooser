@@ -2,23 +2,10 @@
 
 #include <glib.h>
 
+#include <utility>
+
 namespace plainroot::filechooser::detail {
 namespace {
-
-bool is_size_sort(DirectorySortOrder order) {
-  return order == DirectorySortOrder::size_ascending ||
-         order == DirectorySortOrder::size_descending;
-}
-
-bool is_type_sort(DirectorySortOrder order) {
-  return order == DirectorySortOrder::type_ascending ||
-         order == DirectorySortOrder::type_descending;
-}
-
-bool is_modified_sort(DirectorySortOrder order) {
-  return order == DirectorySortOrder::modified_newest_first ||
-         order == DirectorySortOrder::modified_oldest_first;
-}
 
 std::string type_value(const DirectoryEntry &entry,
                        const std::string &folder_label,
@@ -60,20 +47,30 @@ std::string modified_value(const DirectoryEntry &entry) {
 
 } // namespace
 
-DirectoryMetadataDisplay format_directory_metadata_display(
-    const DirectoryEntry &entry, DirectorySortOrder order,
-    const std::string &folder_label, const std::string &unknown_type_label) {
-  if (is_size_sort(order)) {
-    if (entry.kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY)
-      return {"Type", folder_label};
-    if (entry.metadata_available)
-      return {"Size", size_value(entry)};
-  } else if (is_type_sort(order)) {
-    return {"Type", type_value(entry, folder_label, unknown_type_label)};
-  } else if (is_modified_sort(order) && entry.metadata_available) {
-    return {"Modified", modified_value(entry)};
+std::vector<DirectoryMetadataDisplay> format_directory_metadata_displays(
+    const DirectoryEntry &entry, const std::string &folder_label,
+    const std::string &unknown_type_label) {
+  std::vector<DirectoryMetadataDisplay> fields;
+  fields.reserve(3U);
+  if (entry.metadata_available &&
+      entry.kind == PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE) {
+    std::string value = size_value(entry);
+    if (!value.empty())
+      fields.push_back({"Size", std::move(value), true});
   }
-  return {};
+
+  std::string type = type_value(entry, folder_label, unknown_type_label);
+  const bool type_is_ltr = entry.kind != PLAINROOT_CORE_FS_ENTRY_DIRECTORY &&
+                           type != unknown_type_label;
+  fields.push_back({"Type", std::move(type), type_is_ltr});
+
+  if (entry.metadata_available) {
+    std::string value = modified_value(entry);
+    if (!value.empty())
+      fields.push_back({"Modified", std::move(value), true});
+  }
+
+  return fields;
 }
 
 } // namespace plainroot::filechooser::detail

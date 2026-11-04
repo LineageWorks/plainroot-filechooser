@@ -25,6 +25,9 @@ msgstr "Ordner"
 msgid "Unknown type"
 msgstr "Unbekannter Typ"
 
+msgid "Show file details"
+msgstr "Dateidetails anzeigen"
+
 msgid "Choose a file"
 msgstr "Datei auswählen"
 

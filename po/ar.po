@@ -26,6 +26,9 @@ msgstr "مجلد"
 msgid "Unknown type"
 msgstr "نوع غير معروف"
 
+msgid "Show file details"
+msgstr "عرض تفاصيل الملفات"
+
 msgid "Choose a file"
 msgstr "اختر ملفًا"
 
