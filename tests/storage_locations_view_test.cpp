@@ -107,6 +107,7 @@ int main() {
 
   std::string submitted_host;
   std::string submitted_path;
+  std::string disconnected_mount_id;
   unsigned redraws = 0;
   StorageLocationActions actions;
   actions.connect_sftp = [&](std::string host, std::string, uint16_t,
@@ -114,6 +115,9 @@ int main() {
     submitted_host = std::move(host);
     submitted_path = std::move(path);
     return PLAINROOT_STORAGE_OK;
+  };
+  actions.disconnect_network = [&](std::string id) {
+    disconnected_mount_id = std::move(id);
   };
   actions.request_redraw = [&] { ++redraws; };
 
@@ -167,6 +171,37 @@ int main() {
 
   if (!require(layout(context.get(), 1200.0F, 800.0F),
                "layout after mounted network catalog update")) {
+    return 1;
+  }
+
+  const auto *disconnect = find_widget(root, "Disconnect");
+  if (!require(disconnect != nullptr, "managed network mount has Disconnect") ||
+      !require(click(context.get(), disconnect),
+               "request disconnect confirmation") ||
+      !require(layout(context.get(), 1200.0F, 800.0F),
+               "layout disconnect confirmation")) {
+    return 1;
+  }
+
+  const auto *confirm_disconnect = find_widget(root, "Confirm disconnect");
+  if (!require(confirm_disconnect != nullptr,
+               "network disconnect confirmation is discoverable") ||
+      !require(click(context.get(), confirm_disconnect),
+               "confirm network disconnect") ||
+      !require(disconnected_mount_id == "test-mount",
+               "disconnect callback receives the managed mount ID")) {
+    return 1;
+  }
+
+  StorageCatalog disconnected_catalog;
+  disconnected_catalog.complete = false;
+  disconnected_catalog.network_complete = true;
+  disconnected_catalog.revision = 2;
+  view.set_catalog(std::move(disconnected_catalog));
+  if (!require(layout(context.get(), 1200.0F, 800.0F),
+               "layout after disconnected network snapshot") ||
+      !require(find_widget(root, "Disconnect") == nullptr,
+               "disconnected share action is removed")) {
     return 1;
   }
 
