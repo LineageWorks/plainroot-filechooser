@@ -5,36 +5,74 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace {
 
 struct Results {
-  std::mutex mutex;
-  std::condition_variable changed;
+  std::thread::id owner = std::this_thread::get_id();
+  bool delivered_on_owner_thread = true;
   std::vector<plainroot::filechooser::detail::DirectoryResult> values;
 
   void append(plainroot::filechooser::detail::DirectoryResult result) {
-    std::lock_guard lock(mutex);
+    delivered_on_owner_thread &= std::this_thread::get_id() == owner;
     values.push_back(std::move(result));
+  }
+};
+
+struct PostedTask {
+  plainroot_toolkit_application_task_fn callback = nullptr;
+  void *user_data = nullptr;
+  plainroot_toolkit_application_task_destroy_fn destroy = nullptr;
+};
+
+struct TaskQueue {
+  std::mutex mutex;
+  std::condition_variable changed;
+  std::deque<PostedTask> tasks;
+
+  void push(PostedTask task) {
+    std::lock_guard lock(mutex);
+    tasks.push_back(task);
     changed.notify_all();
   }
 
-  bool wait_for_count(std::size_t count) {
-    std::unique_lock lock(mutex);
-    return changed.wait_for(lock, std::chrono::seconds(5),
-                            [this, count] { return values.size() >= count; });
+  bool dispatch_one() {
+    PostedTask task{};
+    {
+      std::unique_lock lock(mutex);
+      if (!changed.wait_for(lock, std::chrono::seconds(5),
+                            [this] { return !tasks.empty(); }))
+        return false;
+      task = tasks.front();
+      tasks.pop_front();
+    }
+    task.callback(task.user_data);
+    if (task.destroy != nullptr)
+      task.destroy(task.user_data);
+    return true;
   }
 
-  plainroot::filechooser::detail::DirectoryResult at(std::size_t index) {
-    std::lock_guard lock(mutex);
-    return values.at(index);
+  void clear() {
+    std::deque<PostedTask> abandoned;
+    {
+      std::lock_guard lock(mutex);
+      abandoned.swap(tasks);
+    }
+    for (const PostedTask &task : abandoned) {
+      if (task.destroy != nullptr)
+        task.destroy(task.user_data);
+    }
   }
 };
+
+TaskQueue task_queue;
 
 } // namespace
 
@@ -44,9 +82,7 @@ extern "C" plainroot_toolkit_result_v1 plainroot_toolkit_application_post_v1(
     plainroot_toolkit_application_task_destroy_fn destroy) {
   if (callback == nullptr)
     return PLAINROOT_TOOLKIT_RESULT_INVALID_ARGUMENT;
-  callback(user_data);
-  if (destroy != nullptr)
-    destroy(user_data);
+  task_queue.push({callback, user_data, destroy});
   return PLAINROOT_TOOLKIT_RESULT_OK;
 }
 
@@ -93,15 +129,26 @@ int main() {
   loader.inspect_symlink((root / "folder-link").native(), 7);
   loader.inspect_symlink((root / "file-link").native(), 7);
   loader.inspect_symlink((root / "dangling-link").native(), 7);
-  if (!results.wait_for_count(3))
+  const auto deadline = std::chrono::steady_clock::now() +
+                        std::chrono::seconds(5);
+  while (results.values.size() < 3 &&
+         std::chrono::steady_clock::now() < deadline) {
+    if (!task_queue.dispatch_one())
+      break;
+  }
+  if (results.values.size() != 3 || !results.delivered_on_owner_thread) {
+    loader.stop();
+    task_queue.clear();
+    fs::remove_all(root, error);
     return 7;
+  }
   loader.stop();
 
   bool folder_ok = false;
   bool file_ok = false;
   bool dangling_rejected = false;
   for (std::size_t index = 0; index < 3; ++index) {
-    const auto result = results.at(index);
+    const auto &result = results.values[index];
     if (result.operation != DirectoryResult::Operation::InspectSymlink ||
         result.generation != 7 || result.selection_probe)
       return 8;
