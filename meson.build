@@ -289,7 +289,7 @@ portal_accept_label_test = executable(
     'tests/portal_accept_label_test.cpp',
     'src/portal_accept_label.cpp',
   ],
-  dependencies: [glib_dep],
+  dependencies: [toolkit_dep, glib_dep],
   install: false,
 )
 test('FileChooser portal accept-label mnemonics', portal_accept_label_test)

@@ -1,4 +1,5 @@
 #include "../src/portal_accept_label.hpp"
+#include <plainroot/toolkit/toolkit.h>
 
 #include <iostream>
 #include <string>
@@ -45,6 +46,16 @@ int main() {
   if (!require(unicode.display_label == "Éditer" &&
                    unicode.mnemonic_utf8 == "é",
                "lowercases a Unicode mnemonic"))
+    return 1;
+  uint32_t shortcut_key = 0U;
+  uint32_t shortcut_modifiers = 0U;
+  const std::string unicode_chord = "Alt+" + unicode.mnemonic_utf8;
+  if (!require(plainroot_toolkit_shortcut_parse_v1(
+                   unicode_chord.c_str(), &shortcut_key,
+                   &shortcut_modifiers) == PLAINROOT_TOOLKIT_RESULT_OK &&
+                   shortcut_key == 0x00e9U &&
+                   shortcut_modifiers == PLAINROOT_TOOLKIT_SHORTCUT_ALT,
+               "converts the Unicode mnemonic into a toolkit Alt shortcut"))
     return 1;
 
   const std::string invalid_utf8{"bad\xfflabel", 9U};
