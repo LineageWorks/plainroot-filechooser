@@ -162,7 +162,12 @@ the FUSE setup hint and stayed open after the user submitted `localhost:/etc`;
 `GetMounts` remained empty and no transient unit or mountpoint was created.
 The chooser keeps the SFTP form open until the mount succeeds, making failed
 attempts retryable. Successful chooser-initiated SFTP connect, browse, and
-disconnect remain unverified until the OS provides mount-capable FUSE.
+disconnect remain unverified until the OS provides mount-capable FUSE. The
+rebuilt Networkd's positive FUSE path was also verified directly on 2026-11-04
+with the helper temporarily set to root-owned `4755`: it mounted
+`localhost:/etc`, allowed reading `/etc/os-release`, and disconnected normally.
+The helper was restored to `0755`; this direct service check does not yet prove
+the successful path through the chooser UI.
 
 Both the browser and portal backend support opt-in diagnostics with
 `PLAINROOT_FILECHOOSER_TRACE=1` in the process environment. They record portal
