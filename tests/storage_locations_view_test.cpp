@@ -1,6 +1,7 @@
 #include "../src/storage_locations_view.hpp"
 #include "../src/ui_context_factory.hpp"
 
+#include <array>
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -25,8 +26,11 @@ bool layout(plainroot_ui_context *context, float width, float height) {
   bounds.struct_size = sizeof(bounds);
   bounds.width = width;
   bounds.height = height;
-  return plainroot_ui_context_layout_v1(context, &bounds) ==
-         PLAINROOT_UI_RESULT_OK;
+  const auto result = plainroot_ui_context_layout_v1(context, &bounds);
+  if (result != PLAINROOT_UI_RESULT_OK)
+    std::cerr << "Layout failed at " << width << 'x' << height
+              << " with UI result " << static_cast<int>(result) << '\n';
+  return result == PLAINROOT_UI_RESULT_OK;
 }
 
 plainroot_ui_rect_v1 widget_bounds(plainroot_ui_widget *widget) {
@@ -35,6 +39,12 @@ plainroot_ui_rect_v1 widget_bounds(plainroot_ui_widget *widget) {
   if (plainroot_ui_widget_bounds_v1(widget, &bounds) != PLAINROOT_UI_RESULT_OK)
     bounds.width = -1.0F;
   return bounds;
+}
+
+bool fits_width(const plainroot_ui_widget *widget, float width) {
+  const auto bounds = widget_bounds(const_cast<plainroot_ui_widget *>(widget));
+  return bounds.width > 0.0F && bounds.x >= 0.0F &&
+         bounds.x + bounds.width <= width + 0.5F;
 }
 
 plainroot_ui_event_v1 pointer_event(uint32_t type, float x, float y) {
@@ -99,6 +109,18 @@ bool set_text(const plainroot_ui_widget *widget, const char *text) {
 } // namespace
 
 int main() {
+  struct Viewport {
+    float width;
+    float height;
+    const char *name;
+  };
+  constexpr std::array<Viewport, 5> viewports{{
+      {390.0F, 844.0F, "phone portrait"},
+      {844.0F, 390.0F, "phone landscape"},
+      {768.0F, 1024.0F, "tablet portrait"},
+      {1024.0F, 768.0F, "tablet landscape"},
+      {1366.0F, 768.0F, "laptop"},
+  }};
   std::unique_ptr<plainroot_ui_context, decltype(&plainroot_ui_context_destroy)>
       context(plainroot::filechooser::make_ui_context("en"),
               &plainroot_ui_context_destroy);
@@ -134,10 +156,25 @@ int main() {
 
   const auto *toggle = find_widget(root, "Connect to SFTP");
   if (!require(toggle != nullptr, "SFTP form toggle is discoverable") ||
-      !require(click(context.get(), toggle), "open SFTP form") ||
-      !require(layout(context.get(), 1200.0F, 800.0F),
-               "layout with SFTP form visible")) {
+      !require(click(context.get(), toggle), "open SFTP form")) {
     return 1;
+  }
+
+  for (const Viewport &viewport : viewports) {
+    const auto *server = find_widget(root, "Server address");
+    const auto *remote = find_widget(root, "Remote folder");
+    const auto *connect = find_widget(root, "Connect");
+    if (!require(layout(context.get(), viewport.width, viewport.height),
+                 "layout SFTP form at device viewport") ||
+        !require(fits_width(server, viewport.width),
+                 "server field remains within viewport width") ||
+        !require(fits_width(remote, viewport.width),
+                 "remote path field remains within viewport width") ||
+        !require(fits_width(connect, viewport.width),
+                 "connect button remains within viewport width")) {
+      std::cerr << "Failed SFTP form viewport: " << viewport.name << '\n';
+      return 1;
+    }
   }
 
   const auto *host = find_widget(root, "Server address");
@@ -149,7 +186,8 @@ int main() {
       !require(click(context.get(), connect), "submit SFTP form and hide it") ||
       !require(submitted_host == "localhost" && submitted_path == "/etc",
                "submit the entered SFTP endpoint") ||
-      !require(layout(context.get(), 1200.0F, 800.0F),
+      !require(layout(context.get(), viewports.back().width,
+                      viewports.back().height),
                "layout after hiding submitted SFTP form")) {
     return 1;
   }
@@ -169,18 +207,33 @@ int main() {
   catalog.network_mounts.push_back(std::move(mount));
   view.set_catalog(std::move(catalog));
 
-  if (!require(layout(context.get(), 1200.0F, 800.0F),
-               "layout after mounted network catalog update")) {
-    return 1;
+  for (const Viewport &viewport : viewports) {
+    if (!require(layout(context.get(), viewport.width, viewport.height),
+                 "layout mounted network row at device viewport") ||
+        !require(fits_width(find_widget(root, "Disconnect"), viewport.width),
+                 "disconnect action remains within viewport width")) {
+      std::cerr << "Failed mounted-share viewport: " << viewport.name << '\n';
+      return 1;
+    }
   }
 
   const auto *disconnect = find_widget(root, "Disconnect");
   if (!require(disconnect != nullptr, "managed network mount has Disconnect") ||
       !require(click(context.get(), disconnect),
-               "request disconnect confirmation") ||
-      !require(layout(context.get(), 1200.0F, 800.0F),
-               "layout disconnect confirmation")) {
+               "request disconnect confirmation")) {
     return 1;
+  }
+
+  for (const Viewport &viewport : viewports) {
+    if (!require(layout(context.get(), viewport.width, viewport.height),
+                 "layout disconnect confirmation at device viewport") ||
+        !require(fits_width(find_widget(root, "Confirm disconnect"),
+                            viewport.width),
+                 "disconnect confirmation remains within viewport width")) {
+      std::cerr << "Failed disconnect confirmation viewport: "
+                << viewport.name << '\n';
+      return 1;
+    }
   }
 
   const auto *confirm_disconnect = find_widget(root, "Confirm disconnect");
@@ -198,11 +251,15 @@ int main() {
   disconnected_catalog.network_complete = true;
   disconnected_catalog.revision = 2;
   view.set_catalog(std::move(disconnected_catalog));
-  if (!require(layout(context.get(), 1200.0F, 800.0F),
-               "layout after disconnected network snapshot") ||
-      !require(find_widget(root, "Disconnect") == nullptr,
-               "disconnected share action is removed")) {
-    return 1;
+  for (const Viewport &viewport : viewports) {
+    if (!require(layout(context.get(), viewport.width, viewport.height),
+                 "layout after disconnected snapshot at device viewport") ||
+        !require(find_widget(root, "Disconnect") == nullptr,
+                 "disconnected share action is removed")) {
+      std::cerr << "Failed disconnected-share viewport: " << viewport.name
+                << '\n';
+      return 1;
+    }
   }
 
   auto *commands = plainroot_render_command_list_v2_create();

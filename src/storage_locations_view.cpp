@@ -157,8 +157,9 @@ private:
         context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
     remote_path_field_ = make_sftp_field("Remote folder (optional)",
                                           "Remote folder");
-    auto *actions = plainroot_ui_box_create_v1(
-        context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
+    auto *actions = plainroot_ui_adaptive_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
+        kExpandedLocationWidth, 8.0F, 0.0F);
     connect_button_ = make_button("Connect", &Impl::submit_sftp_activated,
                                   this);
     cancel_button_ = make_button("Cancel", &Impl::cancel_sftp_activated,
@@ -354,12 +355,13 @@ private:
     auto *row = plainroot_ui_list_item_create_v1(context_, 0.0F);
     auto *layout = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
-        kExpandedLocationWidth, 8.0F, 0.0F);
+        kExpandedLocationWidth, 8.0F, 1.0F);
     auto *text = plainroot_ui_label_create_v1(
         context_, label.c_str(), static_cast<uint32_t>(label.size()),
         PLAINROOT_UI_COLOR_ON_SURFACE_V3, 1.0F);
-    auto *actions = plainroot_ui_box_create_v1(
-        context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
+    auto *actions = plainroot_ui_adaptive_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
+        kExpandedLocationWidth, 8.0F, 0.0F);
     if (text != nullptr && label_is_ltr)
       (void)plainroot_ui_widget_set_text_direction_v1(text,
                                                       PLAINROOT_UI_TEXT_LTR);
