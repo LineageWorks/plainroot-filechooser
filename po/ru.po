@@ -463,3 +463,21 @@ msgstr "Папка создана."
 
 msgid "Creating folder…"
 msgstr "Создание папки…"
+
+msgid "Preview"
+msgstr "Предпросмотр"
+
+msgid "Selected image preview"
+msgstr "Предпросмотр выбранного изображения"
+
+msgid "Select an image to preview."
+msgstr "Выберите изображение для предпросмотра."
+
+msgid "Loading preview…"
+msgstr "Загрузка предпросмотра…"
+
+msgid "No image preview available."
+msgstr "Предпросмотр изображения недоступен."
+
+msgid "Preview unavailable."
+msgstr "Предпросмотр недоступен."

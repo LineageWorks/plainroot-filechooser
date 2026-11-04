@@ -463,3 +463,21 @@ msgstr "تم إنشاء المجلد."
 
 msgid "Creating folder…"
 msgstr "جارٍ إنشاء المجلد…"
+
+msgid "Preview"
+msgstr "معاينة"
+
+msgid "Selected image preview"
+msgstr "معاينة الصورة المحددة"
+
+msgid "Select an image to preview."
+msgstr "اختر صورة لعرض معاينتها."
+
+msgid "Loading preview…"
+msgstr "جارٍ تحميل المعاينة…"
+
+msgid "No image preview available."
+msgstr "معاينة الصورة غير متاحة."
+
+msgid "Preview unavailable."
+msgstr "المعاينة غير متاحة."

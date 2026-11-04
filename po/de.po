@@ -462,3 +462,21 @@ msgstr "Ordner erstellt."
 
 msgid "Creating folder…"
 msgstr "Ordner wird erstellt …"
+
+msgid "Preview"
+msgstr "Vorschau"
+
+msgid "Selected image preview"
+msgstr "Vorschau des ausgewählten Bildes"
+
+msgid "Select an image to preview."
+msgstr "Wählen Sie ein Bild aus, um eine Vorschau anzuzeigen."
+
+msgid "Loading preview…"
+msgstr "Vorschau wird geladen …"
+
+msgid "No image preview available."
+msgstr "Keine Bildvorschau verfügbar."
+
+msgid "Preview unavailable."
+msgstr "Vorschau nicht verfügbar."

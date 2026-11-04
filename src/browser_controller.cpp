@@ -41,6 +41,8 @@ constexpr char kDomain[] = "plainroot-filechooser";
 constexpr float kPagePadding = 16.0F;
 constexpr float kContentSpacing = 16.0F;
 constexpr float kExpandedControlsWidth = 840.0F;
+constexpr float kPreviewWidth = 256.0F;
+constexpr float kPreviewHeight = 192.0F;
 
 std::string tr(const char *message) {
   const char *translated = plainroot_i18n_gettext_v1(kDomain, message);
@@ -301,9 +303,32 @@ public:
     if (new_folder_form_ != nullptr)
       (void)plainroot_ui_widget_set_visible_v1(new_folder_form_, 0U);
 
+    browser_body_ = plainroot_ui_adaptive_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
+        kExpandedControlsWidth, kContentSpacing, 1.0F);
     list_scroll_ =
         plainroot_ui_vertical_scroll_area_create_v1(context_, 0, 0, 1.0F);
     entries_list_ = plainroot_ui_list_create_v1(context_, 1.0F);
+    preview_panel_ = plainroot_ui_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_VERTICAL, 8.0F, 0.0F);
+    const std::string preview_heading = tr("Preview");
+    preview_heading_ = plainroot_ui_label_create_v1(
+        context_, preview_heading.c_str(),
+        static_cast<uint32_t>(preview_heading.size()),
+        PLAINROOT_UI_COLOR_ON_SURFACE_V3, 0.0F);
+    if (preview_heading_ != nullptr)
+      (void)plainroot_ui_label_set_typography_v1(
+          preview_heading_, PLAINROOT_UI_LABEL_TITLE_MEDIUM);
+    const std::string preview_accessible_name = tr("Selected image preview");
+    preview_image_ = plainroot_ui_image_create_v1(
+        context_, 0, 1, 1, kPreviewWidth, kPreviewHeight,
+        PLAINROOT_UI_IMAGE_FIT_CONTAIN, preview_accessible_name.c_str(),
+        static_cast<uint32_t>(preview_accessible_name.size()), 0.0F);
+    preview_status_label_ = make_label("Select an image to preview.", 0.0F);
+    if (preview_panel_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(preview_panel_, 0U);
+    if (preview_image_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(preview_image_, 0U);
     status_label_ = make_label("Loading folder…", 0.0F);
     auto *footer = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
@@ -354,7 +379,10 @@ public:
         search_field_ == nullptr || hidden_switch_ == nullptr ||
         sort_dropdown_ == nullptr ||
         (filters_.size() > 1U && filter_dropdown_ == nullptr) ||
-        list_scroll_ == nullptr || entries_list_ == nullptr ||
+        browser_body_ == nullptr || list_scroll_ == nullptr ||
+        entries_list_ == nullptr || preview_panel_ == nullptr ||
+        preview_heading_ == nullptr || preview_image_ == nullptr ||
+        preview_status_label_ == nullptr ||
         status_label_ == nullptr || footer == nullptr ||
         selected_label_ == nullptr || select == nullptr ||
         (!save_files_.empty() && save_files_panel == nullptr) ||
@@ -518,7 +546,11 @@ public:
         !add(controls, sort_dropdown_) ||
         (filter_dropdown_ != nullptr && !add(controls, filter_dropdown_)) ||
         (choices_panel != nullptr && !add(page, choices_panel)) ||
-        !add(page, storage_view_widget) || !add(page, list_scroll_) ||
+        !add(page, storage_view_widget) || !add(page, browser_body_) ||
+        !add(browser_body_, list_scroll_) || !add(browser_body_, preview_panel_) ||
+        !add(preview_panel_, preview_heading_) ||
+        !add(preview_panel_, preview_image_) ||
+        !add(preview_panel_, preview_status_label_) ||
         !add(list_scroll_, entries_list_) || !add(page, status_label_) ||
         !add(footer_padding, footer) || !add(footer, selected_label_) ||
         !add(footer, select) ||
@@ -548,7 +580,12 @@ public:
     return true;
   }
 
-  void set_window(plainroot_toolkit_window *window) { window_ = window; }
+  void set_window(plainroot_toolkit_window *window) {
+    window_ = window;
+    if (window_ != nullptr)
+      (void)plainroot_toolkit_window_set_ready_callback_v1(
+          window_, &Impl::window_ready, this);
+  }
 
   void set_title(std::string title) { requested_title_ = std::move(title); }
 
@@ -649,6 +686,7 @@ private:
     if (!preserve_selection) {
       selected_path_.clear();
       selected_paths_.clear();
+      clear_preview();
     }
     ++generation_;
     entries_.clear();
@@ -1159,6 +1197,7 @@ private:
     self.initial_filename_.assign(value == nullptr ? "" : value, length);
     if (!self.save_file_ && self.uses_filename_field()) {
       self.selected_path_.clear();
+      self.clear_preview();
       if (self.initial_filename_.empty()) {
         set_label(self.selected_label_, tr("No file selected"));
         self.set_status("");
@@ -1214,6 +1253,7 @@ private:
     set_label(action.controller->selected_label_, display_path(action.path));
     action.controller->set_status(
         tr("File selected. Choose Open to return it."));
+    action.controller->request_preview(action.path);
     action.controller->request_redraw();
   }
 
@@ -1249,6 +1289,14 @@ private:
         selected.push_back(action.path);
     } else if (found != selected.end()) {
       selected.erase(found);
+    }
+    if (checked != 0U) {
+      action.controller->request_preview(action.path);
+    } else if (action.controller->preview_path_ == action.path) {
+      if (selected.empty())
+        action.controller->clear_preview();
+      else
+        action.controller->request_preview(selected.back());
     }
     action.controller->update_selection_summary();
     action.controller->request_redraw();
@@ -1611,6 +1659,29 @@ private:
   }
 
   void apply_directory_result(detail::DirectoryResult result) {
+    if (result.operation == detail::DirectoryResult::Operation::ImagePreview) {
+      if (result.request_id != preview_request_id_ ||
+          result.path != preview_path_)
+        return;
+      if (!result.image_preview_available) {
+        pending_preview_pixels_.clear();
+        preview_image_width_ = 0;
+        preview_image_height_ = 0;
+        if (preview_image_ != nullptr)
+          (void)plainroot_ui_widget_set_visible_v1(preview_image_, 0U);
+        set_label(preview_status_label_, tr("No image preview available."));
+        request_redraw();
+        return;
+      }
+      preview_image_width_ = result.image_preview.width;
+      preview_image_height_ = result.image_preview.height;
+      pending_preview_pixels_ = std::move(result.image_preview.rgba);
+      if (renderer_ready_)
+        upload_preview_image();
+      else
+        set_label(preview_status_label_, tr("Loading preview…"));
+      return;
+    }
     if (result.operation ==
         detail::DirectoryResult::Operation::CreateDirectory) {
       apply_create_folder_result(std::move(result));
@@ -1635,6 +1706,7 @@ private:
                                        selected_paths_.end(), selected_path);
           if (found == selected_paths_.end())
             selected_paths_.push_back(selected_path);
+          request_preview(selected_path);
           update_selection_summary();
           status_error_.clear();
           set_status("");
@@ -2210,6 +2282,78 @@ private:
 
   void set_status(const std::string &text) { set_label(status_label_, text); }
 
+  static void window_ready(void *user_data, plainroot_toolkit_window *) {
+    auto &self = *static_cast<Impl *>(user_data);
+    self.renderer_ready_ = true;
+    self.upload_preview_image();
+  }
+
+  void request_preview(const std::string &path) {
+    ++preview_request_id_;
+    preview_path_ = path;
+    pending_preview_pixels_.clear();
+    preview_image_width_ = 0;
+    preview_image_height_ = 0;
+    if (preview_panel_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(preview_panel_, 1U);
+    if (preview_image_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(preview_image_, 0U);
+    set_label(preview_status_label_, tr("Loading preview…"));
+    loader_.request_image_preview(path, generation_, preview_request_id_);
+    request_redraw();
+  }
+
+  void clear_preview() {
+    ++preview_request_id_;
+    preview_path_.clear();
+    pending_preview_pixels_.clear();
+    preview_image_width_ = 0;
+    preview_image_height_ = 0;
+    if (preview_panel_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(preview_panel_, 0U);
+    if (preview_image_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(preview_image_, 0U);
+  }
+
+  void upload_preview_image() {
+    if (!renderer_ready_ || window_ == nullptr ||
+        pending_preview_pixels_.empty() || preview_image_width_ == 0 ||
+        preview_image_height_ == 0)
+      return;
+    plainroot_toolkit_image_data_v1 image{};
+    image.struct_size = sizeof(image);
+    image.width = preview_image_width_;
+    image.height = preview_image_height_;
+    image.row_stride = static_cast<size_t>(preview_image_width_) * 4U;
+    image.rgba = pending_preview_pixels_.data();
+    image.byte_count = pending_preview_pixels_.size();
+    std::array<char, 512> error{};
+    const auto result = preview_image_id_ == 0
+                            ? plainroot_toolkit_window_create_image_v1(
+                                  window_, &image, &preview_image_id_,
+                                  error.data(), error.size())
+                            : plainroot_toolkit_window_update_image_v1(
+                                  window_, preview_image_id_, &image,
+                                  error.data(), error.size());
+    if (result != PLAINROOT_TOOLKIT_RESULT_OK) {
+      (void)plainroot_ui_widget_set_visible_v1(preview_image_, 0U);
+      set_label(preview_status_label_, tr("Preview unavailable."));
+      request_redraw();
+      return;
+    }
+    (void)plainroot_ui_image_set_resource_v1(
+        preview_image_, preview_image_id_, preview_image_width_,
+        preview_image_height_);
+    (void)plainroot_ui_widget_set_visible_v1(preview_image_, 1U);
+    const std::string description = display_path(preview_path_) + " (" +
+                                    std::to_string(preview_image_width_) +
+                                    " × " +
+                                    std::to_string(preview_image_height_) +
+                                    ")";
+    set_label(preview_status_label_, description);
+    request_redraw();
+  }
+
   void set_storage_status(const std::string &text) {
     if (storage_view_ != nullptr)
       storage_view_->set_status(text);
@@ -2299,10 +2443,22 @@ private:
   plainroot_ui_widget *sort_dropdown_ = nullptr;
   plainroot_ui_widget *recent_sort_option_ = nullptr;
   plainroot_ui_widget *list_scroll_ = nullptr;
+  plainroot_ui_widget *browser_body_ = nullptr;
   plainroot_ui_widget *entries_list_ = nullptr;
+  plainroot_ui_widget *preview_panel_ = nullptr;
+  plainroot_ui_widget *preview_heading_ = nullptr;
+  plainroot_ui_widget *preview_image_ = nullptr;
+  plainroot_ui_widget *preview_status_label_ = nullptr;
   plainroot_ui_widget *status_label_ = nullptr;
   plainroot_ui_widget *selected_label_ = nullptr;
   plainroot_ui_widget *read_only_checkbox_ = nullptr;
+  uint64_t preview_request_id_ = 0;
+  plainroot_render_image_id preview_image_id_ = 0;
+  uint32_t preview_image_width_ = 0;
+  uint32_t preview_image_height_ = 0;
+  bool renderer_ready_ = false;
+  std::string preview_path_;
+  std::vector<uint8_t> pending_preview_pixels_;
 };
 
 BrowserController::BrowserController(plainroot_toolkit_application *application,

@@ -462,3 +462,21 @@ msgstr "התיקייה נוצרה."
 
 msgid "Creating folder…"
 msgstr "התיקייה נוצרת…"
+
+msgid "Preview"
+msgstr "תצוגה מקדימה"
+
+msgid "Selected image preview"
+msgstr "תצוגה מקדימה של התמונה שנבחרה"
+
+msgid "Select an image to preview."
+msgstr "יש לבחור תמונה כדי להציג תצוגה מקדימה."
+
+msgid "Loading preview…"
+msgstr "התצוגה המקדימה נטענת…"
+
+msgid "No image preview available."
+msgstr "אין תצוגה מקדימה זמינה לתמונה."
+
+msgid "Preview unavailable."
+msgstr "התצוגה המקדימה אינה זמינה."

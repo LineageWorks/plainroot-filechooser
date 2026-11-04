@@ -19,6 +19,7 @@ network_storage_dep = dependency(
   'plainroot-storage-network-client',
   version: '>= 0.1.0',
 )
+image_dep = dependency('plainroot-image', version: '>= 0.4.0')
 glib_dep = dependency('glib-2.0', version: '>= 2.66')
 magic_dep = dependency('libmagic', version: '>= 5.39')
 threads_dep = dependency('threads')
@@ -30,6 +31,7 @@ browser_sources = [
   'src/directory_breadcrumbs.cpp',
   'src/directory_sort.cpp',
   'src/directory_loader.cpp',
+  'src/image_preview.cpp',
   'src/mime_database.cpp',
   'src/recent_files.cpp',
   'src/open_filename.cpp',
@@ -47,6 +49,7 @@ filechooser_common = static_library(
     i18n_dep,
     storage_dep,
     network_storage_dep,
+    image_dep,
     glib_dep,
     magic_dep,
     threads_dep,
@@ -60,6 +63,7 @@ common_dependencies = [
   i18n_dep,
   storage_dep,
   network_storage_dep,
+  image_dep,
   glib_dep,
   magic_dep,
   threads_dep,
@@ -146,6 +150,13 @@ directory_breadcrumbs_test = executable(
   install: false,
 )
 test('FileChooser directory breadcrumbs', directory_breadcrumbs_test)
+
+image_preview_test = executable(
+  'filechooser-image-preview-test',
+  ['tests/image_preview_test.cpp', 'src/image_preview.cpp'],
+  install: false,
+)
+test('FileChooser image preview scaling', image_preview_test)
 
 mime_database_test = executable(
   'filechooser-mime-database-test',
@@ -249,10 +260,18 @@ directory_loader_symlink_test = executable(
     'tests/directory_loader_symlink_test.cpp',
     'src/bookmarks.cpp',
     'src/directory_loader.cpp',
+    'src/image_preview.cpp',
     'src/mime_database.cpp',
     'src/recent_files.cpp',
   ],
-  dependencies: [core_dep, toolkit_dep, glib_dep, magic_dep, threads_dep],
+  dependencies: [
+    core_dep,
+    toolkit_dep,
+    image_dep,
+    glib_dep,
+    magic_dep,
+    threads_dep,
+  ],
   install: false,
 )
 test('FileChooser asynchronous symlink target inspection',

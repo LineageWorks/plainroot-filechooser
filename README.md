@@ -33,7 +33,9 @@ file is updated. The current folder path uses
 clickable ancestor breadcrumbs. Search is applied
 to the displayed listing, hidden entries can be shown, and
 the listing supports locale-aware, natural filename ordering in either
-direction while keeping directories first. Single-file open and save modes
+direction while keeping directories first. Selecting an image displays an
+aspect-preserving thumbnail in an adaptive preview pane; image decoding and
+scaling run on the directory worker. Single-file open and save modes
 provide an editable filename field; open requests validate a typed name in the
 current folder and navigate when that name identifies a folder. File selection
 returns the native path on stdout. It consumes

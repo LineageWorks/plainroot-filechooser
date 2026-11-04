@@ -3,6 +3,8 @@
 #include <plainroot/core/filesystem.h>
 #include <plainroot/toolkit/toolkit.h>
 
+#include "image_preview.hpp"
+
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -25,7 +27,8 @@ struct DirectoryResult {
     RecentListing,
     RecordRecent,
     CreateDirectory,
-    InspectSymlink
+    InspectSymlink,
+    ImagePreview
   };
 
   uint64_t generation = 0;
@@ -40,6 +43,8 @@ struct DirectoryResult {
   plainroot_core_fs_entry_kind_v1 inspected_kind =
       PLAINROOT_CORE_FS_ENTRY_UNKNOWN;
   bool selection_probe = false;
+  ImagePreview image_preview;
+  bool image_preview_available = false;
 };
 
 class DirectoryLoader {
@@ -64,6 +69,8 @@ public:
   void inspect_symlink(std::string path, uint64_t generation,
                        bool selection_probe = false,
                        uint64_t request_id = 0);
+  void request_image_preview(std::string path, uint64_t generation,
+                             uint64_t request_id);
   void stop();
 
 private:

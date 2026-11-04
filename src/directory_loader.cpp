@@ -3,6 +3,8 @@
 #include "mime_database.hpp"
 #include "recent_files.hpp"
 
+#include <plainroot/image/image.hpp>
+
 #include <atomic>
 #include <cerrno>
 #include <deque>
@@ -111,6 +113,36 @@ public:
       result.generation = generation;
       result.request_id = request_id;
       result.selection_probe = selection_probe;
+      result.path = std::move(path);
+      result.result = PLAINROOT_CORE_FS_IO_ERROR;
+      publish(std::move(result));
+      return;
+    }
+    wake_worker();
+  }
+
+  void request_image_preview(std::string path, uint64_t generation,
+                             uint64_t request_id) {
+    bool failed = false;
+    {
+      std::lock_guard lock(mutex_);
+      if (stopping_)
+        return;
+      failed = startup_failed_.load(std::memory_order_relaxed);
+      if (!failed) {
+        std::erase_if(jobs_, [](const Job &job) {
+          return job.operation == DirectoryResult::Operation::ImagePreview;
+        });
+        jobs_.push_back({DirectoryResult::Operation::ImagePreview,
+                         std::move(path), generation, request_id, false, {},
+                         {}});
+      }
+    }
+    if (failed) {
+      DirectoryResult result{};
+      result.operation = DirectoryResult::Operation::ImagePreview;
+      result.generation = generation;
+      result.request_id = request_id;
       result.path = std::move(path);
       result.result = PLAINROOT_CORE_FS_IO_ERROR;
       publish(std::move(result));
@@ -315,6 +347,26 @@ private:
 
   void submit_job(plainroot_core_fs_async_executor *executor, Job job,
                   std::vector<std::unique_ptr<Pending>> *pending) {
+    if (job.operation == DirectoryResult::Operation::ImagePreview) {
+      DirectoryResult result{};
+      result.operation = job.operation;
+      result.generation = job.generation;
+      result.request_id = job.request_id;
+      result.path = std::move(job.path);
+      result.result = PLAINROOT_CORE_FS_IO_ERROR;
+      plainroot::image::Image decoded;
+      if (plainroot::image::Image::load_file(result.path, &decoded) &&
+          decoded.valid()) {
+        result.image_preview_available = make_image_preview(
+            decoded.width(), decoded.height(),
+            std::span<const uint8_t>(decoded.rgba(), decoded.byte_count()),
+            256, 192, &result.image_preview);
+        if (result.image_preview_available)
+          result.result = PLAINROOT_CORE_FS_OK;
+      }
+      publish(std::move(result));
+      return;
+    }
     if (job.operation == DirectoryResult::Operation::RecordRecent) {
       (void)record_recent_file(job.secondary_path, job.path,
                                job.application_id);
@@ -530,6 +582,13 @@ void DirectoryLoader::inspect_symlink(std::string path, uint64_t generation,
   if (impl_)
     impl_->inspect_symlink(std::move(path), generation, selection_probe,
                            request_id);
+}
+
+void DirectoryLoader::request_image_preview(std::string path,
+                                            uint64_t generation,
+                                            uint64_t request_id) {
+  if (impl_)
+    impl_->request_image_preview(std::move(path), generation, request_id);
 }
 
 void DirectoryLoader::request_recent(std::string path, uint64_t generation,
