@@ -122,6 +122,20 @@ The user reported that the app terminated, but it is not yet confirmed whether
 only the chooser closed or its parent application exited. This attempt does
 not yet verify browsing the mounted path or chooser-driven disconnect.
 
+Both the browser and portal backend support opt-in diagnostics with
+`PLAINROOT_FILECHOOSER_TRACE=1` in the process environment. They record portal
+request and response lifecycle, SFTP form visibility and submission, typed
+network request IDs and states, and the standalone browser event-loop result.
+They do not log the host, username, remote path, or selected filenames. When
+the backend is activated by D-Bus or systemd, set the variable in that
+backend's environment rather than only in the requesting application's
+environment.
+
+The USB was physically disconnected after the earlier Storaged acceptance,
+then reinserted for follow-up checks. It remains unmounted; the latest host
+catalog still enumerates `/dev/sdb1`, so a new physical-removal event has not
+yet been verified.
+
 The browser accepts an optional absolute starting directory. Directory names
 remain native byte paths for navigation and selection; names that are not valid
 UTF-8 are rendered in a safe display form. Directory I/O runs outside the UI
