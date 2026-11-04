@@ -433,14 +433,32 @@ msgstr "פורט"
 msgid "Enter a valid port from 1 to 65535."
 msgstr "יש להזין מספר פורט תקין בין 1 ל־65535."
 
-msgid "Sort by name"
-msgstr "מיון לפי שם"
+msgid "Sort files"
+msgstr "מיון קבצים"
 
 msgid "Name (ascending)"
 msgstr "שם (בסדר עולה)"
 
 msgid "Name (descending)"
 msgstr "שם (בסדר יורד)"
+
+msgid "Size (smallest first)"
+msgstr "גודל (הקטנים תחילה)"
+
+msgid "Size (largest first)"
+msgstr "גודל (הגדולים תחילה)"
+
+msgid "Type (ascending)"
+msgstr "סוג (בסדר עולה)"
+
+msgid "Type (descending)"
+msgstr "סוג (בסדר יורד)"
+
+msgid "Modified (newest first)"
+msgstr "תאריך שינוי (החדשים תחילה)"
+
+msgid "Modified (oldest first)"
+msgstr "תאריך שינוי (הישנים תחילה)"
 
 msgid "Enter a file name or select a file."
 msgstr "הזינו שם קובץ או בחרו קובץ."

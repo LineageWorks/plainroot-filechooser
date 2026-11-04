@@ -55,6 +55,13 @@ constexpr float kLocationRowHorizontalWidth = 960.0F;
 constexpr float kExpandedControlsWidth = 800.0F;
 constexpr float kPreviewWidth = 256.0F;
 constexpr float kPreviewHeight = 192.0F;
+constexpr std::array<const char *, 9> kSortOptionMessages{
+    "Name (ascending)",       "Name (descending)",
+    "Size (smallest first)",  "Size (largest first)",
+    "Type (ascending)",       "Type (descending)",
+    "Modified (newest first)", "Modified (oldest first)",
+    "Recently used",
+};
 
 std::string tr(const char *message) {
   const char *translated = plainroot_i18n_gettext_v1(kDomain, message);
@@ -92,6 +99,18 @@ std::string parent_path(std::string_view path) {
   if (separator == 0)
     return "/";
   return std::string(path.substr(0, separator));
+}
+
+bool is_type_sort(detail::DirectorySortOrder order) {
+  return order == detail::DirectorySortOrder::type_ascending ||
+         order == detail::DirectorySortOrder::type_descending;
+}
+
+bool is_metadata_sort(detail::DirectorySortOrder order) {
+  return order == detail::DirectorySortOrder::size_ascending ||
+         order == detail::DirectorySortOrder::size_descending ||
+         order == detail::DirectorySortOrder::modified_newest_first ||
+         order == detail::DirectorySortOrder::modified_oldest_first;
 }
 
 } // namespace
@@ -323,7 +342,7 @@ public:
           static_cast<uint32_t>(filter_hint.size()), 1.0F,
           &Impl::filter_changed, this);
     }
-    const std::string sort_hint = tr("Sort by name");
+    const std::string sort_hint = tr("Sort files");
     sort_dropdown_ = plainroot_ui_dropdown_create_v1(
         context_, sort_hint.c_str(), static_cast<uint32_t>(sort_hint.size()),
         0.0F, &Impl::sort_changed, this);
@@ -492,21 +511,17 @@ public:
         return false;
     }
 
-    const std::string ascending_label = tr("Name (ascending)");
-    auto *ascending_option = plainroot_ui_list_box_option_create_v1(
-        context_, ascending_label.c_str(),
-        static_cast<uint32_t>(ascending_label.size()), 0, 0.0F);
-    const std::string descending_label = tr("Name (descending)");
-    auto *descending_option = plainroot_ui_list_box_option_create_v1(
-        context_, descending_label.c_str(),
-        static_cast<uint32_t>(descending_label.size()), 1, 0.0F);
-    const std::string recent_sort_label = tr("Recently used");
-    recent_sort_option_ = plainroot_ui_list_box_option_create_v1(
-        context_, recent_sort_label.c_str(),
-        static_cast<uint32_t>(recent_sort_label.size()), 2, 0.0F);
-    if (!add(sort_dropdown_, ascending_option) ||
-        !add(sort_dropdown_, descending_option) ||
-        !add(sort_dropdown_, recent_sort_option_))
+    for (size_t index = 0; index < kSortOptionMessages.size(); ++index) {
+      const std::string label = tr(kSortOptionMessages[index]);
+      auto *option = plainroot_ui_list_box_option_create_v1(
+          context_, label.c_str(), static_cast<uint32_t>(label.size()),
+          static_cast<int32_t>(index), 0.0F);
+      if (option == nullptr || !add(sort_dropdown_, option))
+        return false;
+      if (index == static_cast<size_t>(detail::DirectorySortOrder::recent_first))
+        recent_sort_option_ = option;
+    }
+    if (recent_sort_option_ == nullptr)
       return false;
     (void)plainroot_ui_widget_set_visible_v1(recent_sort_option_, 0U);
     initializing_sort_dropdown_ = true;
@@ -843,6 +858,9 @@ private:
     directory_loading_ = true;
     entries_mime_classified_ = false;
     mime_database_available_ = false;
+    entries_metadata_collected_ = false;
+    const bool classify_mime = selected_filter_has_mime() ||
+                               is_type_sort(sort_order_);
     if (!preserve_selection) {
       if (allow_multiple_) {
         update_selection_summary();
@@ -861,10 +879,11 @@ private:
       set_status(tr("Loading recent files…"));
       const gchar *data_directory = g_get_user_data_dir();
       const std::string xbel = std::string(data_directory == nullptr ? "" : data_directory) + "/recently-used.xbel";
-      loader_.request_recent(xbel, generation_, selected_filter_has_mime());
+      loader_.request_recent(xbel, generation_, classify_mime);
     } else {
       set_status(tr("Loading folder…"));
-      loader_.request(current_path_, generation_, selected_filter_has_mime());
+      loader_.request(current_path_, generation_, classify_mime,
+                      is_metadata_sort(sort_order_));
     }
     schedule_render();
     request_redraw();
@@ -1110,7 +1129,9 @@ private:
     if (self.recent_sort_option_ != nullptr)
       (void)plainroot_ui_widget_set_visible_v1(self.recent_sort_option_, 1U);
     self.initializing_sort_dropdown_ = true;
-    (void)plainroot_ui_dropdown_set_value_v1(self.sort_dropdown_, 2);
+    (void)plainroot_ui_dropdown_set_value_v1(
+        self.sort_dropdown_,
+        static_cast<int32_t>(detail::DirectorySortOrder::recent_first));
     self.initializing_sort_dropdown_ = false;
     self.render_breadcrumbs();
     self.request_directory_load(false);
@@ -1468,14 +1489,19 @@ private:
     uint32_t has_value = 0;
     if (plainroot_ui_dropdown_get_value_v1(widget, &selected, &has_value) !=
             PLAINROOT_UI_RESULT_OK ||
-        has_value == 0 || selected < 0 || selected > 2 ||
-        (selected == 2 && !self.recent_mode_))
+        has_value == 0 || selected < 0 ||
+        selected > static_cast<int32_t>(detail::DirectorySortOrder::recent_first) ||
+        (selected == static_cast<int32_t>(
+                         detail::DirectorySortOrder::recent_first) &&
+         !self.recent_mode_))
       return;
-    self.sort_order_ = selected == 0
-                           ? detail::DirectorySortOrder::name_ascending
-                           : (selected == 1
-                                  ? detail::DirectorySortOrder::name_descending
-                                  : detail::DirectorySortOrder::recent_first);
+    self.sort_order_ = static_cast<detail::DirectorySortOrder>(selected);
+    if ((is_type_sort(self.sort_order_) && !self.entries_mime_classified_) ||
+        (is_metadata_sort(self.sort_order_) &&
+         !self.entries_metadata_collected_)) {
+      self.request_directory_load(true);
+      return;
+    }
     self.schedule_render();
   }
 
@@ -2072,6 +2098,7 @@ private:
       entries_ = std::move(result.entries);
       entries_mime_classified_ = result.mime_classified;
       mime_database_available_ = result.mime_database_available;
+      entries_metadata_collected_ = result.metadata_collected;
       status_error_.clear();
       if (new_folder_created_) {
         set_status(tr("Folder created."));
@@ -2834,6 +2861,7 @@ private:
   bool recent_mode_ = false;
   bool entries_mime_classified_ = false;
   bool mime_database_available_ = false;
+  bool entries_metadata_collected_ = false;
   bool bookmarks_available_ = true;
   int32_t selected_filter_index_ = -1;
   detail::DirectorySortOrder sort_order_ =

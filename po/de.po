@@ -433,14 +433,32 @@ msgstr "Port"
 msgid "Enter a valid port from 1 to 65535."
 msgstr "Geben Sie einen gültigen Port zwischen 1 und 65535 ein."
 
-msgid "Sort by name"
-msgstr "Nach Name sortieren"
+msgid "Sort files"
+msgstr "Dateien sortieren"
 
 msgid "Name (ascending)"
 msgstr "Name (aufsteigend)"
 
 msgid "Name (descending)"
 msgstr "Name (absteigend)"
+
+msgid "Size (smallest first)"
+msgstr "Größe (kleinste zuerst)"
+
+msgid "Size (largest first)"
+msgstr "Größe (größte zuerst)"
+
+msgid "Type (ascending)"
+msgstr "Typ (aufsteigend)"
+
+msgid "Type (descending)"
+msgstr "Typ (absteigend)"
+
+msgid "Modified (newest first)"
+msgstr "Geändert (neueste zuerst)"
+
+msgid "Modified (oldest first)"
+msgstr "Geändert (älteste zuerst)"
 
 msgid "Enter a file name or select a file."
 msgstr "Geben Sie einen Dateinamen ein oder wählen Sie eine Datei aus."

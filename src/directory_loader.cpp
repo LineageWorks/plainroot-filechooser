@@ -15,8 +15,6 @@
 #include <poll.h>
 #include <thread>
 #include <utility>
-#include <sys/stat.h>
-
 #include <sys/eventfd.h>
 #include <unistd.h>
 
@@ -40,7 +38,8 @@ public:
            !startup_failed_.load(std::memory_order_acquire);
   }
 
-  void request(std::string path, uint64_t generation, bool classify_mime) {
+  void request(std::string path, uint64_t generation, bool classify_mime,
+               bool collect_metadata) {
     bool failed = false;
     {
       std::lock_guard lock(mutex_);
@@ -52,9 +51,10 @@ public:
         std::erase_if(jobs_, [](const Job &job) {
           return job.operation == DirectoryResult::Operation::Listing;
         });
-        jobs_.push_back({DirectoryResult::Operation::Listing,
-                         std::move(path), generation, 0, classify_mime, {},
-                         {}});
+        Job job{DirectoryResult::Operation::Listing, std::move(path),
+                generation, 0, classify_mime, {}, {}};
+        job.collect_metadata = collect_metadata;
+        jobs_.push_back(std::move(job));
       }
     }
     if (failed) {
@@ -240,6 +240,7 @@ private:
     std::string secondary_path;
     std::string application_id;
     bool selection_probe = false;
+    bool collect_metadata = false;
   };
 
   struct Pending {
@@ -287,6 +288,7 @@ private:
     delivery.operation = pending.job.operation;
     delivery.selection_probe = pending.job.selection_probe;
     delivery.mime_classified = pending.job.classify_mime;
+    delivery.metadata_collected = pending.job.collect_metadata;
     delivery.mime_database_available =
         pending.owner->mime_database_ != nullptr &&
         pending.owner->mime_database_->available();
@@ -305,11 +307,33 @@ private:
                   PLAINROOT_CORE_FS_OK ||
               (entry.name == nullptr && entry.name_size != 0U))
             continue;
-          DirectoryEntry directory_entry{
-              std::string(entry.name == nullptr ? "" : entry.name,
-                          entry.name_size),
-              entry.kind,
-              {}};
+          DirectoryEntry directory_entry{};
+          directory_entry.name = std::string(
+              entry.name == nullptr ? "" : entry.name, entry.name_size);
+          directory_entry.kind = entry.kind;
+          if (pending.job.collect_metadata) {
+            std::string native_path = pending.job.path;
+            if (native_path != "/" && !native_path.ends_with('/'))
+              native_path.push_back('/');
+            native_path.append(directory_entry.name);
+            plainroot_core_fs_path_v1 entry_path{};
+            entry_path.struct_size = sizeof(entry_path);
+            entry_path.data = native_path.data();
+            entry_path.size = native_path.size();
+            plainroot_core_fs_metadata_v1 metadata{};
+            metadata.struct_size = sizeof(metadata);
+            if (plainroot_core_fs_stat_v1(&entry_path, 0U, &metadata,
+                                          nullptr) == PLAINROOT_CORE_FS_OK) {
+              directory_entry.size_bytes = metadata.size_bytes;
+              directory_entry.modified_unix_seconds =
+                  metadata.modified_unix_seconds;
+              directory_entry.modified_nanoseconds =
+                  metadata.modified_nanoseconds;
+              directory_entry.metadata_available = true;
+              if (directory_entry.kind == PLAINROOT_CORE_FS_ENTRY_UNKNOWN)
+                directory_entry.kind = metadata.kind;
+            }
+          }
           const bool regular_or_symlink =
               directory_entry.kind == PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE ||
               directory_entry.kind == PLAINROOT_CORE_FS_ENTRY_SYMLINK;
@@ -408,6 +432,7 @@ private:
       result.mime_classified = job.classify_mime;
       result.mime_database_available = mime_database_ != nullptr &&
                                        mime_database_->available();
+      result.metadata_collected = true;
       std::vector<RecentFile> recent;
       result.result = load_recent_files(job.path, recent)
                           ? PLAINROOT_CORE_FS_OK
@@ -417,13 +442,23 @@ private:
         entry.name = std::move(file.name);
         entry.path = std::move(file.path);
         entry.sort_timestamp = file.visited_unix_seconds;
-        struct stat metadata {};
-        if (stat(entry.path.c_str(), &metadata) != 0 ||
-            (!S_ISDIR(metadata.st_mode) && !S_ISREG(metadata.st_mode)))
+        plainroot_core_fs_path_v1 native_path{};
+        native_path.struct_size = sizeof(native_path);
+        native_path.data = entry.path.data();
+        native_path.size = entry.path.size();
+        plainroot_core_fs_metadata_v1 metadata{};
+        metadata.struct_size = sizeof(metadata);
+        if (plainroot_core_fs_stat_v1(
+                &native_path, PLAINROOT_CORE_FS_STAT_FOLLOW_SYMLINKS,
+                &metadata, nullptr) != PLAINROOT_CORE_FS_OK ||
+            (metadata.kind != PLAINROOT_CORE_FS_ENTRY_DIRECTORY &&
+             metadata.kind != PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE))
           continue;
-        entry.kind = S_ISDIR(metadata.st_mode)
-                         ? PLAINROOT_CORE_FS_ENTRY_DIRECTORY
-                         : PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE;
+        entry.kind = metadata.kind;
+        entry.size_bytes = metadata.size_bytes;
+        entry.modified_unix_seconds = metadata.modified_unix_seconds;
+        entry.modified_nanoseconds = metadata.modified_nanoseconds;
+        entry.metadata_available = true;
         if (job.classify_mime && result.mime_database_available &&
             entry.kind == PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE)
           entry.mime_types = mime_database_->types_for_file(entry.path,
@@ -595,9 +630,10 @@ DirectoryLoader::~DirectoryLoader() = default;
 bool DirectoryLoader::ready() const { return impl_ && impl_->ready(); }
 
 void DirectoryLoader::request(std::string path, uint64_t generation,
-                              bool classify_mime) {
+                              bool classify_mime, bool collect_metadata) {
   if (impl_)
-    impl_->request(std::move(path), generation, classify_mime);
+    impl_->request(std::move(path), generation, classify_mime,
+                   collect_metadata);
 }
 
 void DirectoryLoader::create_directory(std::string path, uint64_t generation,

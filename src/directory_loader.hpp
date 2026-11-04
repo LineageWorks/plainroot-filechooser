@@ -19,6 +19,10 @@ struct DirectoryEntry {
   std::vector<std::string> mime_types;
   std::string path;
   int64_t sort_timestamp = 0;
+  uint64_t size_bytes = 0;
+  int64_t modified_unix_seconds = 0;
+  uint32_t modified_nanoseconds = 0;
+  bool metadata_available = false;
 };
 
 struct DirectoryResult {
@@ -40,6 +44,7 @@ struct DirectoryResult {
   std::vector<DirectoryEntry> entries;
   bool mime_classified = false;
   bool mime_database_available = false;
+  bool metadata_collected = false;
   Operation operation = Operation::Listing;
   plainroot_core_fs_entry_kind_v1 inspected_kind =
       PLAINROOT_CORE_FS_ENTRY_UNKNOWN;
@@ -60,7 +65,7 @@ public:
 
   bool ready() const;
   void request(std::string path, uint64_t generation,
-               bool classify_mime = false);
+               bool classify_mime = false, bool collect_metadata = false);
   void request_recent(std::string xbel_path, uint64_t generation,
                       bool classify_mime = false);
   void record_recent(std::vector<std::string> paths, std::string xbel_path,

@@ -434,14 +434,32 @@ msgstr "المنفذ"
 msgid "Enter a valid port from 1 to 65535."
 msgstr "أدخل رقم منفذ صالحًا من 1 إلى 65535."
 
-msgid "Sort by name"
-msgstr "ترتيب حسب الاسم"
+msgid "Sort files"
+msgstr "ترتيب الملفات"
 
 msgid "Name (ascending)"
 msgstr "الاسم (تصاعديًا)"
 
 msgid "Name (descending)"
 msgstr "الاسم (تنازليًا)"
+
+msgid "Size (smallest first)"
+msgstr "الحجم (الأصغر أولًا)"
+
+msgid "Size (largest first)"
+msgstr "الحجم (الأكبر أولًا)"
+
+msgid "Type (ascending)"
+msgstr "النوع (تصاعديًا)"
+
+msgid "Type (descending)"
+msgstr "النوع (تنازليًا)"
+
+msgid "Modified (newest first)"
+msgstr "تاريخ التعديل (الأحدث أولًا)"
+
+msgid "Modified (oldest first)"
+msgstr "تاريخ التعديل (الأقدم أولًا)"
 
 msgid "Enter a file name or select a file."
 msgstr "أدخل اسم ملف أو اختر ملفًا."

@@ -2,6 +2,7 @@
 
 #include <plainroot/toolkit/toolkit.h>
 
+#include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -132,14 +133,15 @@ int main() {
   loader.inspect_location((root / "target-folder").native(), 8, 101);
   loader.inspect_location((root / "target-file.txt").native(), 8, 102);
   loader.inspect_location((root / "missing-location").native(), 8, 103);
+  loader.request(root.native(), 9, false, true);
   const auto deadline = std::chrono::steady_clock::now() +
                         std::chrono::seconds(5);
-  while (results.values.size() < 6 &&
+  while (results.values.size() < 7 &&
          std::chrono::steady_clock::now() < deadline) {
     if (!task_queue.dispatch_one())
       break;
   }
-  if (results.values.size() != 6 || !results.delivered_on_owner_thread) {
+  if (results.values.size() != 7 || !results.delivered_on_owner_thread) {
     loader.stop();
     task_queue.clear();
     fs::remove_all(root, error);
@@ -153,8 +155,20 @@ int main() {
   bool location_folder_ok = false;
   bool location_file_ok = false;
   bool missing_location_rejected = false;
+  bool listing_metadata_ok = false;
   for (std::size_t index = 0; index < results.values.size(); ++index) {
     const auto &result = results.values[index];
+    if (result.operation == DirectoryResult::Operation::Listing &&
+        result.generation == 9 && result.result == PLAINROOT_CORE_FS_OK &&
+        result.metadata_collected) {
+      const auto file = std::find_if(
+          result.entries.begin(), result.entries.end(), [](const auto &entry) {
+            return entry.name == "target-file.txt";
+          });
+      listing_metadata_ok =
+          file != result.entries.end() && file->metadata_available &&
+          file->size_bytes == 4U && file->modified_unix_seconds > 0;
+    }
     if (result.operation == DirectoryResult::Operation::InspectSymlink &&
         (result.generation != 7 || result.selection_probe))
       return 8;
@@ -188,7 +202,8 @@ int main() {
 
   fs::remove_all(root, error);
   return folder_ok && file_ok && dangling_rejected && location_folder_ok &&
-                 location_file_ok && missing_location_rejected
+                 location_file_ok && missing_location_rejected &&
+                 listing_metadata_ok
              ? 0
              : 9;
 }

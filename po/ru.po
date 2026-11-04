@@ -434,14 +434,32 @@ msgstr "Порт"
 msgid "Enter a valid port from 1 to 65535."
 msgstr "Введите допустимый номер порта от 1 до 65535."
 
-msgid "Sort by name"
-msgstr "Сортировать по имени"
+msgid "Sort files"
+msgstr "Сортировать файлы"
 
 msgid "Name (ascending)"
 msgstr "Имя (по возрастанию)"
 
 msgid "Name (descending)"
 msgstr "Имя (по убыванию)"
+
+msgid "Size (smallest first)"
+msgstr "Размер (сначала меньшие)"
+
+msgid "Size (largest first)"
+msgstr "Размер (сначала большие)"
+
+msgid "Type (ascending)"
+msgstr "Тип (по возрастанию)"
+
+msgid "Type (descending)"
+msgstr "Тип (по убыванию)"
+
+msgid "Modified (newest first)"
+msgstr "Изменено (сначала новые)"
+
+msgid "Modified (oldest first)"
+msgstr "Изменено (сначала старые)"
 
 msgid "Enter a file name or select a file."
 msgstr "Введите имя файла или выберите файл."
