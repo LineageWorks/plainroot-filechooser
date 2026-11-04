@@ -44,8 +44,12 @@ constexpr float kPagePadding = 16.0F;
 constexpr float kContentSpacing = 16.0F;
 constexpr float kCompactWindowWidth = 600.0F;
 constexpr float kShortWindowHeight = 480.0F;
-/* Reflow just below the canonical medium-to-expanded breakpoint so a phone
- * in landscape has room for its side-by-side controls after page padding. */
+constexpr float kCompactControlsWidth = 720.0F;
+constexpr float kCompactFilenameWidth = 640.0F;
+constexpr float kLocationActionsHorizontalWidth = 800.0F;
+constexpr float kLocationRowHorizontalWidth = 960.0F;
+/* Content panes use the wider breakpoint; short action rows wrap earlier so
+ * phone landscape retains room for the file list. */
 constexpr float kExpandedControlsWidth = 800.0F;
 constexpr float kPreviewWidth = 256.0F;
 constexpr float kPreviewHeight = 192.0F;
@@ -157,12 +161,12 @@ public:
     const std::string title_text = requested_title_.empty()
                                        ? tr(default_title)
                                        : requested_title_;
-    auto *title = plainroot_ui_label_create_v1(
+    title_ = plainroot_ui_label_create_v1(
         context_, title_text.c_str(), static_cast<uint32_t>(title_text.size()),
         PLAINROOT_UI_COLOR_ON_SURFACE_V3, 0.0F);
-    if (title != nullptr)
+    if (title_ != nullptr)
       (void)plainroot_ui_label_set_typography_v1(
-          title, PLAINROOT_UI_LABEL_HEADLINE_SMALL);
+          title_, PLAINROOT_UI_LABEL_HEADLINE_SMALL);
 
     storage_view_ = std::make_unique<detail::StorageLocationsView>(
         context_,
@@ -189,10 +193,10 @@ public:
 
     auto *location_row = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
-        kExpandedControlsWidth, 8.0F, 0.0F);
+        kLocationRowHorizontalWidth, 8.0F, 0.0F);
     auto *location_actions = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
-        kCompactWindowWidth, 8.0F, 0.0F);
+        kLocationActionsHorizontalWidth, 8.0F, 0.0F);
     auto *location_navigation_actions = plainroot_ui_box_create_v1(
         context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
     auto *location_places_actions = plainroot_ui_box_create_v1(
@@ -289,13 +293,13 @@ public:
 
     auto *controls = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
-        kExpandedControlsWidth, 12.0F, 0.0F);
+        kCompactControlsWidth, 12.0F, 0.0F);
     const bool show_filename_entry = uses_filename_field();
     auto *filename_row = show_filename_entry
                              ? plainroot_ui_adaptive_box_create_v1(
                                    context_, PLAINROOT_UI_AXIS_VERTICAL,
                                    PLAINROOT_UI_AXIS_HORIZONTAL,
-                                   kExpandedControlsWidth, 8.0F, 0.0F)
+                                   kCompactFilenameWidth, 8.0F, 0.0F)
                              : nullptr;
     auto *filename_label =
         show_filename_entry ? make_label("File name", 0.0F) : nullptr;
@@ -428,7 +432,7 @@ public:
 
     if (root == nullptr || outer == nullptr || padding == nullptr ||
         page == nullptr || footer_padding == nullptr ||
-        title == nullptr || location_row == nullptr ||
+        title_ == nullptr || location_row == nullptr ||
         location_actions == nullptr || location_navigation_actions == nullptr ||
         location_places_actions == nullptr || location_folder_actions == nullptr ||
         up == nullptr || home == nullptr ||
@@ -591,8 +595,14 @@ public:
       }
     }
 
+    const bool filename_before_browser = show_filename_entry && save_file_;
+    if (show_filename_entry &&
+        (!add(filename_row, filename_label) ||
+         !add(filename_row, filename_field_)))
+      return false;
+
     if (!add(root, outer) || !add(root, footer_padding) ||
-        !add(outer, padding) || !add(padding, page) || !add(page, title) ||
+        !add(outer, padding) || !add(padding, page) || !add(page, title_) ||
         !add(page, location_row) ||
         (save_files_panel != nullptr && !add(page, save_files_panel)) ||
         !add(location_row, location_actions) ||
@@ -619,9 +629,7 @@ public:
         !add(new_folder_form_, new_folder_actions) ||
         !add(new_folder_actions, new_folder_create_button_) ||
         !add(new_folder_actions, new_folder_cancel_button_) ||
-        (show_filename_entry &&
-         (!add(page, filename_row) || !add(filename_row, filename_label) ||
-          !add(filename_row, filename_field_))) ||
+        (filename_before_browser && !add(page, filename_row)) ||
         !add(page, controls) ||
         !add(controls, search_field_) || !add(controls, hidden_switch_) ||
         !add(controls, sort_dropdown_) ||
@@ -633,7 +641,10 @@ public:
         !add(preview_panel_, preview_heading_) ||
         !add(preview_panel_, preview_image_) ||
         !add(preview_panel_, preview_status_label_) ||
-        !add(list_scroll_, entries_list_) || !add(page, status_label_) ||
+        !add(list_scroll_, entries_list_) ||
+        (show_filename_entry && !filename_before_browser &&
+         !add(page, filename_row)) ||
+        !add(page, status_label_) ||
         !add(footer_padding, footer) || !add(footer, selected_label_) ||
         !add(footer, select) ||
         plainroot_ui_context_set_root_v1(context_, root) !=
@@ -2654,6 +2665,9 @@ private:
     last_window_height_ = height;
     const bool compact = width < kCompactWindowWidth ||
                          height < kShortWindowHeight;
+    if (title_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(
+          title_, height < kShortWindowHeight ? 0U : 1U);
     (void)plainroot_ui_widget_set_visible_v1(storage_toggle_button_,
                                              compact ? 1U : 0U);
     (void)plainroot_ui_widget_set_visible_v1(
@@ -2850,6 +2864,7 @@ private:
   bool compact_storage_expanded_ = false;
   float last_window_width_ = 0.0F;
   float last_window_height_ = 0.0F;
+  plainroot_ui_widget *title_ = nullptr;
   std::string preview_path_;
   std::vector<uint8_t> pending_preview_pixels_;
 };
