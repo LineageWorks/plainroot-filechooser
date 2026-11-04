@@ -5,6 +5,7 @@
 using plainroot::filechooser::detail::entry_is_multi_selectable;
 using plainroot::filechooser::detail::portal_default_accept_label;
 using plainroot::filechooser::detail::portal_selection_mode_valid;
+using plainroot::filechooser::detail::selection_mode_allows_image_preview;
 using plainroot::filechooser::detail::symlink_target_matches_selection;
 using plainroot::filechooser::detail::PortalDefaultAcceptLabel;
 
@@ -25,6 +26,8 @@ int main() {
   assert(portal_selection_mode_valid(true, false, false));
   assert(!portal_selection_mode_valid(true, true, false));
   assert(!portal_selection_mode_valid(true, false, true));
+  assert(selection_mode_allows_image_preview(false));
+  assert(!selection_mode_allows_image_preview(true));
 
   assert(!entry_is_multi_selectable(
       false, false, PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE));

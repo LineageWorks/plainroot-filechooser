@@ -1571,7 +1571,10 @@ private:
     } else if (found != selected.end()) {
       selected.erase(found);
     }
-    if (checked != 0U) {
+    if (!detail::selection_mode_allows_image_preview(
+            action.controller->select_directory_)) {
+      action.controller->clear_preview();
+    } else if (checked != 0U) {
       action.controller->request_preview(action.path);
     } else if (action.controller->preview_path_ == action.path) {
       if (selected.empty())
@@ -1997,7 +2000,10 @@ private:
                                        selected_paths_.end(), selected_path);
           if (found == selected_paths_.end())
             selected_paths_.push_back(selected_path);
-          request_preview(selected_path);
+          if (detail::selection_mode_allows_image_preview(select_directory_))
+            request_preview(selected_path);
+          else
+            clear_preview();
           update_selection_summary();
           status_error_.clear();
           set_status("");

@@ -23,6 +23,11 @@ constexpr bool portal_selection_mode_valid(bool save_file, bool multiple,
   return !save_file || (!multiple && !directory);
 }
 
+constexpr bool selection_mode_allows_image_preview(
+    bool select_directory) noexcept {
+  return !select_directory;
+}
+
 constexpr bool entry_is_multi_selectable(bool allow_multiple,
                                          bool select_directories,
                                          plainroot_core_fs_entry_kind_v1 kind)
