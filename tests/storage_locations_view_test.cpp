@@ -130,13 +130,14 @@ int main() {
   std::string submitted_host;
   std::string submitted_path;
   std::string disconnected_mount_id;
+  plainroot_storage_result_v1 connect_result = PLAINROOT_STORAGE_NOT_READY;
   unsigned redraws = 0;
   StorageLocationActions actions;
   actions.connect_sftp = [&](std::string host, std::string, uint16_t,
                              std::string path) {
     submitted_host = std::move(host);
     submitted_path = std::move(path);
-    return PLAINROOT_STORAGE_OK;
+    return connect_result;
   };
   actions.disconnect_network = [&](std::string id) {
     disconnected_mount_id = std::move(id);
@@ -156,9 +157,33 @@ int main() {
 
   const auto *toggle = find_widget(root, "Connect to SFTP");
   if (!require(toggle != nullptr, "SFTP form toggle is discoverable") ||
-      !require(click(context.get(), toggle), "open SFTP form")) {
+      !require(click(context.get(), toggle), "open SFTP form") ||
+      !require(layout(context.get(), 1200.0F, 800.0F),
+               "layout SFTP form before service-unavailable response")) {
     return 1;
   }
+
+  const auto *server_after_failure = find_widget(root, "Server address");
+  const auto *remote_after_failure = find_widget(root, "Remote folder");
+  const auto *connect_after_failure = find_widget(root, "Connect");
+  if (!require(set_text(server_after_failure, "localhost"),
+               "set server before unavailable-service response") ||
+      !require(set_text(remote_after_failure, "/etc"),
+               "set remote folder before unavailable-service response") ||
+      !require(click(context.get(), connect_after_failure),
+               "submit SFTP request while the service is unavailable") ||
+      !require(submitted_host == "localhost" && submitted_path == "/etc",
+               "unavailable-service response follows the submitted values")) {
+    return 1;
+  }
+  const auto failed_connect_bounds = widget_bounds(
+      const_cast<plainroot_ui_widget *>(connect_after_failure));
+  if (!require(failed_connect_bounds.width > 0.0F &&
+                   failed_connect_bounds.height > 0.0F,
+               "SFTP form remains open after a synchronous service error")) {
+    return 1;
+  }
+  connect_result = PLAINROOT_STORAGE_OK;
 
   size_t submitted_count = 0;
   for (size_t index = 0; index < viewports.size(); ++index) {
