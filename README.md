@@ -19,6 +19,11 @@ broker routing, which remains a live acceptance gate. A default `DESTDIR`
 install was also checked and contained neither portal registration nor
 activation files.
 
+Run `just check-filechooser-portal-routing` to verify Plainroot-first selection
+and GTK fallback in an isolated D-Bus session with temporary XDG directories.
+This checks broker routing without changing host portal configuration; it does
+not open an interactive chooser or replace live desktop acceptance.
+
 ## Current slice
 
 The `plainroot-filechooser-browser` executable is an integration prototype for
