@@ -53,6 +53,7 @@ struct StorageOperationUpdate {
 
 struct NetworkOperationUpdate {
   uint32_t type = PLAINROOT_STORAGE_NETWORK_EVENT_REQUEST_COMPLETED;
+  uint64_t request_id = 0;
   uint32_t request_kind = 0;
   uint32_t operation_kind = 0;
   uint32_t state = PLAINROOT_STORAGE_NETWORK_OPERATION_ACCEPTED;
@@ -93,8 +94,10 @@ public:
   plainroot_storage_result_v1 connect_sftp(const std::string &host,
                                            const std::string &username,
                                            uint16_t port,
-                                           const std::string &remote_path);
-  plainroot_storage_result_v1 disconnect_network(const std::string &id);
+                                           const std::string &remote_path,
+                                           uint64_t *request_id);
+  plainroot_storage_result_v1 disconnect_network(const std::string &id,
+                                                 uint64_t *request_id);
   plainroot_storage_result_v1 request_snapshot();
 
 private:

@@ -5,6 +5,7 @@
 #include "directory_loader.hpp"
 #include "directory_sort.hpp"
 #include "mime_database.hpp"
+#include "network_operation_tracker.hpp"
 #include "open_filename.hpp"
 #include "portal_selection_mode.hpp"
 #include "recent_files.hpp"
@@ -1865,6 +1866,7 @@ private:
   void apply_network_operation(detail::NetworkOperationUpdate update) {
     if (update.type == PLAINROOT_STORAGE_NETWORK_EVENT_ERROR) {
       storage_operation_pending_ = false;
+      network_operation_tracker_.reset();
       set_storage_status(tr(update.result == PLAINROOT_STORAGE_NOT_READY
                                 ? "Network service is unavailable."
                                 : "Unable to start the network operation."));
@@ -1876,6 +1878,10 @@ private:
       if (update.request_kind != PLAINROOT_STORAGE_NETWORK_REQUEST_CONNECT &&
           update.request_kind !=
               PLAINROOT_STORAGE_NETWORK_REQUEST_DISCONNECT)
+        return;
+      if (!network_operation_tracker_.complete_request(
+              update.request_id, update.request_kind, update.result,
+              update.operation_id))
         return;
       if (update.result != PLAINROOT_STORAGE_OK) {
         storage_operation_pending_ = false;
@@ -1894,8 +1900,11 @@ private:
 
     if (update.type != PLAINROOT_STORAGE_NETWORK_EVENT_OPERATION_CHANGED)
       return;
+    if (!network_operation_tracker_.matches_operation(update.operation_id))
+      return;
     if (update.state == PLAINROOT_STORAGE_NETWORK_OPERATION_SUCCEEDED) {
       storage_operation_pending_ = false;
+      network_operation_tracker_.reset();
       const bool disconnect =
           update.operation_kind == PLAINROOT_STORAGE_NETWORK_OPERATION_DISCONNECT;
       set_storage_status(tr(disconnect ? "Network location disconnected."
@@ -1904,16 +1913,19 @@ private:
         (void)storage_bridge_->request_snapshot();
     } else if (update.state == PLAINROOT_STORAGE_NETWORK_OPERATION_FAILED) {
       storage_operation_pending_ = false;
+      network_operation_tracker_.reset();
       set_storage_status(tr(network_operation_error_message(update.error)));
       if (storage_bridge_ != nullptr)
         (void)storage_bridge_->request_snapshot();
     } else if (update.state ==
                PLAINROOT_STORAGE_NETWORK_OPERATION_CANCELLED) {
       storage_operation_pending_ = false;
+      network_operation_tracker_.reset();
       set_storage_status(tr("Network connection was cancelled."));
     } else if (update.state ==
                PLAINROOT_STORAGE_NETWORK_OPERATION_INDETERMINATE) {
       storage_operation_pending_ = false;
+      network_operation_tracker_.reset();
       set_storage_status(tr("Network operation outcome is uncertain."));
       if (storage_bridge_ != nullptr)
         (void)storage_bridge_->request_snapshot();
@@ -2029,12 +2041,16 @@ private:
       request_redraw();
       return PLAINROOT_STORAGE_BUSY;
     }
+    uint64_t request_id = 0;
     const auto result = storage_bridge_ == nullptr
                             ? PLAINROOT_STORAGE_NOT_READY
-                            : storage_bridge_->connect_sftp(host, username, port,
-                                                            remote_path);
+                            : storage_bridge_->connect_sftp(
+                                  host, username, port, remote_path,
+                                  &request_id);
     if (result == PLAINROOT_STORAGE_OK) {
       storage_operation_pending_ = true;
+      network_operation_tracker_.begin(
+          request_id, PLAINROOT_STORAGE_NETWORK_REQUEST_CONNECT);
       set_storage_status(tr("Connecting to SFTP location…"));
     } else {
       set_storage_status(tr(result == PLAINROOT_STORAGE_NOT_READY
@@ -2051,11 +2067,15 @@ private:
       request_redraw();
       return;
     }
+    uint64_t request_id = 0;
     const auto result = storage_bridge_ == nullptr
                             ? PLAINROOT_STORAGE_NOT_READY
-                            : storage_bridge_->disconnect_network(id);
+                            : storage_bridge_->disconnect_network(
+                                  id, &request_id);
     if (result == PLAINROOT_STORAGE_OK) {
       storage_operation_pending_ = true;
+      network_operation_tracker_.begin(
+          request_id, PLAINROOT_STORAGE_NETWORK_REQUEST_DISCONNECT);
       set_storage_status(tr("Disconnecting network location…"));
     } else {
       set_storage_status(tr(result == PLAINROOT_STORAGE_NOT_READY
@@ -2375,6 +2395,7 @@ private:
   std::unique_ptr<detail::StorageLocationsView> storage_view_;
   bool storage_catalog_complete_ = false;
   bool storage_operation_pending_ = false;
+  detail::NetworkOperationTracker network_operation_tracker_;
   std::unique_ptr<detail::StorageBridge> storage_bridge_;
   bool ui_ready_ = false;
   bool select_directory_ = false;

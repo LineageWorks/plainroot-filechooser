@@ -151,6 +151,15 @@ directory_breadcrumbs_test = executable(
 )
 test('FileChooser directory breadcrumbs', directory_breadcrumbs_test)
 
+network_operation_tracker_test = executable(
+  'filechooser-network-operation-tracker-test',
+  'tests/network_operation_tracker_test.cpp',
+  dependencies: [storage_dep, network_storage_dep],
+  install: false,
+)
+test('FileChooser correlates managed network operations',
+     network_operation_tracker_test)
+
 image_preview_test = executable(
   'filechooser-image-preview-test',
   ['tests/image_preview_test.cpp', 'src/image_preview.cpp'],

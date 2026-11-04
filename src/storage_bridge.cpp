@@ -271,6 +271,7 @@ void on_network_event(const plainroot_storage_network_event_v1 *event,
       if (state.network_operation_handler) {
         NetworkOperationUpdate update{};
         update.type = event->type;
+        update.request_id = event->request_id;
         update.request_kind = event->request_kind;
         update.result = event->result;
         update.operation_id = copy_bytes(event->operation_id);
@@ -626,21 +627,26 @@ public:
   plainroot_storage_result_v1 connect_sftp(const std::string &host,
                                            const std::string &username,
                                            uint16_t port,
-                                           const std::string &remote_path) {
+                                           const std::string &remote_path,
+                                           uint64_t *request_id) {
     if (!ready_ || state_->network_client == nullptr)
       return PLAINROOT_STORAGE_NOT_READY;
-    uint64_t request_id = 0;
+    uint64_t local_request_id = 0;
     return plainroot_storage_network_client_connect_sftp_v1(
         state_->network_client, host.c_str(), username.c_str(), port,
-        remote_path.c_str(), &request_id, nullptr);
+        remote_path.c_str(), request_id == nullptr ? &local_request_id
+                                                   : request_id,
+        nullptr);
   }
 
-  plainroot_storage_result_v1 disconnect_network(const std::string &id) {
+  plainroot_storage_result_v1 disconnect_network(const std::string &id,
+                                                 uint64_t *request_id) {
     if (!ready_ || state_->network_client == nullptr)
       return PLAINROOT_STORAGE_NOT_READY;
-    uint64_t request_id = 0;
+    uint64_t local_request_id = 0;
     return plainroot_storage_network_client_disconnect_v1(
-        state_->network_client, {id.data(), id.size()}, &request_id, nullptr);
+        state_->network_client, {id.data(), id.size()},
+        request_id == nullptr ? &local_request_id : request_id, nullptr);
   }
 
   plainroot_storage_result_v1 request_snapshot() {
@@ -698,14 +704,18 @@ StorageBridge::unmount_mount(const std::string &id) {
 plainroot_storage_result_v1
 StorageBridge::connect_sftp(const std::string &host,
                             const std::string &username, uint16_t port,
-                            const std::string &remote_path) {
-  return impl_ ? impl_->connect_sftp(host, username, port, remote_path)
+                            const std::string &remote_path,
+                            uint64_t *request_id) {
+  return impl_ ? impl_->connect_sftp(host, username, port, remote_path,
+                                     request_id)
                : PLAINROOT_STORAGE_NOT_READY;
 }
 
 plainroot_storage_result_v1
-StorageBridge::disconnect_network(const std::string &id) {
-  return impl_ ? impl_->disconnect_network(id) : PLAINROOT_STORAGE_NOT_READY;
+StorageBridge::disconnect_network(const std::string &id,
+                                  uint64_t *request_id) {
+  return impl_ ? impl_->disconnect_network(id, request_id)
+               : PLAINROOT_STORAGE_NOT_READY;
 }
 
 plainroot_storage_result_v1 StorageBridge::request_snapshot() {
