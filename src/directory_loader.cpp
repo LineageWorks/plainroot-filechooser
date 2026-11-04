@@ -92,7 +92,8 @@ public:
     wake_worker();
   }
 
-  void inspect_symlink(std::string path, uint64_t generation) {
+  void inspect_symlink(std::string path, uint64_t generation,
+                       bool selection_probe, uint64_t request_id) {
     bool failed = false;
     {
       std::lock_guard lock(mutex_);
@@ -101,12 +102,15 @@ public:
       failed = startup_failed_.load(std::memory_order_relaxed);
       if (!failed)
         jobs_.push_back({DirectoryResult::Operation::InspectSymlink,
-                         std::move(path), generation, 0, false, {}, {}});
+                         std::move(path), generation, request_id, false, {},
+                         {}, selection_probe});
     }
     if (failed) {
       DirectoryResult result{};
       result.operation = DirectoryResult::Operation::InspectSymlink;
       result.generation = generation;
+      result.request_id = request_id;
+      result.selection_probe = selection_probe;
       result.path = std::move(path);
       result.result = PLAINROOT_CORE_FS_IO_ERROR;
       publish(std::move(result));
@@ -177,6 +181,7 @@ private:
     bool classify_mime = false;
     std::string secondary_path;
     std::string application_id;
+    bool selection_probe = false;
   };
 
   struct Pending {
@@ -222,6 +227,7 @@ private:
     delivery.result = result;
     delivery.native_code = native_code;
     delivery.operation = pending.job.operation;
+    delivery.selection_probe = pending.job.selection_probe;
     delivery.mime_classified = pending.job.classify_mime;
     delivery.mime_database_available =
         pending.owner->mime_database_ != nullptr &&
@@ -518,10 +524,12 @@ void DirectoryLoader::create_directory(std::string path, uint64_t generation,
     impl_->create_directory(std::move(path), generation, request_id);
 }
 
-void DirectoryLoader::inspect_symlink(std::string path,
-                                      uint64_t generation) {
+void DirectoryLoader::inspect_symlink(std::string path, uint64_t generation,
+                                      bool selection_probe,
+                                      uint64_t request_id) {
   if (impl_)
-    impl_->inspect_symlink(std::move(path), generation);
+    impl_->inspect_symlink(std::move(path), generation, selection_probe,
+                           request_id);
 }
 
 void DirectoryLoader::request_recent(std::string path, uint64_t generation,

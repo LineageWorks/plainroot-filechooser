@@ -30,6 +30,7 @@
 #include <sys/stat.h>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -687,6 +688,14 @@ private:
     request_redraw();
   }
 
+  void inspect_symlink_selection(const std::string &path) {
+    const uint64_t request_id = ++symlink_selection_request_id_;
+    pending_symlink_selections_.emplace(request_id, path);
+    loader_.inspect_symlink(path, generation_, true, request_id);
+    set_status(tr("Checking link…"));
+    request_redraw();
+  }
+
   void set_folder_creation_controls_enabled(bool enabled) {
     const uint32_t value = enabled ? 1U : 0U;
     if (new_folder_button_ != nullptr)
@@ -1219,10 +1228,20 @@ private:
     auto &action = *static_cast<EntryAction *>(user_data);
     if (action.controller == nullptr || widget == nullptr)
       return;
+    if (action.controller->setting_symlink_selection_)
+      return;
     uint32_t checked = 0;
     if (plainroot_ui_checkbox_get_checked_v1(widget, &checked) !=
         PLAINROOT_UI_RESULT_OK)
       return;
+    if (action.kind == PLAINROOT_CORE_FS_ENTRY_SYMLINK && checked != 0U) {
+      action.controller->setting_symlink_selection_ = true;
+      (void)plainroot_ui_checkbox_set_checked_v1(widget, 0U);
+      action.controller->setting_symlink_selection_ = false;
+      (void)plainroot_ui_widget_set_enabled_v1(widget, 0U);
+      action.controller->inspect_symlink_selection(action.path);
+      return;
+    }
     auto &selected = action.controller->selected_paths_;
     const auto found = std::find(selected.begin(), selected.end(), action.path);
     if (checked != 0U) {
@@ -1597,7 +1616,37 @@ private:
       apply_create_folder_result(std::move(result));
       return;
     }
-    if (result.operation == detail::DirectoryResult::Operation::InspectSymlink) {
+    if (result.operation ==
+        detail::DirectoryResult::Operation::InspectSymlink) {
+      if (result.selection_probe) {
+        const auto pending =
+            pending_symlink_selections_.find(result.request_id);
+        if (pending == pending_symlink_selections_.end())
+          return;
+        const std::string selected_path = std::move(pending->second);
+        pending_symlink_selections_.erase(pending);
+        if (result.generation != generation_)
+          return;
+        const bool correct_target_kind =
+            detail::symlink_target_matches_selection(select_directory_,
+                                                     result.inspected_kind);
+        if (result.result == PLAINROOT_CORE_FS_OK && correct_target_kind) {
+          const auto found = std::find(selected_paths_.begin(),
+                                       selected_paths_.end(), selected_path);
+          if (found == selected_paths_.end())
+            selected_paths_.push_back(selected_path);
+          update_selection_summary();
+          status_error_.clear();
+          set_status("");
+        } else if (result.result != PLAINROOT_CORE_FS_OK) {
+          set_status(tr("This item is no longer available."));
+        } else {
+          set_status(tr("This item cannot be selected here."));
+        }
+        schedule_render();
+        request_redraw();
+        return;
+      }
       if (result.generation != generation_)
         return;
       if (result.result == PLAINROOT_CORE_FS_OK &&
@@ -2000,10 +2049,10 @@ private:
                                        2.0F, 1.0F);
       plainroot_ui_widget *control = nullptr;
       plainroot_ui_widget *entry_content = nullptr;
-      const bool is_directory =
-          entry->kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY;
+      const bool is_symlink =
+          entry->kind == PLAINROOT_CORE_FS_ENTRY_SYMLINK;
       const bool selectable = detail::entry_is_multi_selectable(
-          allow_multiple_, select_directory_, is_directory);
+          allow_multiple_, select_directory_, entry->kind);
       if (selectable) {
         const bool selected =
             std::find(selected_paths_.begin(), selected_paths_.end(),
@@ -2012,7 +2061,8 @@ private:
             context_, label.c_str(), static_cast<uint32_t>(label.size()),
             selected ? 1U : 0U, 1.0F, &Impl::selection_changed, action.get());
         entry_content = control;
-        if (control != nullptr && select_directory_) {
+        if (control != nullptr &&
+            (select_directory_ || (allow_multiple_ && is_symlink))) {
           const std::string open_label = tr("Open");
           auto *open_button = plainroot_ui_button_create_v1(
               context_, open_label.c_str(),
@@ -2199,6 +2249,7 @@ private:
   bool new_folder_created_ = false;
   bool folder_creation_pending_ = false;
   bool directory_loading_ = false;
+  bool setting_symlink_selection_ = false;
   bool recent_mode_ = false;
   bool entries_mime_classified_ = false;
   bool mime_database_available_ = false;
@@ -2208,6 +2259,7 @@ private:
       detail::DirectorySortOrder::name_ascending;
   uint64_t generation_ = 0;
   uint64_t folder_create_request_id_ = 0;
+  uint64_t symlink_selection_request_id_ = 0;
   std::string current_path_;
   std::string search_query_;
   std::string initial_filename_;
@@ -2215,6 +2267,7 @@ private:
   std::string pending_save_path_;
   std::string selected_path_;
   std::vector<std::string> selected_paths_;
+  std::unordered_map<uint64_t, std::string> pending_symlink_selections_;
   std::vector<BrowserFilter> filters_;
   std::vector<BrowserChoice> choices_;
   std::vector<BrowserChoiceSelection> choice_selections_;

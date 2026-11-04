@@ -39,6 +39,7 @@ struct DirectoryResult {
   Operation operation = Operation::Listing;
   plainroot_core_fs_entry_kind_v1 inspected_kind =
       PLAINROOT_CORE_FS_ENTRY_UNKNOWN;
+  bool selection_probe = false;
 };
 
 class DirectoryLoader {
@@ -60,7 +61,9 @@ public:
                      std::string application_id);
   void create_directory(std::string path, uint64_t generation,
                         uint64_t request_id);
-  void inspect_symlink(std::string path, uint64_t generation);
+  void inspect_symlink(std::string path, uint64_t generation,
+                       bool selection_probe = false,
+                       uint64_t request_id = 0);
   void stop();
 
 private:

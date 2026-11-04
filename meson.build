@@ -238,6 +238,7 @@ test('FileChooser portal request size limits', portal_limits_test)
 portal_selection_mode_test = executable(
   'filechooser-portal-selection-mode-test',
   'tests/portal_selection_mode_test.cpp',
+  dependencies: [core_dep],
   install: false,
 )
 test('FileChooser portal selection modes', portal_selection_mode_test)

@@ -163,6 +163,9 @@ msgstr "Link wird überprüft …"
 msgid "This item is no longer available."
 msgstr "Dieses Element ist nicht mehr verfügbar."
 
+msgid "This item cannot be selected here."
+msgstr "Dieses Element kann hier nicht ausgewählt werden."
+
 msgid "Search files"
 msgstr "Dateien durchsuchen"
 

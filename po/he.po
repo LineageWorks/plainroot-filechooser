@@ -163,6 +163,9 @@ msgstr "הקישור נבדק…"
 msgid "This item is no longer available."
 msgstr "פריט זה אינו זמין עוד."
 
+msgid "This item cannot be selected here."
+msgstr "אי אפשר לבחור את הפריט הזה כאן."
+
 msgid "Search files"
 msgstr "חיפוש קבצים"
 

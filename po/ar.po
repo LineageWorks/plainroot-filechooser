@@ -164,6 +164,9 @@ msgstr "جارٍ التحقق من الرابط…"
 msgid "This item is no longer available."
 msgstr "لم يعد هذا العنصر متاحًا."
 
+msgid "This item cannot be selected here."
+msgstr "لا يمكن تحديد هذا العنصر هنا."
+
 msgid "Search files"
 msgstr "البحث في الملفات"
 

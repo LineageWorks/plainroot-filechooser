@@ -164,6 +164,9 @@ msgstr "Проверка ссылки…"
 msgid "This item is no longer available."
 msgstr "Этот объект больше недоступен."
 
+msgid "This item cannot be selected here."
+msgstr "Этот объект нельзя выбрать здесь."
+
 msgid "Search files"
 msgstr "Поиск файлов"
 
