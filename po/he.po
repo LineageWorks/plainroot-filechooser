@@ -519,3 +519,9 @@ msgstr "אין תצוגה מקדימה זמינה לתמונה."
 
 msgid "Preview unavailable."
 msgstr "התצוגה המקדימה אינה זמינה."
+
+msgid "Show storage locations"
+msgstr "הצג מיקומי אחסון"
+
+msgid "Hide storage locations"
+msgstr "הסתר מיקומי אחסון"

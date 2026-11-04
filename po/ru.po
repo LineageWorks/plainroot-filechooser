@@ -520,3 +520,9 @@ msgstr "Предпросмотр изображения недоступен."
 
 msgid "Preview unavailable."
 msgstr "Предпросмотр недоступен."
+
+msgid "Show storage locations"
+msgstr "Показать места хранения"
+
+msgid "Hide storage locations"
+msgstr "Скрыть места хранения"

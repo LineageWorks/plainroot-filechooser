@@ -519,3 +519,9 @@ msgstr "Keine Bildvorschau verfügbar."
 
 msgid "Preview unavailable."
 msgstr "Vorschau nicht verfügbar."
+
+msgid "Show storage locations"
+msgstr "Speicherorte anzeigen"
+
+msgid "Hide storage locations"
+msgstr "Speicherorte ausblenden"

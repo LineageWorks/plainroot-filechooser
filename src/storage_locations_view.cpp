@@ -69,6 +69,12 @@ public:
     auto *refresh = make_button("Refresh", &Impl::refresh_activated, this);
     sftp_toggle_ = make_button("Connect to SFTP", &Impl::toggle_sftp_activated,
                                this);
+    if (refresh != nullptr)
+      (void)plainroot_ui_button_set_style_v1(
+          refresh, PLAINROOT_UI_BUTTON_STYLE_TEXT);
+    if (sftp_toggle_ != nullptr)
+      (void)plainroot_ui_button_set_style_v1(
+          sftp_toggle_, PLAINROOT_UI_BUTTON_STYLE_TEXT);
     status_ = make_label("Checking storage locations…", 0.0F);
     list_ = plainroot_ui_list_create_v1(context_, 0.0F);
     create_sftp_form();
@@ -174,6 +180,9 @@ private:
     if (connect_button_ != nullptr)
       (void)plainroot_ui_button_set_style_v1(
           connect_button_, PLAINROOT_UI_BUTTON_STYLE_FILLED);
+    if (cancel_button_ != nullptr)
+      (void)plainroot_ui_button_set_style_v1(
+          cancel_button_, PLAINROOT_UI_BUTTON_STYLE_TEXT);
     if (sftp_form_ == nullptr || endpoint_row == nullptr ||
         host_field_ == nullptr || username_field_ == nullptr ||
         port_field_ == nullptr ||
@@ -424,6 +433,9 @@ private:
     if (kind == ActionKind::confirm_unmount)
       (void)plainroot_ui_button_set_style_v1(button,
                                              PLAINROOT_UI_BUTTON_STYLE_FILLED);
+    else
+      (void)plainroot_ui_button_set_style_v1(button,
+                                             PLAINROOT_UI_BUTTON_STYLE_TEXT);
     row_actions_.push_back(std::move(action));
   }
 

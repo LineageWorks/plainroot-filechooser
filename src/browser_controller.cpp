@@ -42,7 +42,11 @@ namespace {
 constexpr char kDomain[] = "plainroot-filechooser";
 constexpr float kPagePadding = 16.0F;
 constexpr float kContentSpacing = 16.0F;
-constexpr float kExpandedControlsWidth = 840.0F;
+constexpr float kCompactWindowWidth = 600.0F;
+constexpr float kShortWindowHeight = 480.0F;
+/* Reflow just below the canonical medium-to-expanded breakpoint so a phone
+ * in landscape has room for its side-by-side controls after page padding. */
+constexpr float kExpandedControlsWidth = 800.0F;
 constexpr float kPreviewWidth = 256.0F;
 constexpr float kPreviewHeight = 192.0F;
 
@@ -175,14 +179,26 @@ public:
                                   std::move(remote_path));
             },
             [this] { refresh_storage(); }, [this] { request_redraw(); }});
-    auto *storage_view_widget = storage_view_->create();
+    storage_view_widget_ = storage_view_->create();
+    storage_toggle_button_ =
+        make_button("Show storage locations",
+                    &Impl::storage_locations_activated);
+    set_text_button_style(storage_toggle_button_);
+    if (storage_toggle_button_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(storage_toggle_button_, 0U);
 
     auto *location_row = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
         kExpandedControlsWidth, 8.0F, 0.0F);
     auto *location_actions = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
-        420.0F, 8.0F, 0.0F);
+        kCompactWindowWidth, 8.0F, 0.0F);
+    auto *location_navigation_actions = plainroot_ui_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
+    auto *location_places_actions = plainroot_ui_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
+    auto *location_folder_actions = plainroot_ui_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
     location_path_row_ = plainroot_ui_box_create_v1(
         context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 1.0F);
     auto *up = make_button("Up", &Impl::up_activated);
@@ -198,6 +214,12 @@ public:
         make_button("Bookmark folder", &Impl::bookmark_activated);
     new_folder_button_ =
         make_button("New folder", &Impl::new_folder_activated);
+    set_text_button_style(up);
+    set_text_button_style(home);
+    set_text_button_style(location_button_);
+    set_text_button_style(recent_button_);
+    set_text_button_style(bookmark_button_);
+    set_text_button_style(new_folder_button_);
     location_entry_row_ = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
         560.0F, 8.0F, 0.0F);
@@ -211,6 +233,7 @@ public:
     location_go_button_ = make_button("Go", &Impl::location_go_activated);
     location_cancel_button_ =
         make_button("Cancel", &Impl::location_cancel_activated);
+    set_text_button_style(location_cancel_button_);
     if (location_go_button_ != nullptr)
       (void)plainroot_ui_button_set_style_v1(
           location_go_button_, PLAINROOT_UI_BUTTON_STYLE_FILLED);
@@ -324,6 +347,7 @@ public:
         make_button("Create", &Impl::create_folder_activated);
     new_folder_cancel_button_ =
         make_button("Cancel", &Impl::cancel_create_folder_activated);
+    set_text_button_style(new_folder_cancel_button_);
     if (new_folder_create_button_ != nullptr)
       (void)plainroot_ui_button_set_style_v1(
           new_folder_create_button_, PLAINROOT_UI_BUTTON_STYLE_FILLED);
@@ -405,7 +429,9 @@ public:
     if (root == nullptr || outer == nullptr || padding == nullptr ||
         page == nullptr || footer_padding == nullptr ||
         title == nullptr || location_row == nullptr ||
-        location_actions == nullptr || up == nullptr || home == nullptr ||
+        location_actions == nullptr || location_navigation_actions == nullptr ||
+        location_places_actions == nullptr || location_folder_actions == nullptr ||
+        up == nullptr || home == nullptr ||
         location_button_ == nullptr || location_path_row_ == nullptr ||
         location_entry_row_ == nullptr || location_entry_actions_ == nullptr ||
         location_field_ == nullptr || location_go_button_ == nullptr ||
@@ -416,7 +442,8 @@ public:
         new_folder_actions == nullptr || new_folder_field_ == nullptr ||
         new_folder_create_button_ == nullptr ||
         new_folder_cancel_button_ == nullptr ||
-        storage_view_widget == nullptr || breadcrumb_scroll_ == nullptr ||
+        storage_view_widget_ == nullptr || storage_toggle_button_ == nullptr ||
+        breadcrumb_scroll_ == nullptr ||
         breadcrumb_strip_ == nullptr || controls == nullptr ||
         search_field_ == nullptr || hidden_switch_ == nullptr ||
         sort_dropdown_ == nullptr ||
@@ -569,11 +596,15 @@ public:
         !add(page, location_row) ||
         (save_files_panel != nullptr && !add(page, save_files_panel)) ||
         !add(location_row, location_actions) ||
-        !add(location_actions, up) || !add(location_actions, home) ||
-        !add(location_actions, recent_button_) ||
-        !add(location_actions, places_dropdown_) ||
-        !add(location_actions, bookmark_button_) ||
-        !add(location_actions, new_folder_button_) ||
+        !add(location_actions, location_navigation_actions) ||
+        !add(location_navigation_actions, up) ||
+        !add(location_navigation_actions, home) ||
+        !add(location_navigation_actions, recent_button_) ||
+        !add(location_actions, location_places_actions) ||
+        !add(location_places_actions, places_dropdown_) ||
+        !add(location_actions, location_folder_actions) ||
+        !add(location_folder_actions, bookmark_button_) ||
+        !add(location_folder_actions, new_folder_button_) ||
         !add(location_row, location_path_row_) ||
         !add(location_path_row_, location_button_) ||
         !add(location_path_row_, breadcrumb_scroll_) ||
@@ -596,7 +627,8 @@ public:
         !add(controls, sort_dropdown_) ||
         (filter_dropdown_ != nullptr && !add(controls, filter_dropdown_)) ||
         (choices_panel != nullptr && !add(page, choices_panel)) ||
-        !add(page, storage_view_widget) || !add(page, browser_body_) ||
+        !add(page, storage_toggle_button_) ||
+        !add(page, storage_view_widget_) || !add(page, browser_body_) ||
         !add(browser_body_, list_scroll_) || !add(browser_body_, preview_panel_) ||
         !add(preview_panel_, preview_heading_) ||
         !add(preview_panel_, preview_image_) ||
@@ -633,6 +665,10 @@ public:
   void set_window(plainroot_toolkit_window *window) {
     window_ = window;
     if (window_ != nullptr) {
+      if (plainroot_toolkit_window_set_resize_callback_v1(
+              window_, &Impl::window_resized, this) !=
+          PLAINROOT_TOOLKIT_RESULT_OK)
+        detail::trace("unable to register responsive storage layout");
       (void)plainroot_toolkit_window_set_ready_callback_v1(
           window_, &Impl::window_ready, this);
       uint32_t key = 0;
@@ -826,6 +862,12 @@ private:
     return parent != nullptr && child != nullptr &&
            plainroot_ui_widget_add_child_v1(parent, child) ==
                PLAINROOT_UI_RESULT_OK;
+  }
+
+  static void set_text_button_style(plainroot_ui_widget *button) {
+    if (button != nullptr)
+      (void)plainroot_ui_button_set_style_v1(
+          button, PLAINROOT_UI_BUTTON_STYLE_TEXT);
   }
 
   plainroot_ui_widget *make_label(const char *message, float flex) {
@@ -2585,6 +2627,45 @@ private:
     self.upload_preview_image();
   }
 
+  static void window_resized(
+      void *user_data, plainroot_toolkit_window *,
+      const plainroot_toolkit_window_state_v1 *state,
+      const plainroot_ui_rect_v1 *content_bounds) {
+    if (state == nullptr || content_bounds == nullptr ||
+        (state->flags & PLAINROOT_TOOLKIT_WINDOW_CONFIGURED) == 0U)
+      return;
+    auto &self = *static_cast<Impl *>(user_data);
+    self.update_storage_view_layout(content_bounds->width,
+                                    static_cast<float>(state->height));
+  }
+
+  static void storage_locations_activated(void *user_data,
+                                          plainroot_ui_widget *) {
+    auto &self = *static_cast<Impl *>(user_data);
+    self.compact_storage_expanded_ = !self.compact_storage_expanded_;
+    self.update_storage_view_layout(self.last_window_width_,
+                                    self.last_window_height_);
+  }
+
+  void update_storage_view_layout(float width, float height) {
+    if (storage_toggle_button_ == nullptr || storage_view_widget_ == nullptr)
+      return;
+    last_window_width_ = width;
+    last_window_height_ = height;
+    const bool compact = width < kCompactWindowWidth ||
+                         height < kShortWindowHeight;
+    (void)plainroot_ui_widget_set_visible_v1(storage_toggle_button_,
+                                             compact ? 1U : 0U);
+    (void)plainroot_ui_widget_set_visible_v1(
+        storage_view_widget_,
+        !compact || compact_storage_expanded_ ? 1U : 0U);
+    if (compact)
+      set_label(storage_toggle_button_,
+                tr(compact_storage_expanded_ ? "Hide storage locations"
+                                             : "Show storage locations"));
+    request_redraw();
+  }
+
   void request_preview(const std::string &path) {
     ++preview_request_id_;
     preview_path_ = path;
@@ -2746,6 +2827,8 @@ private:
   plainroot_ui_widget *places_dropdown_ = nullptr;
   plainroot_ui_widget *recent_button_ = nullptr;
   plainroot_ui_widget *bookmark_button_ = nullptr;
+  plainroot_ui_widget *storage_toggle_button_ = nullptr;
+  plainroot_ui_widget *storage_view_widget_ = nullptr;
   plainroot_ui_widget *filter_dropdown_ = nullptr;
   plainroot_ui_widget *sort_dropdown_ = nullptr;
   plainroot_ui_widget *recent_sort_option_ = nullptr;
@@ -2764,6 +2847,9 @@ private:
   uint32_t preview_image_width_ = 0;
   uint32_t preview_image_height_ = 0;
   bool renderer_ready_ = false;
+  bool compact_storage_expanded_ = false;
+  float last_window_width_ = 0.0F;
+  float last_window_height_ = 0.0F;
   std::string preview_path_;
   std::vector<uint8_t> pending_preview_pixels_;
 };

@@ -520,3 +520,9 @@ msgstr "معاينة الصورة غير متاحة."
 
 msgid "Preview unavailable."
 msgstr "المعاينة غير متاحة."
+
+msgid "Show storage locations"
+msgstr "إظهار مواقع التخزين"
+
+msgid "Hide storage locations"
+msgstr "إخفاء مواقع التخزين"
