@@ -1785,6 +1785,9 @@ private:
 
   void apply_storage_catalog(detail::StorageCatalog catalog) {
     const bool complete = catalog.complete;
+    detail::trace("storage-catalog complete=%u removable=%zu network=%zu",
+                  complete ? 1U : 0U, catalog.removable_volumes.size(),
+                  catalog.network_mounts.size());
     const bool empty =
         catalog.removable_volumes.empty() && catalog.network_mounts.empty();
     storage_catalog_complete_ = complete;
@@ -1864,6 +1867,15 @@ private:
   }
 
   void apply_network_operation(detail::NetworkOperationUpdate update) {
+    detail::trace(
+        "network-update type=%u request=%llu operation=%s kind=%u state=%u "
+        "result=%u error=%u",
+        static_cast<unsigned>(update.type),
+        static_cast<unsigned long long>(update.request_id),
+        update.operation_id.c_str(),
+        static_cast<unsigned>(update.operation_kind),
+        static_cast<unsigned>(update.state),
+        static_cast<unsigned>(update.result), static_cast<unsigned>(update.error));
     if (update.type == PLAINROOT_STORAGE_NETWORK_EVENT_ERROR) {
       storage_operation_pending_ = false;
       network_operation_tracker_.reset();

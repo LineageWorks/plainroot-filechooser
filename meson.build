@@ -160,6 +160,16 @@ network_operation_tracker_test = executable(
 test('FileChooser correlates managed network operations',
      network_operation_tracker_test)
 
+storage_locations_view_test = executable(
+  'filechooser-storage-locations-view-test',
+  'tests/storage_locations_view_test.cpp',
+  link_with: filechooser_common,
+  dependencies: common_dependencies,
+  install: false,
+)
+test('FileChooser hides SFTP form and applies network mount snapshots',
+     storage_locations_view_test)
+
 image_preview_test = executable(
   'filechooser-image-preview-test',
   ['tests/image_preview_test.cpp', 'src/image_preview.cpp'],
