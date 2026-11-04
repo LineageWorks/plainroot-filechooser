@@ -54,9 +54,10 @@ adaptive path field. It accepts absolute and current-folder-relative paths, as
 well as `~` and `~/...`; path normalization is lexical and existence checks run
 asynchronously. Directories open in the browser, files are selected for open
 requests, and save requests use a typed file path to set its parent folder and
-filename. Search is applied
-to the displayed listing, hidden entries can be shown, and
-the listing supports locale-aware, natural filename ordering in either
+filename. Single-select file names align to the logical start edge of their
+rows, keeping the listing easy to scan in both LTR and RTL locales. Search is
+applied to the displayed listing, hidden entries can be shown, and the listing
+supports locale-aware, natural filename ordering in either
 direction while keeping directories first. The **Show file details** switch
 shows size, file type, and modified time together; metadata is read
 asynchronously on the directory worker only when details are shown or a

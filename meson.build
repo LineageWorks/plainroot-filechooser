@@ -12,6 +12,7 @@ project(
 )
 
 toolkit_dep = dependency('plainroot-toolkit', version: '>= 0.21.0')
+ui_dep = dependency('plainroot-ui', version: '>= 0.27.0')
 core_dep = dependency('plainroot-core', version: '>= 0.8.0')
 i18n_dep = dependency('plainroot-i18n', version: '>= 0.1.0')
 storage_dep = dependency('plainroot-storage-client', version: '>= 0.1.0')
@@ -48,6 +49,7 @@ filechooser_common = static_library(
   browser_sources,
   dependencies: [
     toolkit_dep,
+    ui_dep,
     core_dep,
     i18n_dep,
     storage_dep,
@@ -62,6 +64,7 @@ filechooser_common = static_library(
 
 common_dependencies = [
   toolkit_dep,
+  ui_dep,
   core_dep,
   i18n_dep,
   storage_dep,

@@ -2621,6 +2621,10 @@ private:
                 control, PLAINROOT_UI_BUTTON_STYLE_TEXT) !=
                 PLAINROOT_UI_RESULT_OK)
           control = nullptr;
+        if (control != nullptr &&
+            plainroot_ui_button_set_text_alignment_v1(
+                control, PLAINROOT_UI_ALIGN_START) != PLAINROOT_UI_RESULT_OK)
+          control = nullptr;
         entry_content = control;
       }
       const bool has_metadata = !metadata_displays.empty();
