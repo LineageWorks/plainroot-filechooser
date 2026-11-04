@@ -26,9 +26,12 @@ not open an interactive chooser or replace live desktop acceptance.
 Run `just check-filechooser-installed-routing` to repeat those routing checks
 using the opt-in staged install payload. It temporarily enables
 `portal_registration` in the Meson build, installs into a temporary `DESTDIR`,
-starts private broker sessions for Plainroot selection and GTK fallback, then
-restores the build option and removes the staged files. It does not register
-Plainroot in the current desktop session or verify interactive GTK parity.
+starts private broker sessions using `XDG_CURRENT_DESKTOP=PlainrootDE:Hyprland`
+to verify Plainroot selection and GTK fallback, then checks that a plain
+`Hyprland` session still selects GTK with the Plainroot backend installed.
+Finally, it restores the build option and removes the staged files. It does not
+register Plainroot in the current desktop session or verify interactive GTK
+parity.
 
 ## Current slice
 

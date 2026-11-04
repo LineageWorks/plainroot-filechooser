@@ -97,7 +97,8 @@ if ! grep -Fqx 'DBusName=org.freedesktop.impl.portal.desktop.plainroot' \
 fi
 
 run_route_case() {
-  local case_name=$1 expected_portal=$2 include_staged_registration=$3
+  local case_name=$1 expected_portal=$2 current_desktop=$3
+  local include_staged_registration=$4
   local case_root="$stage_root/cases/$case_name"
   local data_home="$case_root/data"
   local config_home="$case_root/config"
@@ -130,7 +131,7 @@ EOF
       XDG_DATA_HOME="$data_home" \
       XDG_DATA_DIRS="$data_dirs" \
       XDG_RUNTIME_DIR="$runtime_dir" \
-      XDG_CURRENT_DESKTOP=PlainrootDE \
+      XDG_CURRENT_DESKTOP="$current_desktop" \
       WAYLAND_DISPLAY=plainroot-no-display \
       DISPLAY= \
       HOME="$case_root/home" \
@@ -160,7 +161,8 @@ EOF
     "$expected_portal"
 }
 
-run_route_case plainroot plainroot true
-run_route_case gtk-fallback gtk false
+run_route_case plainroot plainroot PlainrootDE:Hyprland true
+run_route_case gtk-fallback gtk PlainrootDE:Hyprland false
+run_route_case hyprland-session gtk Hyprland true
 
-printf 'Installed portal payload routes Plainroot first and retains GTK fallback in a private broker session.\n'
+printf 'Installed portal payload routes Plainroot first for PlainrootDE and preserves GTK fallback for other desktops.\n'
