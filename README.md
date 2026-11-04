@@ -115,7 +115,12 @@ temporary FUSE helper permission change was restored to mode `0755`. This
 confirms browser access to an existing managed SSHFS mount; chooser-initiated
 SFTP connect/disconnect and persistent FUSE setup remain open. The USB volume
 is unmounted and was physically disconnected after the live Storaged
-acceptance.
+acceptance. A follow-up chooser-initiated SFTP attempt on 2026-11-04 reached
+the transient SSHFS unit's `Started` state and then a normal Networkd unmount
+about three seconds later. No mount or recent FileChooser core dump remained.
+The user reported that the app terminated, but it is not yet confirmed whether
+only the chooser closed or its parent application exited. This attempt does
+not yet verify browsing the mounted path or chooser-driven disconnect.
 
 The browser accepts an optional absolute starting directory. Directory names
 remain native byte paths for navigation and selection; names that are not valid
