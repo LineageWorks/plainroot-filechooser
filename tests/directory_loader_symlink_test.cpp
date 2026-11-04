@@ -129,14 +129,17 @@ int main() {
   loader.inspect_symlink((root / "folder-link").native(), 7);
   loader.inspect_symlink((root / "file-link").native(), 7);
   loader.inspect_symlink((root / "dangling-link").native(), 7);
+  loader.inspect_location((root / "target-folder").native(), 8, 101);
+  loader.inspect_location((root / "target-file.txt").native(), 8, 102);
+  loader.inspect_location((root / "missing-location").native(), 8, 103);
   const auto deadline = std::chrono::steady_clock::now() +
                         std::chrono::seconds(5);
-  while (results.values.size() < 3 &&
+  while (results.values.size() < 6 &&
          std::chrono::steady_clock::now() < deadline) {
     if (!task_queue.dispatch_one())
       break;
   }
-  if (results.values.size() != 3 || !results.delivered_on_owner_thread) {
+  if (results.values.size() != 6 || !results.delivered_on_owner_thread) {
     loader.stop();
     task_queue.clear();
     fs::remove_all(root, error);
@@ -147,10 +150,16 @@ int main() {
   bool folder_ok = false;
   bool file_ok = false;
   bool dangling_rejected = false;
-  for (std::size_t index = 0; index < 3; ++index) {
+  bool location_folder_ok = false;
+  bool location_file_ok = false;
+  bool missing_location_rejected = false;
+  for (std::size_t index = 0; index < results.values.size(); ++index) {
     const auto &result = results.values[index];
-    if (result.operation != DirectoryResult::Operation::InspectSymlink ||
-        result.generation != 7 || result.selection_probe)
+    if (result.operation == DirectoryResult::Operation::InspectSymlink &&
+        (result.generation != 7 || result.selection_probe))
+      return 8;
+    if (result.operation == DirectoryResult::Operation::InspectLocation &&
+        result.generation != 8)
       return 8;
     if (result.path == (root / "folder-link").native())
       folder_ok = result.result == PLAINROOT_CORE_FS_OK &&
@@ -161,8 +170,25 @@ int main() {
                     PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE;
     else if (result.path == (root / "dangling-link").native())
       dangling_rejected = result.result != PLAINROOT_CORE_FS_OK;
+    else if (result.path == (root / "target-folder").native())
+      location_folder_ok =
+          result.operation == DirectoryResult::Operation::InspectLocation &&
+          result.request_id == 101 && result.result == PLAINROOT_CORE_FS_OK &&
+          result.inspected_kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY;
+    else if (result.path == (root / "target-file.txt").native())
+      location_file_ok =
+          result.operation == DirectoryResult::Operation::InspectLocation &&
+          result.request_id == 102 && result.result == PLAINROOT_CORE_FS_OK &&
+          result.inspected_kind == PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE;
+    else if (result.path == (root / "missing-location").native())
+      missing_location_rejected =
+          result.operation == DirectoryResult::Operation::InspectLocation &&
+          result.request_id == 103 && result.result != PLAINROOT_CORE_FS_OK;
   }
 
   fs::remove_all(root, error);
-  return folder_ok && file_ok && dangling_rejected ? 0 : 9;
+  return folder_ok && file_ok && dangling_rejected && location_folder_ok &&
+                 location_file_ok && missing_location_rejected
+             ? 0
+             : 9;
 }

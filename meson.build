@@ -32,6 +32,7 @@ browser_sources = [
   'src/directory_sort.cpp',
   'src/directory_loader.cpp',
   'src/image_preview.cpp',
+  'src/location_path.cpp',
   'src/mime_database.cpp',
   'src/recent_files.cpp',
   'src/open_filename.cpp',
@@ -211,6 +212,14 @@ open_filename_test = executable(
 )
 test('FileChooser typed open filename', open_filename_test)
 
+location_path_test = executable(
+  'filechooser-location-path-test',
+  ['tests/location_path_test.cpp', 'src/location_path.cpp'],
+  dependencies: [glib_dep],
+  install: false,
+)
+test('FileChooser typed location path normalization', location_path_test)
+
 portal_choices_test = executable(
   'filechooser-portal-choices-test',
   [
@@ -293,7 +302,7 @@ directory_loader_symlink_test = executable(
   ],
   install: false,
 )
-test('FileChooser asynchronous symlink target inspection',
+test('FileChooser asynchronous path inspection',
      directory_loader_symlink_test, timeout: 10)
 
 portal_request_limits_test = executable(

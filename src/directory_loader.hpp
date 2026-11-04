@@ -28,6 +28,7 @@ struct DirectoryResult {
     RecordRecent,
     CreateDirectory,
     InspectSymlink,
+    InspectLocation,
     ImagePreview
   };
 
@@ -69,6 +70,8 @@ public:
   void inspect_symlink(std::string path, uint64_t generation,
                        bool selection_probe = false,
                        uint64_t request_id = 0);
+  void inspect_location(std::string path, uint64_t generation,
+                        uint64_t request_id);
   void request_image_preview(std::string path, uint64_t generation,
                              uint64_t request_id);
   void stop();

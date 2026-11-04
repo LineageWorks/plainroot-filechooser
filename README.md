@@ -44,7 +44,12 @@ GTK's interoperable `$XDG_CONFIG_HOME/gtk-3.0/bookmarks` format (defaulting to
 `~/.config/gtk-3.0/bookmarks`); the current folder can be added to or removed
 from that list, and existing non-local GTK bookmark URIs are preserved when the
 file is updated. The current folder path uses
-clickable ancestor breadcrumbs. Search is applied
+clickable ancestor breadcrumbs. The Location action or `Ctrl+L` opens an
+adaptive path field. It accepts absolute and current-folder-relative paths, as
+well as `~` and `~/...`; path normalization is lexical and existence checks run
+asynchronously. Directories open in the browser, files are selected for open
+requests, and save requests use a typed file path to set its parent folder and
+filename. Search is applied
 to the displayed listing, hidden entries can be shown, and
 the listing supports locale-aware, natural filename ordering in either
 direction while keeping directories first. Selecting an image displays an

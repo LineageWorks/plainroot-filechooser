@@ -112,6 +112,30 @@ msgstr "למעלה"
 msgid "Home"
 msgstr "תיקיית הבית"
 
+msgid "Location"
+msgstr "מיקום"
+
+msgid "Location path"
+msgstr "נתיב מיקום"
+
+msgid "Go"
+msgstr "מעבר"
+
+msgid "Enter a location"
+msgstr "הזנת מיקום"
+
+msgid "Enter a location path."
+msgstr "יש להזין נתיב למיקום."
+
+msgid "Checking location…"
+msgstr "המיקום נבדק…"
+
+msgid "Unable to open this location."
+msgstr "לא ניתן לפתוח את המיקום הזה."
+
+msgid "File name entered. Choose Save to check it."
+msgstr "שם הקובץ הוזן. יש לבחור בשמירה כדי לבדוק אותו."
+
 msgid "Places"
 msgstr "מקומות"
 

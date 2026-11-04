@@ -113,6 +113,30 @@ msgstr "أعلى"
 msgid "Home"
 msgstr "المجلد الرئيسي"
 
+msgid "Location"
+msgstr "الموقع"
+
+msgid "Location path"
+msgstr "مسار الموقع"
+
+msgid "Go"
+msgstr "انتقال"
+
+msgid "Enter a location"
+msgstr "أدخل موقعًا"
+
+msgid "Enter a location path."
+msgstr "أدخل مسار الموقع."
+
+msgid "Checking location…"
+msgstr "جارٍ التحقق من الموقع…"
+
+msgid "Unable to open this location."
+msgstr "تعذّر فتح هذا الموقع."
+
+msgid "File name entered. Choose Save to check it."
+msgstr "أُدخل اسم الملف. اختر «حفظ» للتحقق منه."
+
 msgid "Places"
 msgstr "الأماكن"
 

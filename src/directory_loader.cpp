@@ -121,6 +121,32 @@ public:
     wake_worker();
   }
 
+  void inspect_location(std::string path, uint64_t generation,
+                        uint64_t request_id) {
+    bool failed = false;
+    {
+      std::lock_guard lock(mutex_);
+      if (stopping_)
+        return;
+      failed = startup_failed_.load(std::memory_order_relaxed);
+      if (!failed)
+        jobs_.push_back({DirectoryResult::Operation::InspectLocation,
+                         std::move(path), generation, request_id, false, {},
+                         {}});
+    }
+    if (failed) {
+      DirectoryResult result{};
+      result.operation = DirectoryResult::Operation::InspectLocation;
+      result.generation = generation;
+      result.request_id = request_id;
+      result.path = std::move(path);
+      result.result = PLAINROOT_CORE_FS_IO_ERROR;
+      publish(std::move(result));
+      return;
+    }
+    wake_worker();
+  }
+
   void request_image_preview(std::string path, uint64_t generation,
                              uint64_t request_id) {
     bool failed = false;
@@ -309,7 +335,9 @@ private:
         plainroot_core_fs_listing_release_v1(listing);
     }
     if (result == PLAINROOT_CORE_FS_OK &&
-        pending.job.operation == DirectoryResult::Operation::InspectSymlink) {
+        (pending.job.operation == DirectoryResult::Operation::InspectSymlink ||
+         pending.job.operation ==
+             DirectoryResult::Operation::InspectLocation)) {
       plainroot_core_fs_metadata_v1 metadata{};
       metadata.struct_size = sizeof(metadata);
       delivery.result = plainroot_core_fs_async_request_get_metadata_v1(
@@ -418,7 +446,9 @@ private:
       submitted = plainroot_core_fs_async_create_directory_v1(
           executor, &path, &Impl::completed, next.get(), &next->request);
     } else if (next->job.operation ==
-               DirectoryResult::Operation::InspectSymlink) {
+                   DirectoryResult::Operation::InspectSymlink ||
+               next->job.operation ==
+                   DirectoryResult::Operation::InspectLocation) {
       submitted = plainroot_core_fs_async_stat_v1(
           executor, &path, PLAINROOT_CORE_FS_STAT_FOLLOW_SYMLINKS,
           &Impl::completed, next.get(), &next->request);
@@ -582,6 +612,12 @@ void DirectoryLoader::inspect_symlink(std::string path, uint64_t generation,
   if (impl_)
     impl_->inspect_symlink(std::move(path), generation, selection_probe,
                            request_id);
+}
+
+void DirectoryLoader::inspect_location(std::string path, uint64_t generation,
+                                       uint64_t request_id) {
+  if (impl_)
+    impl_->inspect_location(std::move(path), generation, request_id);
 }
 
 void DirectoryLoader::request_image_preview(std::string path,

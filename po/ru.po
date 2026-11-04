@@ -113,6 +113,30 @@ msgstr "Вверх"
 msgid "Home"
 msgstr "Домашняя папка"
 
+msgid "Location"
+msgstr "Расположение"
+
+msgid "Location path"
+msgstr "Путь к расположению"
+
+msgid "Go"
+msgstr "Перейти"
+
+msgid "Enter a location"
+msgstr "Ввести расположение"
+
+msgid "Enter a location path."
+msgstr "Введите путь к расположению."
+
+msgid "Checking location…"
+msgstr "Проверка расположения…"
+
+msgid "Unable to open this location."
+msgstr "Не удалось открыть это расположение."
+
+msgid "File name entered. Choose Save to check it."
+msgstr "Имя файла введено. Нажмите «Сохранить», чтобы проверить его."
+
 msgid "Places"
 msgstr "Места"
 

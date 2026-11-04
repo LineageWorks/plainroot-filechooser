@@ -4,6 +4,7 @@
 #include "directory_breadcrumbs.hpp"
 #include "directory_loader.hpp"
 #include "directory_sort.hpp"
+#include "location_path.hpp"
 #include "mime_database.hpp"
 #include "network_operation_tracker.hpp"
 #include "open_filename.hpp"
@@ -182,8 +183,11 @@ public:
     auto *location_actions = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
         420.0F, 8.0F, 0.0F);
+    location_path_row_ = plainroot_ui_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 1.0F);
     auto *up = make_button("Up", &Impl::up_activated);
     auto *home = make_button("Home", &Impl::home_activated);
+    location_button_ = make_button("Location", &Impl::location_activated);
     recent_button_ = make_button("Recent", &Impl::recent_activated);
     const std::string places_hint = tr("Places");
     places_dropdown_ = plainroot_ui_dropdown_create_v1(
@@ -194,6 +198,31 @@ public:
         make_button("Bookmark folder", &Impl::bookmark_activated);
     new_folder_button_ =
         make_button("New folder", &Impl::new_folder_activated);
+    location_entry_row_ = plainroot_ui_adaptive_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
+        560.0F, 8.0F, 0.0F);
+    location_entry_actions_ = plainroot_ui_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
+    const std::string location_hint = tr("Location path");
+    location_field_ = plainroot_ui_text_field_create_v1(
+        context_, "", 0, location_hint.c_str(),
+        static_cast<uint32_t>(location_hint.size()),
+        static_cast<uint32_t>(PATH_MAX - 1), 1.0F, nullptr, nullptr);
+    location_go_button_ = make_button("Go", &Impl::location_go_activated);
+    location_cancel_button_ =
+        make_button("Cancel", &Impl::location_cancel_activated);
+    if (location_go_button_ != nullptr)
+      (void)plainroot_ui_button_set_style_v1(
+          location_go_button_, PLAINROOT_UI_BUTTON_STYLE_FILLED);
+    if (location_field_ != nullptr)
+      (void)plainroot_ui_widget_set_text_direction_v1(
+          location_field_, PLAINROOT_UI_TEXT_LTR);
+    if (location_field_ != nullptr)
+      (void)plainroot_ui_widget_set_accessible_name_v1(
+          location_field_, location_hint.c_str(),
+          static_cast<uint32_t>(location_hint.size()));
+    if (location_entry_row_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(location_entry_row_, 0U);
     breadcrumb_scroll_ =
         plainroot_ui_horizontal_scroll_area_create_v1(context_, 0.0F, 1.0F);
     breadcrumb_strip_ = plainroot_ui_box_create_v1(
@@ -377,6 +406,10 @@ public:
         page == nullptr || footer_padding == nullptr ||
         title == nullptr || location_row == nullptr ||
         location_actions == nullptr || up == nullptr || home == nullptr ||
+        location_button_ == nullptr || location_path_row_ == nullptr ||
+        location_entry_row_ == nullptr || location_entry_actions_ == nullptr ||
+        location_field_ == nullptr || location_go_button_ == nullptr ||
+        location_cancel_button_ == nullptr ||
         recent_button_ == nullptr ||
         places_dropdown_ == nullptr || bookmark_button_ == nullptr ||
         new_folder_button_ == nullptr || new_folder_form_ == nullptr ||
@@ -541,6 +574,15 @@ public:
         !add(location_actions, places_dropdown_) ||
         !add(location_actions, bookmark_button_) ||
         !add(location_actions, new_folder_button_) ||
+        !add(location_row, location_path_row_) ||
+        !add(location_path_row_, location_button_) ||
+        !add(location_path_row_, breadcrumb_scroll_) ||
+        !add(breadcrumb_scroll_, breadcrumb_strip_) ||
+        !add(page, location_entry_row_) ||
+        !add(location_entry_row_, location_field_) ||
+        !add(location_entry_row_, location_entry_actions_) ||
+        !add(location_entry_actions_, location_go_button_) ||
+        !add(location_entry_actions_, location_cancel_button_) ||
         !add(page, new_folder_form_) ||
         !add(new_folder_form_, new_folder_field_) ||
         !add(new_folder_form_, new_folder_actions) ||
@@ -549,8 +591,7 @@ public:
         (show_filename_entry &&
          (!add(page, filename_row) || !add(filename_row, filename_label) ||
           !add(filename_row, filename_field_))) ||
-        !add(location_row, breadcrumb_scroll_) ||
-        !add(breadcrumb_scroll_, breadcrumb_strip_) || !add(page, controls) ||
+        !add(page, controls) ||
         !add(controls, search_field_) || !add(controls, hidden_switch_) ||
         !add(controls, sort_dropdown_) ||
         (filter_dropdown_ != nullptr && !add(controls, filter_dropdown_)) ||
@@ -591,9 +632,27 @@ public:
 
   void set_window(plainroot_toolkit_window *window) {
     window_ = window;
-    if (window_ != nullptr)
+    if (window_ != nullptr) {
       (void)plainroot_toolkit_window_set_ready_callback_v1(
           window_, &Impl::window_ready, this);
+      uint32_t key = 0;
+      uint32_t modifiers = 0;
+      const std::string description = tr("Enter a location");
+      if (plainroot_toolkit_shortcut_parse_v1("Ctrl+L", &key, &modifiers) ==
+          PLAINROOT_TOOLKIT_RESULT_OK) {
+        plainroot_toolkit_shortcut_v1 shortcut{};
+        shortcut.struct_size = sizeof(shortcut);
+        shortcut.action_id = "filechooser.enter-location";
+        shortcut.description = description.c_str();
+        shortcut.key = key;
+        shortcut.modifiers = modifiers;
+        shortcut.callback = &Impl::location_shortcut;
+        shortcut.user_data = this;
+        if (plainroot_toolkit_window_set_shortcuts_v1(window_, &shortcut, 1U) !=
+            PLAINROOT_TOOLKIT_RESULT_OK)
+          detail::trace("unable to register Ctrl+L location shortcut");
+      }
+    }
   }
 
   void set_title(std::string title) { requested_title_ = std::move(title); }
@@ -665,6 +724,12 @@ public:
       set_status(tr("Choose an absolute directory path."));
       return;
     }
+    uint8_t location_visible = 0;
+    if (location_entry_row_ != nullptr)
+      (void)plainroot_ui_widget_get_visible_v1(location_entry_row_,
+                                               &location_visible);
+    if (location_visible != 0U || location_request_pending_)
+      close_location_entry(false);
     ++folder_create_request_id_;
     folder_creation_pending_ = false;
     set_folder_creation_controls_enabled(true);
@@ -798,6 +863,156 @@ private:
     auto &self = *static_cast<Impl *>(user_data);
     const char *home = std::getenv("HOME");
     self.navigate(home != nullptr && home[0] == '/' ? home : "/");
+  }
+
+  static void location_activated(void *user_data, plainroot_ui_widget *) {
+    static_cast<Impl *>(user_data)->toggle_location_entry();
+  }
+
+  static void location_shortcut(void *user_data,
+                                plainroot_toolkit_application *,
+                                plainroot_toolkit_window *, const char *) {
+    static_cast<Impl *>(user_data)->toggle_location_entry();
+  }
+
+  static void location_go_activated(void *user_data, plainroot_ui_widget *) {
+    static_cast<Impl *>(user_data)->submit_location_entry();
+  }
+
+  static void location_cancel_activated(void *user_data,
+                                        plainroot_ui_widget *) {
+    static_cast<Impl *>(user_data)->close_location_entry(true);
+  }
+
+  void toggle_location_entry() {
+    uint8_t visible = 0;
+    if (location_entry_row_ != nullptr)
+      (void)plainroot_ui_widget_get_visible_v1(location_entry_row_, &visible);
+    if (visible != 0U) {
+      close_location_entry(true);
+      return;
+    }
+    const std::string current = detail::location_path_to_utf8(current_path_);
+    set_label(location_field_, current);
+    (void)plainroot_ui_widget_set_visible_v1(location_entry_row_, 1U);
+    if (location_field_ != nullptr)
+      (void)plainroot_ui_widget_accessibility_perform_action_v1(
+          location_field_, PLAINROOT_UI_ACCESSIBILITY_ACTION_FOCUS);
+    request_redraw();
+  }
+
+  void close_location_entry(bool restore_focus) {
+    ++location_request_id_;
+    location_request_pending_ = false;
+    if (location_go_button_ != nullptr)
+      (void)plainroot_ui_widget_set_enabled_v1(location_go_button_, 1U);
+    if (location_entry_row_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(location_entry_row_, 0U);
+    if (restore_focus && location_button_ != nullptr)
+      (void)plainroot_ui_widget_accessibility_perform_action_v1(
+          location_button_, PLAINROOT_UI_ACCESSIBILITY_ACTION_FOCUS);
+    request_redraw();
+  }
+
+  void submit_location_entry() {
+    if (location_request_pending_ || location_field_ == nullptr)
+      return;
+    const char *value = nullptr;
+    uint32_t length = 0;
+    if (plainroot_ui_text_field_get_text_v1(location_field_, &value, &length) !=
+            PLAINROOT_UI_RESULT_OK ||
+        (value == nullptr && length != 0U)) {
+      set_status(tr("Enter a location path."));
+      request_redraw();
+      return;
+    }
+    const auto resolution = detail::resolve_location_path(
+        current_path_, std::string_view(value == nullptr ? "" : value, length),
+        g_get_home_dir() == nullptr ? std::string_view{}
+                                    : std::string_view(g_get_home_dir()));
+    if (resolution.status != detail::LocationPathStatus::valid) {
+      set_status(tr("Enter a location path."));
+      request_redraw();
+      return;
+    }
+    location_request_pending_ = true;
+    ++location_request_id_;
+    (void)plainroot_ui_widget_set_enabled_v1(location_go_button_, 0U);
+    set_status(tr("Checking location…"));
+    loader_.inspect_location(resolution.path, generation_,
+                             location_request_id_);
+    request_redraw();
+  }
+
+  void apply_location_result(detail::DirectoryResult result) {
+    if (result.request_id != location_request_id_ ||
+        result.generation != generation_)
+      return;
+    location_request_pending_ = false;
+    if (location_go_button_ != nullptr)
+      (void)plainroot_ui_widget_set_enabled_v1(location_go_button_, 1U);
+
+    if (result.result == PLAINROOT_CORE_FS_OK &&
+        result.inspected_kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY) {
+      close_location_entry(false);
+      navigate(std::move(result.path));
+      return;
+    }
+    if (result.result == PLAINROOT_CORE_FS_OK &&
+        result.inspected_kind == PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE) {
+      activate_location_file(std::move(result.path));
+      return;
+    }
+    if (save_file_ && result.native_code == ENOENT) {
+      set_save_target_from_location(result.path);
+      return;
+    }
+    set_status(tr("Unable to open this location."));
+    request_redraw();
+  }
+
+  void set_save_target_from_location(const std::string &path) {
+    const size_t separator = path.find_last_of('/');
+    if (separator == std::string::npos || separator + 1U >= path.size()) {
+      set_status(tr("Enter a location path."));
+      request_redraw();
+      return;
+    }
+    const std::string directory =
+        separator == 0U ? "/" : path.substr(0, separator);
+    const std::string filename = display_path(path.substr(separator + 1U));
+    close_location_entry(false);
+    navigate(directory);
+    initial_filename_ = filename;
+    set_label(filename_field_, initial_filename_);
+    set_status(tr("File name entered. Choose Save to check it."));
+    request_redraw();
+  }
+
+  void activate_location_file(std::string path) {
+    if (save_file_) {
+      set_save_target_from_location(path);
+      return;
+    }
+    if (select_directory_ || !save_files_.empty()) {
+      set_status(tr("This item cannot be selected here."));
+      request_redraw();
+      return;
+    }
+    close_location_entry(false);
+    if (allow_multiple_) {
+      if (std::find(selected_paths_.begin(), selected_paths_.end(), path) ==
+          selected_paths_.end())
+        selected_paths_.push_back(path);
+      request_preview(path);
+      update_selection_summary();
+      set_status(tr("File selected. Choose Open to return it."));
+      request_redraw();
+      return;
+    }
+    EntryAction action{this, std::move(path),
+                       PLAINROOT_CORE_FS_ENTRY_REGULAR_FILE};
+    entry_activated(&action, nullptr);
   }
 
   static void recent_activated(void *user_data, plainroot_ui_widget *) {
@@ -1222,6 +1437,8 @@ private:
 
   static void entry_activated(void *user_data, plainroot_ui_widget *) {
     auto &action = *static_cast<EntryAction *>(user_data);
+    if (action.controller->location_request_pending_)
+      action.controller->close_location_entry(false);
     if (action.kind == PLAINROOT_CORE_FS_ENTRY_DIRECTORY) {
       action.controller->navigate(action.path);
       return;
@@ -1277,6 +1494,8 @@ private:
     auto &action = *static_cast<EntryAction *>(user_data);
     if (action.controller == nullptr || widget == nullptr)
       return;
+    if (action.controller->location_request_pending_)
+      action.controller->close_location_entry(false);
     if (action.controller->setting_symlink_selection_)
       return;
     uint32_t checked = 0;
@@ -1673,6 +1892,11 @@ private:
   }
 
   void apply_directory_result(detail::DirectoryResult result) {
+    if (result.operation ==
+        detail::DirectoryResult::Operation::InspectLocation) {
+      apply_location_result(std::move(result));
+      return;
+    }
     if (result.operation == detail::DirectoryResult::Operation::ImagePreview) {
       if (result.request_id != preview_request_id_ ||
           result.path != preview_path_)
@@ -2461,6 +2685,7 @@ private:
   bool new_folder_created_ = false;
   bool folder_creation_pending_ = false;
   bool directory_loading_ = false;
+  bool location_request_pending_ = false;
   bool setting_symlink_selection_ = false;
   bool recent_mode_ = false;
   bool entries_mime_classified_ = false;
@@ -2470,6 +2695,7 @@ private:
   detail::DirectorySortOrder sort_order_ =
       detail::DirectorySortOrder::name_ascending;
   uint64_t generation_ = 0;
+  uint64_t location_request_id_ = 0;
   uint64_t folder_create_request_id_ = 0;
   uint64_t symlink_selection_request_id_ = 0;
   std::string current_path_;
@@ -2496,6 +2722,13 @@ private:
   std::vector<plainroot_ui_widget *> choice_widgets_;
   plainroot_ui_widget *breadcrumb_scroll_ = nullptr;
   plainroot_ui_widget *breadcrumb_strip_ = nullptr;
+  plainroot_ui_widget *location_button_ = nullptr;
+  plainroot_ui_widget *location_path_row_ = nullptr;
+  plainroot_ui_widget *location_entry_row_ = nullptr;
+  plainroot_ui_widget *location_entry_actions_ = nullptr;
+  plainroot_ui_widget *location_field_ = nullptr;
+  plainroot_ui_widget *location_go_button_ = nullptr;
+  plainroot_ui_widget *location_cancel_button_ = nullptr;
   plainroot_ui_widget *new_folder_button_ = nullptr;
   plainroot_ui_widget *new_folder_form_ = nullptr;
   plainroot_ui_widget *new_folder_field_ = nullptr;

@@ -112,6 +112,30 @@ msgstr "Nach oben"
 msgid "Home"
 msgstr "Persönlicher Ordner"
 
+msgid "Location"
+msgstr "Ort"
+
+msgid "Location path"
+msgstr "Ortspfad"
+
+msgid "Go"
+msgstr "Gehe zu"
+
+msgid "Enter a location"
+msgstr "Ort eingeben"
+
+msgid "Enter a location path."
+msgstr "Geben Sie einen Ortspfad ein."
+
+msgid "Checking location…"
+msgstr "Ort wird überprüft …"
+
+msgid "Unable to open this location."
+msgstr "Dieser Ort kann nicht geöffnet werden."
+
+msgid "File name entered. Choose Save to check it."
+msgstr "Dateiname eingegeben. Wählen Sie „Speichern“, um ihn zu prüfen."
+
 msgid "Places"
 msgstr "Orte"
 
