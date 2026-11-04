@@ -1316,7 +1316,9 @@ private:
     }
     if (self.allow_multiple_) {
       if (self.selected_paths_.empty()) {
-        self.set_status(tr("Select at least one file."));
+        self.set_status(self.select_directory_
+                            ? tr("Select at least one folder.")
+                            : tr("Select at least one file."));
         self.request_redraw();
         return;
       }
@@ -1595,10 +1597,13 @@ private:
     const std::string count = number_result == PLAINROOT_I18N_RESULT_OK
                                   ? formatted_count
                                   : std::to_string(selected_paths_.size());
-    gchar *summary =
-        g_strdup_printf(tr("Selected files: %s").c_str(), count.c_str());
+    const std::string format = select_directory_
+                                   ? tr("Selected folders: %s")
+                                   : tr("Selected files: %s");
+    gchar *summary = g_strdup_printf(format.c_str(), count.c_str());
     if (summary == nullptr)
-      return tr("Selected files");
+      return select_directory_ ? tr("Selected folders")
+                               : tr("Selected files");
     std::string result(summary);
     g_free(summary);
     return result;

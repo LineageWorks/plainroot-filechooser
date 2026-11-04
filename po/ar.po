@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: plainroot-filechooser 0.1.0\n"
-"PO-Revision-Date: 2026-11-02 00:00+0300\n"
+"PO-Revision-Date: 2026-11-04 10:23+0200\n"
 "Last-Translator: PlainrootDE contributors\n"
 "Language-Team: Arabic\n"
 "Language: ar\n"
@@ -20,14 +20,23 @@ msgstr "اختر ملفات"
 msgid "Selected files: %s"
 msgstr "الملفات المحددة: %s"
 
+msgid "Selected folders: %s"
+msgstr "المجلدات المحددة: %s"
+
 msgid "Selected files"
 msgstr "الملفات المحددة"
+
+msgid "Selected folders"
+msgstr "المجلدات المحددة"
 
 msgid "Unable to read the selected options."
 msgstr "تعذّرت قراءة الخيارات المحددة."
 
 msgid "Select at least one file."
 msgstr "اختر ملفًا واحدًا على الأقل."
+
+msgid "Select at least one folder."
+msgstr "اختر مجلدًا واحدًا على الأقل."
 
 msgid "Choose a folder"
 msgstr "اختر مجلدًا"
