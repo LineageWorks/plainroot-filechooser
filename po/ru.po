@@ -338,6 +338,9 @@ msgstr "Этот том уже подключён."
 msgid "This location is managed by another service."
 msgstr "Это расположение управляется другой службой."
 
+msgid "The storage location is busy. Close files using it and try again."
+msgstr "Место хранения занято. Закройте файлы, использующие его, и повторите попытку."
+
 msgid "A mount location is unavailable."
 msgstr "Точка подключения недоступна."
 

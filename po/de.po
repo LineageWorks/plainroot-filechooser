@@ -337,6 +337,9 @@ msgstr "Dieser Datenträger ist bereits eingebunden."
 msgid "This location is managed by another service."
 msgstr "Dieser Speicherort wird von einem anderen Dienst verwaltet."
 
+msgid "The storage location is busy. Close files using it and try again."
+msgstr "Der Speicherort wird verwendet. Schließen Sie die darauf zugreifenden Dateien und versuchen Sie es erneut."
+
 msgid "A mount location is unavailable."
 msgstr "Ein Einhängeort ist nicht verfügbar."
 

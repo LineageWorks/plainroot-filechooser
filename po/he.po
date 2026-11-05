@@ -337,6 +337,9 @@ msgstr "אמצעי האחסון הזה כבר מעוגן."
 msgid "This location is managed by another service."
 msgstr "השירות שמנהל את המיקום הזה הוא שירות אחר."
 
+msgid "The storage location is busy. Close files using it and try again."
+msgstr "מיקום האחסון תפוס. יש לסגור קבצים שמשתמשים בו ולנסות שוב."
+
 msgid "A mount location is unavailable."
 msgstr "מיקום העיגון אינו זמין."
 

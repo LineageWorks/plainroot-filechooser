@@ -14,6 +14,7 @@
 #include "recent_files.hpp"
 #include "storage_bridge.hpp"
 #include "storage_locations_view.hpp"
+#include "storage_operation_error.hpp"
 #include "trace.hpp"
 
 #include <plainroot/i18n/i18n.h>
@@ -2256,7 +2257,8 @@ private:
         (void)storage_bridge_->request_snapshot();
     } else if (update.state == PLAINROOT_STORAGE_OPERATION_FAILED) {
       storage_operation_pending_ = false;
-      set_storage_status(tr(storage_operation_error_message(update.error)));
+      set_storage_status(
+          tr(detail::storage_operation_error_message(update.error)));
       if (storage_bridge_ != nullptr)
         (void)storage_bridge_->request_snapshot();
     } else if (update.state == PLAINROOT_STORAGE_OPERATION_CANCELLED) {
@@ -2404,29 +2406,6 @@ private:
       return "Network operation outcome is uncertain.";
     default:
       return "The network operation failed.";
-    }
-  }
-
-  static const char *storage_operation_error_message(uint32_t error) {
-    switch (error) {
-    case PLAINROOT_STORAGE_OPERATION_ERROR_AUTHORIZATION_DENIED:
-      return "Storage authorization was denied.";
-    case PLAINROOT_STORAGE_OPERATION_ERROR_INCOMPLETE_SNAPSHOT:
-      return "Storage information is incomplete; refresh and try again.";
-    case PLAINROOT_STORAGE_OPERATION_ERROR_STALE_ENTITY:
-      return "This storage device changed. Refresh and try again.";
-    case PLAINROOT_STORAGE_OPERATION_ERROR_UNSUPPORTED_FILESYSTEM:
-      return "This filesystem is not supported for mounting.";
-    case PLAINROOT_STORAGE_OPERATION_ERROR_ALREADY_MOUNTED:
-      return "This volume is already mounted.";
-    case PLAINROOT_STORAGE_OPERATION_ERROR_MOUNT_NOT_OWNED:
-      return "This location is managed by another service.";
-    case PLAINROOT_STORAGE_OPERATION_ERROR_MOUNTPOINT_UNAVAILABLE:
-      return "A mount location is unavailable.";
-    case PLAINROOT_STORAGE_OPERATION_ERROR_AUTHORIZATION_UNAVAILABLE:
-      return "Storage authorization is unavailable.";
-    default:
-      return "The storage operation failed.";
     }
   }
 

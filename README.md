@@ -80,6 +80,8 @@ offers disconnect only for network mounts owned by
 `plainroot-networkd`. Partial local snapshots suppress local volume operations.
 Local file browsing remains available when either storage service is
 unavailable. Closing the browser never unmounts a volume or network location.
+If a normal unmount fails because the location is in use, the chooser preserves
+the typed busy result and shows localized guidance to close files using it.
 Networkd checks FUSE device and mount capability before accepting a connection;
 when the session cannot mount FUSE locations, the chooser gives a localized
 setup hint and leaves the endpoint form available for retry. Plainroot does not

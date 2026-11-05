@@ -177,6 +177,15 @@ network_operation_tracker_test = executable(
 test('FileChooser correlates managed network operations',
      network_operation_tracker_test)
 
+storage_operation_error_test = executable(
+  'filechooser-storage-operation-error-test',
+  'tests/storage_operation_error_test.cpp',
+  dependencies: [storage_dep],
+  install: false,
+)
+test('FileChooser storage operation error messages',
+     storage_operation_error_test)
+
 storage_locations_view_test = executable(
   'filechooser-storage-locations-view-test',
   'tests/storage_locations_view_test.cpp',

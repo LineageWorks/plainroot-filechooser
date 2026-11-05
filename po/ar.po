@@ -338,6 +338,9 @@ msgstr "وحدة التخزين هذه مركّبة بالفعل."
 msgid "This location is managed by another service."
 msgstr "تدير خدمة أخرى هذا الموقع."
 
+msgid "The storage location is busy. Close files using it and try again."
+msgstr "موقع التخزين مشغول. أغلِق الملفات التي تستخدمه ثم حاول مرة أخرى."
+
 msgid "A mount location is unavailable."
 msgstr "موقع التركيب غير متاح."
 
