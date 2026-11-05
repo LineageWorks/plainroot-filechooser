@@ -34,6 +34,9 @@ public:
   bool create_ui();
   void set_window(plainroot_toolkit_window *window);
   void set_title(std::string title);
+  void set_recent_application_id(std::string application_id);
+  void record_recent_paths(const std::vector<std::string> &paths,
+                           bool allow_missing);
   void set_select_directory(bool select_directory);
   void set_allow_multiple(bool allow_multiple);
   void set_filters(std::vector<BrowserFilter> filters,

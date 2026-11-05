@@ -16,6 +16,7 @@ struct RecentFile {
 bool load_recent_files(std::string_view xbel_path,
                        std::vector<RecentFile> &files);
 bool record_recent_file(std::string_view xbel_path, std::string_view path,
-                        std::string_view application_id);
+                        std::string_view application_id,
+                        bool allow_missing = false);
 
 } // namespace plainroot::filechooser::detail

@@ -761,6 +761,21 @@ public:
 
   void set_title(std::string title) { requested_title_ = std::move(title); }
 
+  void set_recent_application_id(std::string application_id) {
+    recent_application_id_ = std::move(application_id);
+  }
+
+  void record_recent_paths(const std::vector<std::string> &paths,
+                           bool allow_missing) {
+    if (paths.empty())
+      return;
+    const char *data_directory = g_get_user_data_dir();
+    loader_.record_recent(
+        paths, std::string(data_directory == nullptr ? "" : data_directory) +
+                   "/recently-used.xbel",
+        recent_application_id_, allow_missing);
+  }
+
   void set_select_directory(bool select_directory) {
     select_directory_ = select_directory;
   }
@@ -2004,11 +2019,6 @@ private:
       return;
     if (paths.empty())
       return;
-    const char *data_directory = g_get_user_data_dir();
-    loader_.record_recent(
-        paths, std::string(data_directory == nullptr ? "" : data_directory) +
-                   "/recently-used.xbel",
-        "Plainroot FileChooser");
     detail::trace("selection-complete paths=%zu", paths.size());
     finished_ = true;
     if (completion_ != nullptr) {
@@ -2028,6 +2038,7 @@ private:
                   selected_choices);
       return;
     }
+    record_recent_paths(paths, save_file_);
     for (const std::string &path : paths) {
       (void)std::fwrite(path.data(), 1, path.size(), stdout);
       (void)std::fputc('\n', stdout);
@@ -2932,6 +2943,7 @@ private:
   CompletionFn completion_ = nullptr;
   void *completion_user_data_ = nullptr;
   std::string requested_title_;
+  std::string recent_application_id_ = "Plainroot FileChooser";
   std::string accept_label_;
   std::string accept_label_display_;
   std::string accept_label_mnemonic_;
@@ -3071,6 +3083,17 @@ void BrowserController::set_window(plainroot_toolkit_window *window) {
 void BrowserController::set_title(std::string title) {
   if (impl_)
     impl_->set_title(std::move(title));
+}
+
+void BrowserController::set_recent_application_id(std::string application_id) {
+  if (impl_)
+    impl_->set_recent_application_id(std::move(application_id));
+}
+
+void BrowserController::record_recent_paths(
+    const std::vector<std::string> &paths, bool allow_missing) {
+  if (impl_)
+    impl_->record_recent_paths(paths, allow_missing);
 }
 
 void BrowserController::set_select_directory(bool select_directory) {

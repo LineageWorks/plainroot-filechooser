@@ -69,7 +69,8 @@ public:
   void request_recent(std::string xbel_path, uint64_t generation,
                       bool classify_mime = false);
   void record_recent(std::vector<std::string> paths, std::string xbel_path,
-                     std::string application_id);
+                     std::string application_id,
+                     bool allow_missing = false);
   void create_directory(std::string path, uint64_t generation,
                         uint64_t request_id);
   void inspect_symlink(std::string path, uint64_t generation,

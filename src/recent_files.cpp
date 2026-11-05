@@ -7,6 +7,7 @@
 #include <glib.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <string>
 #include <sys/stat.h>
 #include <time.h>
@@ -78,8 +79,6 @@ bool load_recent_files(std::string_view xbel_path,
     GDateTime *visited = g_bookmark_file_get_visited_date_time(
         bookmarks, uris[i], nullptr);
     int64_t timestamp = visited == nullptr ? 0 : g_date_time_to_unix(visited);
-    if (visited != nullptr)
-      g_date_time_unref(visited);
     files.push_back({path, file_name(path), timestamp});
   }
   g_strfreev(uris);
@@ -91,14 +90,17 @@ bool load_recent_files(std::string_view xbel_path,
 }
 
 bool record_recent_file(std::string_view xbel_path, std::string_view input_path,
-                        std::string_view application_id) {
+                        std::string_view application_id, bool allow_missing) {
   const std::string path = canonical_local_path(input_path);
   if (path.empty() || xbel_path.empty() || xbel_path.front() != '/')
     return false;
   struct stat metadata {};
-  if (stat(path.c_str(), &metadata) != 0 ||
-      (!S_ISREG(metadata.st_mode) && !S_ISDIR(metadata.st_mode)))
+  if (stat(path.c_str(), &metadata) != 0) {
+    if (!allow_missing || errno != ENOENT)
+      return false;
+  } else if (!S_ISREG(metadata.st_mode) && !S_ISDIR(metadata.st_mode)) {
     return false;
+  }
   GBookmarkFile *bookmarks = g_bookmark_file_new();
   plainroot::core::filesystem::Buffer contents;
   const auto read = plainroot::core::filesystem::read_bytes(
@@ -130,7 +132,7 @@ bool record_recent_file(std::string_view xbel_path, std::string_view input_path,
   g_bookmark_file_add_application(bookmarks, uri,
                                   application_id.empty() ? "Plainroot FileChooser"
                                                          : std::string(application_id).c_str(),
-                                  "xdg-open %u");
+                                  "gio open %u");
   gsize size = 0;
   GError *error = nullptr;
   gchar *serialized = g_bookmark_file_to_data(bookmarks, &size, &error);

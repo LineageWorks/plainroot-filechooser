@@ -195,7 +195,7 @@ public:
   }
 
   void record_recent(std::vector<std::string> paths, std::string xbel_path,
-                     std::string application_id) {
+                     std::string application_id, bool allow_missing) {
     {
       std::lock_guard lock(mutex_);
       if (stopping_)
@@ -206,6 +206,7 @@ public:
         job.path = std::move(path);
         job.secondary_path = xbel_path;
         job.application_id = application_id;
+        job.allow_missing = allow_missing;
         jobs_.push_back(std::move(job));
       }
     }
@@ -241,6 +242,7 @@ private:
     std::string application_id;
     bool selection_probe = false;
     bool collect_metadata = false;
+    bool allow_missing = false;
   };
 
   struct Pending {
@@ -421,7 +423,7 @@ private:
     }
     if (job.operation == DirectoryResult::Operation::RecordRecent) {
       (void)record_recent_file(job.secondary_path, job.path,
-                               job.application_id);
+                               job.application_id, job.allow_missing);
       return;
     }
     if (job.operation == DirectoryResult::Operation::RecentListing) {
@@ -671,10 +673,11 @@ void DirectoryLoader::request_recent(std::string path, uint64_t generation,
 
 void DirectoryLoader::record_recent(std::vector<std::string> paths,
                                     std::string xbel_path,
-                                    std::string application_id) {
+                                    std::string application_id,
+                                    bool allow_missing) {
   if (impl_)
     impl_->record_recent(std::move(paths), std::move(xbel_path),
-                         std::move(application_id));
+                         std::move(application_id), allow_missing);
 }
 
 void DirectoryLoader::stop() {

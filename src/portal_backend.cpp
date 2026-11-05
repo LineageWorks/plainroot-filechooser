@@ -656,6 +656,9 @@ public:
       if (response == kResponseSuccess &&
           uris.size() == result_paths->size() && !uris.empty()) {
         send_reply(request, response, uris, current_filter, choices, writable);
+        if (request.controller != nullptr)
+          request.controller->record_recent_paths(
+              *result_paths, request.save_file || request.save_files);
         request.finished = true;
         unregister_request(request);
         if (close_window && request.window != nullptr)
@@ -759,6 +762,7 @@ private:
     request.controller = std::make_unique<BrowserController>(
         application_, request.context, browser_completed, &request);
     request.controller->set_title(request.title);
+    request.controller->set_recent_application_id(request.app_id);
     request.controller->set_select_directory(request.directory);
     request.controller->set_allow_multiple(request.multiple);
     request.controller->set_allow_read_only(
