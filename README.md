@@ -3,21 +3,20 @@
 `plainroot-filechooser` provides the Plainroot XDG FileChooser backend and
 browser. Plainroot applications continue to call the toolkit's XDG portal
 client; the backend must not call that client from its own process. Portal
-registration is an explicit Meson opt-in (`-Dportal_registration=true`) and
-remains disabled by default until live broker behavior and GTK capability
-coverage are accepted. GTK is a capability and behavior reference, not a visual
-template; Plainroot follows its own desktop design. When enabled, the build
-installs the FileChooser portal descriptor, D-Bus and systemd user activation,
-and the `plainrootde-portals.conf` that prefers Plainroot for FileChooser while
-keeping Hyprland and GTK as defaults for other interfaces. The PlainrootDE
-session must set `XDG_CURRENT_DESKTOP=PlainrootDE:Hyprland` for that
-desktop-specific configuration to take precedence. The current host's Hyprland
-session is not reconfigured. Plainroot's build and runtime dependency closure
-must stay free of GIO. An opt-in `DESTDIR` install was verified in a disposable
-staging root; all registration and activation files landed at their configured
-`/usr` paths. A default `DESTDIR` install was also checked and contained
-neither portal registration nor activation files. The active desktop
-configuration is not changed by these checks.
+registration is enabled by default for PlainrootDE packages. The build installs
+the FileChooser portal descriptor, D-Bus and systemd user activation, and the
+`plainrootde-portals.conf` that prefers Plainroot for FileChooser while keeping
+Hyprland and GTK as defaults for other interfaces. The PlainrootDE session must
+set `XDG_CURRENT_DESKTOP=PlainrootDE:Hyprland` for that desktop-specific
+configuration to take precedence; a plain Hyprland session continues to use
+GTK. Set `PLAINROOT_FILECHOOSER_PORTAL_REGISTRATION=false` during a workspace
+build or `-Dportal_registration=false` with Meson to omit the registration
+assets. Building or staging does not rewrite the host's portal preferences.
+Installing into the system prefix only adds the PlainrootDE-specific routing
+configuration. GTK is a capability and behavior reference, not a visual
+template; Plainroot follows its own desktop design. Plainroot's build and
+runtime dependency closure must stay free of GIO. Both enabled and disabled
+`DESTDIR` payloads are covered by the install checks.
 
 Run `just check-filechooser-portal-routing` to verify Plainroot-first selection
 and GTK fallback in an isolated D-Bus session with temporary XDG directories.
@@ -25,14 +24,17 @@ This checks broker routing without changing host portal configuration; it does
 not open an interactive chooser or replace live desktop acceptance.
 
 Run `just check-filechooser-installed-routing` to repeat those routing checks
-using the opt-in staged install payload. It temporarily enables
-`portal_registration` in the Meson build, installs into a temporary `DESTDIR`,
-starts private broker sessions using `XDG_CURRENT_DESKTOP=PlainrootDE:Hyprland`
+using the installed payload. It ensures `portal_registration` is enabled,
+installs into a temporary `DESTDIR`, and starts private broker sessions using
+`XDG_CURRENT_DESKTOP=PlainrootDE:Hyprland`
 to verify Plainroot selection and GTK fallback, then checks that a plain
 `Hyprland` session still selects GTK with the Plainroot backend installed.
 Finally, it restores the build option and removes the staged files. It does not
-register Plainroot in the current desktop session or verify interactive GTK
-capability behavior.
+change host portal preferences or launch an interactive chooser.
+
+Run `just check-filechooser-install` to verify enabled and explicitly disabled
+registration payloads in separate temporary `DESTDIR` installs. It restores the
+build option and never changes host portal files.
 
 For an interactive Editor check without changing the host portal setup, run
 `PLAINROOT_STAGE=0 just staged-filechooser-session`, then launch

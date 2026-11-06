@@ -128,9 +128,9 @@ if get_option('portal_registration')
     install_dir: get_option('datadir') / 'xdg-desktop-portal',
   )
 else
-  # Keep the prototype out of the desktop's active portal set until its live
-  # broker behavior and GTK capability parity have been accepted.
-  message('Portal registration is disabled; use -Dportal_registration=true to install it')
+  # Disabling this only omits install-time registration assets. It does not
+  # modify portal preferences already present on the host.
+  message('PlainrootDE FileChooser portal registration is disabled')
 endif
 
 directory_sort_test = executable(

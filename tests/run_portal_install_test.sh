@@ -86,7 +86,7 @@ default=hyprland;gtk
 org.freedesktop.impl.portal.FileChooser=plainroot;gtk
 EOF
 
-printf 'Opt-in portal registration staging passed.\n'
+printf 'PlainrootDE portal registration staging passed.\n'
 
 rm -rf -- "$stage_root"
 mkdir -m 700 -- "$stage_root"
@@ -95,11 +95,11 @@ DESTDIR="$stage_root" meson install -C "$build_dir" >/dev/null
 for file in "$portal_descriptor" "$dbus_service" "$user_service" \
             "$portals_config"; do
   if [[ -e "$stage_root$file" ]]; then
-    printf 'Default install unexpectedly contains portal registration: %s\n' \
+    printf 'Explicitly disabled install unexpectedly contains portal registration: %s\n' \
       "$file" >&2
     exit 1
   fi
 done
 check_file "$backend"
 check_file "$browser"
-printf 'Default install omits portal registration and activation files.\n'
+printf 'Explicitly disabled install omits portal registration and activation files.\n'
