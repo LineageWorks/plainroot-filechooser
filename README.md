@@ -33,6 +33,14 @@ Finally, it restores the build option and removes the staged files. It does not
 register Plainroot in the current desktop session or verify interactive GTK
 parity.
 
+For an interactive Editor check without changing the host portal setup, run
+`PLAINROOT_STAGE=0 just staged-filechooser-session`, then launch
+`plainroot-editor` from the shell it opens. This private D-Bus session starts
+the staged Plainroot backend directly, routes FileChooser requests to it for
+`PlainrootDE:Hyprland`, keeps GTK as the fallback, and enables
+`PLAINROOT_FILECHOOSER_TRACE=1` for lifecycle diagnostics. The temporary
+activation files and portal preference are removed when the session exits.
+
 On 2026-11-05, the installed-payload routing check passed: the private broker
 selected Plainroot for `PlainrootDE:Hyprland`, selected GTK for plain Hyprland,
 and used GTK when the staged Plainroot descriptor was omitted. The check
