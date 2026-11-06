@@ -362,6 +362,7 @@ public:
     sort_dropdown_ = plainroot_ui_dropdown_create_v1(
         context_, sort_hint.c_str(), static_cast<uint32_t>(sort_hint.size()),
         0.0F, &Impl::sort_changed, this);
+    set_accessible_name(sort_dropdown_, sort_hint);
     if (show_filename_entry) {
       const std::string hint = tr("File name");
       filename_field_ = plainroot_ui_text_field_create_v1(

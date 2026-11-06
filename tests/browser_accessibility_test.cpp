@@ -3,6 +3,8 @@
 
 #include <plainroot/ui/widgets.h>
 
+#include <array>
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -45,6 +47,36 @@ const plainroot_ui_widget *find_widget(const plainroot_ui_widget *parent,
       return match;
   }
   return nullptr;
+}
+
+plainroot_ui_rect_v1 widget_bounds(const plainroot_ui_widget *widget) {
+  plainroot_ui_rect_v1 bounds{};
+  bounds.struct_size = sizeof(bounds);
+  if (widget == nullptr ||
+      plainroot_ui_widget_bounds_v1(
+          const_cast<plainroot_ui_widget *>(widget), &bounds) !=
+          PLAINROOT_UI_RESULT_OK)
+    bounds.width = -1.0F;
+  return bounds;
+}
+
+bool fits_width(const plainroot_ui_widget *widget, float width) {
+  const auto bounds = widget_bounds(widget);
+  return bounds.width > 0.0F && bounds.x >= -0.5F &&
+         bounds.x + bounds.width <= width + 0.5F;
+}
+
+bool shares_row(const plainroot_ui_widget *first,
+                const plainroot_ui_widget *second) {
+  const auto first_bounds = widget_bounds(first);
+  const auto second_bounds = widget_bounds(second);
+  return first_bounds.height > 0.0F && second_bounds.height > 0.0F &&
+         std::abs(first_bounds.y - second_bounds.y) <= 1.0F;
+}
+
+bool is_below(const plainroot_ui_widget *first,
+              const plainroot_ui_widget *second) {
+  return widget_bounds(first).y > widget_bounds(second).y;
 }
 
 bool stable_name_after_input(const plainroot_ui_widget *field,
@@ -102,6 +134,61 @@ int main() {
                                      PLAINROOT_UI_WIDGET_TEXT_FIELD);
   const auto *new_folder_button = find_widget(
       root, "New folder", PLAINROOT_UI_WIDGET_BUTTON);
+  const auto *sort = find_widget(
+      root, "Sort files", PLAINROOT_UI_WIDGET_DROPDOWN);
+  const auto *hidden = find_widget(root, "Show hidden files",
+                                   PLAINROOT_UI_WIDGET_SWITCH);
+  const auto *details = find_widget(root, "Show file details",
+                                    PLAINROOT_UI_WIDGET_SWITCH);
+  plainroot_ui_accessibility_info_v1 sort_info{};
+  sort_info.struct_size = sizeof(sort_info);
+  const bool stable_sort_accessible_name =
+      sort != nullptr &&
+      plainroot_ui_dropdown_set_value_v1(
+          const_cast<plainroot_ui_widget *>(sort), 1) ==
+          PLAINROOT_UI_RESULT_OK &&
+      plainroot_ui_widget_accessibility_v1(sort, &sort_info) ==
+          PLAINROOT_UI_RESULT_OK &&
+      sort_info.name_utf8 != nullptr &&
+      std::string(sort_info.name_utf8, sort_info.name_length) == "Sort files";
+  const bool compact_controls_found =
+      search != nullptr && sort != nullptr && hidden != nullptr &&
+      details != nullptr;
+  struct Viewport {
+    float width;
+    float height;
+    bool controls_horizontal;
+    const char *name;
+  };
+  constexpr std::array<Viewport, 5> viewports{{
+      {390.0F, 844.0F, false, "phone portrait"},
+      {844.0F, 390.0F, true, "phone landscape"},
+      {768.0F, 1024.0F, false, "tablet portrait"},
+      {1024.0F, 768.0F, true, "tablet landscape"},
+      {1366.0F, 768.0F, true, "laptop"},
+  }};
+  bool responsive_controls_passed = compact_controls_found;
+  for (const Viewport &viewport : viewports) {
+    bounds.width = viewport.width;
+    bounds.height = viewport.height;
+    const bool laid_out =
+        plainroot_ui_context_layout_v1(context.get(), &bounds) ==
+        PLAINROOT_UI_RESULT_OK;
+    const bool fits = fits_width(search, viewport.width) &&
+                      fits_width(sort, viewport.width) &&
+                      fits_width(hidden, viewport.width) &&
+                      fits_width(details, viewport.width);
+    const bool arrangement =
+        (shares_row(search, sort) == viewport.controls_horizontal) &&
+        (shares_row(hidden, details) == viewport.controls_horizontal) &&
+        (viewport.controls_horizontal ||
+         (is_below(sort, search) && is_below(details, hidden)));
+    if (!laid_out || !fits || !arrangement) {
+      std::cerr << "Responsive browser controls failed at " << viewport.name
+                << " (" << viewport.width << 'x' << viewport.height << ")\n";
+      responsive_controls_passed = false;
+    }
+  }
   const bool folder_form_opened =
       new_folder_button != nullptr &&
       plainroot_ui_widget_accessibility_perform_action_v1(
@@ -119,6 +206,11 @@ int main() {
               "New folder opens from the accessibility action") &&
       require(folder_name != nullptr,
               "visible new-folder field has a stable accessible name") &&
+      require(stable_sort_accessible_name,
+              "sort dropdown keeps its accessible name when its value changes") &&
+      require(responsive_controls_passed,
+              "search, sort, and switches adapt across phone, tablet, and "
+              "laptop layouts") &&
       require(stable_name_after_input(search, "Search files", "notes"),
               "search query does not replace the accessible name") &&
       require(stable_name_after_input(filename, "File name", "report.txt"),
