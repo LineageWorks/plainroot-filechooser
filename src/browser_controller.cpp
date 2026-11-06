@@ -273,9 +273,7 @@ public:
       (void)plainroot_ui_widget_set_text_direction_v1(
           location_field_, PLAINROOT_UI_TEXT_LTR);
     if (location_field_ != nullptr)
-      (void)plainroot_ui_widget_set_accessible_name_v1(
-          location_field_, location_hint.c_str(),
-          static_cast<uint32_t>(location_hint.size()));
+      set_accessible_name(location_field_, location_hint);
     if (location_entry_row_ != nullptr)
       (void)plainroot_ui_widget_set_visible_v1(location_entry_row_, 0U);
     breadcrumb_scroll_ =
@@ -337,6 +335,7 @@ public:
         context_, empty.data(), 0, search_hint.c_str(),
         static_cast<uint32_t>(search_hint.size()), 512, 1.0F,
         &Impl::search_changed, this);
+    set_accessible_name(search_field_, search_hint);
     const std::string hidden_label = tr("Show hidden files");
     hidden_switch_ = plainroot_ui_switch_create_v1(
         context_, hidden_label.c_str(),
@@ -365,6 +364,7 @@ public:
           static_cast<uint32_t>(initial_filename_.size()), hint.c_str(),
           static_cast<uint32_t>(hint.size()), NAME_MAX, 1.0F,
           &Impl::filename_changed, this);
+      set_accessible_name(filename_field_, hint);
       if (filename_field_ != nullptr)
         (void)plainroot_ui_widget_set_text_direction_v1(
             filename_field_, PLAINROOT_UI_TEXT_LTR);
@@ -380,6 +380,7 @@ public:
         context_, "", 0, folder_name_hint.c_str(),
         static_cast<uint32_t>(folder_name_hint.size()), NAME_MAX, 1.0F,
         nullptr, nullptr);
+    set_accessible_name(new_folder_field_, folder_name_hint);
     new_folder_create_button_ =
         make_button("Create", &Impl::create_folder_activated);
     new_folder_cancel_button_ =
@@ -964,6 +965,13 @@ private:
     return plainroot_ui_label_create_v1(context_, text.c_str(),
                                         static_cast<uint32_t>(text.size()),
                                         PLAINROOT_UI_COLOR_ON_SURFACE_V3, flex);
+  }
+
+  void set_accessible_name(plainroot_ui_widget *widget,
+                           const std::string &name) {
+    if (widget != nullptr)
+      (void)plainroot_ui_widget_set_accessible_name_v1(
+          widget, name.c_str(), static_cast<uint32_t>(name.size()));
   }
 
   plainroot_ui_widget *make_button(const char *message,

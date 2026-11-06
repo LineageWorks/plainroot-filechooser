@@ -68,8 +68,10 @@ preview pane. JPEG EXIF
 orientation is applied by `plainroot-image`; image decoding and scaling run on
 the directory worker. Single-file open and save modes
 provide an editable filename field; open requests validate a typed name in the
-current folder and navigate when that name identifies a folder. File selection
-returns the native path on stdout. It consumes
+current folder and navigate when that name identifies a folder. Search, file
+name, folder name, and location inputs keep stable localized accessible names
+separate from their changing values. File selection returns the native path on
+stdout. It consumes
 `plainroot-storage-client` snapshots to list removable volumes and mounted
 network locations. Local volume mount and confirmed unmount requests go through
 `plainroot-storaged`. SFTP locations can be connected through the asynchronous
