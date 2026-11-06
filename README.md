@@ -133,12 +133,14 @@ returned as selected ID/value pairs. `OpenFile` requests also offer an
 boolean, defaulting to true when the checkbox remains unchecked. Request
 parsing bounds group and option counts and string sizes, and rejects duplicate
 IDs or invalid initial selections. MIME
-filters use the shared MIME database's `globs2`, aliases, and subclass data,
-plus libmagic content sniffing for ambiguous or unmatched filenames. MIME
+filters use the shared MIME database's `globs2`, aliases, subclass data, and
+compiled XDG `magic` rules for ambiguous or unmatched filenames. MIME
 classification runs on the directory worker and is requested only when the
 selected filter uses MIME patterns. Glob and MIME patterns in one filter are
-combined as alternatives. The backend and browser link libmagic but remain
-free of GIO. Portal parent identifiers and the `modal` option are forwarded to
+combined as alternatives. Content sniffing reads the same XDG MIME database as
+filename matching, including rule priorities, masks, ranges, nested matches,
+and `__NOMAGIC__` overrides. The backend and browser remain free of GIO and
+libmagic. Portal parent identifiers and the `modal` option are forwarded to
 toolkit window creation. On Wayland, `xdg-foreign` v2 transient parenting and
 the optional testing `xdg-dialog-v1` presentation hint are used when available.
 The modal hint does not enforce parent-event filtering, and parent destruction
@@ -217,8 +219,8 @@ The browser accepts an optional absolute starting directory. Directory names
 remain native byte paths for navigation and selection; names that are not valid
 UTF-8 are rendered in a safe display form. Directory I/O runs outside the UI
 thread, and results are applied on the toolkit application thread. MIME data is
-read from user and system XDG MIME directories; libmagic is used for content
-sniffing when filename rules do not resolve to one unambiguous type.
+read from user and system XDG MIME directories; their compiled `magic` rules
+classify content when filename rules do not resolve to one unambiguous type.
 
 ## Build
 

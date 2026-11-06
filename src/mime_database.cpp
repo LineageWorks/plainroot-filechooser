@@ -1,17 +1,23 @@
 #include "mime_database.hpp"
 
 #include <glib.h>
-#include <magic.h>
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <charconv>
+#include <cctype>
+#include <cerrno>
+#include <cstdint>
 #include <fstream>
+#include <iterator>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 #include <fnmatch.h>
 #include <fcntl.h>
@@ -63,6 +69,201 @@ bool has_glob_metacharacter(std::string_view pattern) {
   return pattern.find_first_of("*?[") != std::string_view::npos;
 }
 
+constexpr std::string_view kMagicHeader("MIME-Magic\0\n", 12);
+constexpr size_t kMaximumMagicDatabaseSize = 32U * 1024U * 1024U;
+constexpr size_t kMaximumSniffExtent = 16U * 1024U * 1024U;
+constexpr uint64_t kMaximumMagicRange = 1024U * 1024U;
+
+struct MagicMatchlet {
+  size_t indent = 0;
+  size_t offset = 0;
+  size_t range_length = 1;
+  size_t word_size = 1;
+  std::vector<unsigned char> value;
+  std::vector<unsigned char> mask;
+};
+
+struct MagicRule {
+  std::string type;
+  int priority = 0;
+  size_t directory_rank = 0;
+  std::vector<MagicMatchlet> matchlets;
+};
+
+bool read_magic_number(std::string_view bytes, size_t &position,
+                       uint64_t &number) {
+  const size_t start = position;
+  while (position < bytes.size() &&
+         std::isdigit(static_cast<unsigned char>(bytes[position])))
+    ++position;
+  if (position == start)
+    return false;
+  const auto parsed = std::from_chars(bytes.data() + start,
+                                      bytes.data() + position, number);
+  return parsed.ec == std::errc{} && parsed.ptr == bytes.data() + position;
+}
+
+bool parse_magic_rule(std::string_view bytes, size_t &position,
+                      MagicMatchlet &matchlet) {
+  uint64_t number = 0;
+  if (position >= bytes.size() || bytes[position] == '[')
+    return false;
+  if (bytes[position] == '\n') {
+    ++position;
+    return false;
+  }
+
+  if (std::isdigit(static_cast<unsigned char>(bytes[position]))) {
+    if (!read_magic_number(bytes, position, number) ||
+        number > std::numeric_limits<size_t>::max())
+      return false;
+    matchlet.indent = static_cast<size_t>(number);
+  } else {
+    matchlet.indent = 0;
+  }
+  if (position >= bytes.size() || bytes[position++] != '>')
+    return false;
+  if (!read_magic_number(bytes, position, number) ||
+      number > kMaximumSniffExtent)
+    return false;
+  matchlet.offset = static_cast<size_t>(number);
+  if (position >= bytes.size() || bytes[position++] != '=')
+    return false;
+  if (position + 2U > bytes.size())
+    return false;
+  const size_t value_length =
+      (static_cast<size_t>(static_cast<unsigned char>(bytes[position])) << 8U) |
+      static_cast<size_t>(static_cast<unsigned char>(bytes[position + 1U]));
+  position += 2U;
+  if (value_length == 0U || position + value_length > bytes.size())
+    return false;
+  matchlet.value.reserve(value_length);
+  for (size_t index = 0; index < value_length; ++index)
+    matchlet.value.push_back(
+        static_cast<unsigned char>(bytes[position + index]));
+  position += value_length;
+
+  if (position < bytes.size() && bytes[position] == '&') {
+    ++position;
+    if (position + value_length > bytes.size())
+      return false;
+    matchlet.mask.reserve(value_length);
+    for (size_t index = 0; index < value_length; ++index)
+      matchlet.mask.push_back(
+          static_cast<unsigned char>(bytes[position + index]));
+    position += value_length;
+  }
+  if (position < bytes.size() && bytes[position] == '~') {
+    ++position;
+    if (!read_magic_number(bytes, position, number) ||
+        (number != 0U && number != 1U && number != 2U && number != 4U))
+      return false;
+    matchlet.word_size = static_cast<size_t>(number);
+  }
+  if (position < bytes.size() && bytes[position] == '+') {
+    ++position;
+    if (!read_magic_number(bytes, position, number) ||
+        number > kMaximumMagicRange)
+      return false;
+    matchlet.range_length = static_cast<size_t>(number);
+  }
+  if (position >= bytes.size() || bytes[position] != '\n') {
+    // The XDG format reserves unknown suffix characters for future extensions.
+    // Their line has no further binary data, so skip it without interpreting it.
+    while (position < bytes.size() && bytes[position] != '\n')
+      ++position;
+    if (position < bytes.size())
+      ++position;
+    return false;
+  }
+  ++position;
+
+  if (matchlet.range_length == 0U)
+    return false;
+  if (matchlet.word_size > 1U) {
+    if (value_length % matchlet.word_size != 0U)
+      return false;
+    if (std::endian::native == std::endian::little) {
+      for (size_t offset = 0; offset < value_length;
+           offset += matchlet.word_size) {
+        std::reverse(matchlet.value.begin() +
+                         static_cast<std::ptrdiff_t>(offset),
+                     matchlet.value.begin() + static_cast<std::ptrdiff_t>(
+                                                  offset + matchlet.word_size));
+        if (!matchlet.mask.empty())
+          std::reverse(matchlet.mask.begin() +
+                           static_cast<std::ptrdiff_t>(offset),
+                       matchlet.mask.begin() + static_cast<std::ptrdiff_t>(
+                                                   offset + matchlet.word_size));
+      }
+    }
+  }
+  if (matchlet.offset > kMaximumSniffExtent ||
+      matchlet.range_length > kMaximumSniffExtent ||
+      matchlet.offset + matchlet.range_length - 1U > kMaximumSniffExtent ||
+      value_length > kMaximumSniffExtent - matchlet.offset -
+                         (matchlet.range_length - 1U))
+    return false;
+  return true;
+}
+
+bool magic_matchlet_matches(const MagicMatchlet &matchlet,
+                            const std::vector<unsigned char> &data) {
+  for (size_t offset = 0; offset < matchlet.range_length; ++offset) {
+    const size_t candidate_offset = matchlet.offset + offset;
+    if (candidate_offset > data.size() ||
+        matchlet.value.size() > data.size() - candidate_offset)
+      return false;
+    bool matches = true;
+    for (size_t index = 0; index < matchlet.value.size(); ++index) {
+      const unsigned char mask = matchlet.mask.empty()
+                                     ? 0xffU
+                                     : matchlet.mask[index];
+      if ((matchlet.value[index] & mask) !=
+          (data[candidate_offset + index] & mask)) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches)
+      return true;
+  }
+  return false;
+}
+
+bool magic_rule_level_matches(const MagicRule &rule,
+                              const std::vector<unsigned char> &data,
+                              size_t &position, size_t indent) {
+  bool level_matches = false;
+  while (position < rule.matchlets.size() &&
+         rule.matchlets[position].indent == indent) {
+    const MagicMatchlet &matchlet = rule.matchlets[position++];
+    const bool parent_matches = magic_matchlet_matches(matchlet, data);
+    const bool has_children = position < rule.matchlets.size() &&
+                              rule.matchlets[position].indent > indent;
+    bool children_match = true;
+    if (has_children && parent_matches) {
+      children_match = magic_rule_level_matches(rule, data, position,
+                                                indent + 1U);
+    } else if (has_children) {
+      while (position < rule.matchlets.size() &&
+             rule.matchlets[position].indent > indent)
+        ++position;
+    }
+    if (parent_matches && (!has_children || children_match))
+      level_matches = true;
+  }
+  return level_matches;
+}
+
+bool magic_rule_matches(const MagicRule &rule,
+                        const std::vector<unsigned char> &data) {
+  if (rule.matchlets.empty() || rule.matchlets.front().indent != 0U)
+    return false;
+  size_t position = 0;
+  return magic_rule_level_matches(rule, data, position, 0U);
+}
+
 } // namespace
 
 bool mime_type_pattern_matches(const std::vector<std::string> &types,
@@ -103,39 +304,43 @@ public:
 
   explicit Impl(std::vector<std::string> mime_directories,
                 bool enable_content_sniffing) {
-    for (const std::string &directory : mime_directories)
-      load_directory(directory);
-    if (enable_content_sniffing) {
-      magic_ = magic_open(MAGIC_MIME_TYPE | MAGIC_NO_COMPRESS_FORK |
-                          MAGIC_NO_CHECK_COMPRESS | MAGIC_PRESERVE_ATIME);
-      if (magic_ != nullptr && magic_load(magic_, nullptr) != 0) {
-        magic_close(magic_);
-        magic_ = nullptr;
-      }
-    }
-  }
-
-  ~Impl() {
-    if (magic_ != nullptr)
-      magic_close(magic_);
+    for (size_t rank = 0; rank < mime_directories.size(); ++rank)
+      load_directory(mime_directories[rank], rank, enable_content_sniffing);
   }
 
   bool available() const noexcept {
-    return !globs_.empty() || magic_ != nullptr;
+    return !globs_.empty() || !magic_rules_.empty();
   }
 
-  bool content_sniffing_available() const noexcept { return magic_ != nullptr; }
+  bool content_sniffing_available() const noexcept {
+    return !magic_rules_.empty();
+  }
 
   std::vector<std::string> types_for_file(std::string_view native_path,
                                           std::string_view native_name) {
-    auto types = matching_globs(native_name);
-    if (types.size() == 1U)
-      return include_parent_types(types);
-
+    const auto candidates = matching_globs(native_name);
     const std::string sniffed = sniff_file(native_path);
-    if (!sniffed.empty())
-      return include_parent_types({canonical_type(sniffed)});
-    return include_parent_types({fallback_type(native_path)});
+    if (sniffed.empty()) {
+      if (!candidates.empty())
+        return include_parent_types({candidates.front()});
+      return include_parent_types({fallback_type(native_path)});
+    }
+
+    if (candidates.empty())
+      return include_parent_types({sniffed});
+
+    const auto sniffed_hierarchy = include_parent_types({sniffed});
+    for (const std::string &candidate : candidates) {
+      const std::string canonical_candidate = canonical_type(candidate);
+      if (canonical_candidate == sniffed ||
+          std::find(sniffed_hierarchy.begin(), sniffed_hierarchy.end(),
+                    canonical_candidate) != sniffed_hierarchy.end())
+        return include_parent_types({sniffed});
+    }
+
+    // When the content rules do not refine a filename candidate, retain the
+    // highest-ranked XDG glob candidate, as the shared MIME matcher does.
+    return include_parent_types({candidates.front()});
   }
 
   std::vector<std::string>
@@ -176,10 +381,127 @@ public:
   }
 
 private:
-  void load_directory(const std::string &directory) {
+  void load_directory(const std::string &directory, size_t rank,
+                      bool enable_content_sniffing) {
     load_globs(directory + "/globs2");
     load_aliases(directory + "/aliases");
     load_subclasses(directory + "/subclasses");
+    if (enable_content_sniffing)
+      load_magic(directory + "/magic", rank);
+  }
+
+  void load_magic(const std::string &path, size_t directory_rank) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input)
+      return;
+    input.seekg(0, std::ios::end);
+    const std::streamoff length = input.tellg();
+    if (length < static_cast<std::streamoff>(kMagicHeader.size()) ||
+        length > static_cast<std::streamoff>(kMaximumMagicDatabaseSize))
+      return;
+    input.seekg(0, std::ios::beg);
+    std::string bytes(static_cast<size_t>(length), '\0');
+    input.read(bytes.data(), length);
+    if (!input || !std::string_view(bytes).starts_with(kMagicHeader))
+      return;
+
+    size_t position = kMagicHeader.size();
+    MagicRule section;
+    bool have_section = false;
+    bool last_matchlet_valid = true;
+    auto finish_section = [&]() {
+      if (have_section && !section.matchlets.empty()) {
+        for (const MagicMatchlet &matchlet : section.matchlets) {
+          const size_t extent = matchlet.offset + matchlet.value.size() +
+                                matchlet.range_length - 1U;
+          magic_max_extent_ = std::max(magic_max_extent_, extent);
+        }
+        magic_rules_.push_back(std::move(section));
+      }
+      section = {};
+      have_section = false;
+      last_matchlet_valid = true;
+    };
+
+    while (position < bytes.size()) {
+      if (bytes[position] == '[') {
+        finish_section();
+        const size_t line_end = bytes.find('\n', position);
+        if (line_end == std::string::npos)
+          break;
+        const std::string_view header(bytes.data() + position + 1U,
+                                      line_end - position - 1U);
+        const size_t colon = header.find(':');
+        if (colon == std::string_view::npos || header.empty() ||
+            header.back() != ']') {
+          position = line_end + 1U;
+          have_section = false;
+          continue;
+        }
+        int priority = 0;
+        const auto parsed_priority = std::from_chars(
+            header.data(), header.data() + colon, priority);
+        const std::string_view type = header.substr(
+            colon + 1U, header.size() - colon - 2U);
+        if (parsed_priority.ec != std::errc{} ||
+            parsed_priority.ptr != header.data() + colon || type.empty()) {
+          position = line_end + 1U;
+          have_section = false;
+          continue;
+        }
+        section.type.assign(type);
+        section.priority = priority;
+        section.directory_rank = directory_rank;
+        have_section = true;
+        position = line_end + 1U;
+        continue;
+      }
+      if (!have_section) {
+        const size_t line_end = bytes.find('\n', position);
+        position = line_end == std::string::npos ? bytes.size() : line_end + 1U;
+        continue;
+      }
+      if (bytes[position] == '\n') {
+        ++position;
+        continue;
+      }
+
+      const size_t line_start = position;
+      MagicMatchlet matchlet;
+      if (!parse_magic_rule(bytes, position, matchlet)) {
+        if (position == line_start) {
+          const size_t line_end = bytes.find('\n', position);
+          position = line_end == std::string::npos ? bytes.size()
+                                                   : line_end + 1U;
+        }
+        last_matchlet_valid = false;
+        continue;
+      }
+      if ((!section.matchlets.empty() &&
+           matchlet.indent > section.matchlets.back().indent + 1U) ||
+          (section.matchlets.empty() && matchlet.indent != 0U)) {
+        last_matchlet_valid = false;
+        continue;
+      }
+
+      const std::string marker(matchlet.value.begin(), matchlet.value.end());
+      if (matchlet.indent == 0U && matchlet.offset == 0U &&
+          matchlet.range_length == 1U && matchlet.mask.empty() &&
+          marker == "__NOMAGIC__") {
+        const std::string replaced_type = ascii_lower(section.type);
+        std::erase_if(magic_rules_, [&replaced_type](const MagicRule &rule) {
+          return ascii_lower(rule.type) == replaced_type;
+        });
+        section.matchlets.clear();
+        last_matchlet_valid = true;
+        continue;
+      }
+      if (!last_matchlet_valid && matchlet.indent != 0U)
+        continue;
+      section.matchlets.push_back(std::move(matchlet));
+      last_matchlet_valid = true;
+    }
+    finish_section();
   }
 
   void load_globs(const std::string &path) {
@@ -335,8 +657,9 @@ private:
     return types;
   }
 
-  std::string sniff_file(std::string_view path) {
-    if (magic_ == nullptr || path.empty() || path.find('\0') != std::string_view::npos)
+  std::string sniff_file(std::string_view path) const {
+    if (magic_rules_.empty() || magic_max_extent_ == 0U || path.empty() ||
+        path.find('\0') != std::string_view::npos)
       return {};
     const std::string native_path(path);
     const int descriptor =
@@ -348,10 +671,36 @@ private:
       close(descriptor);
       return {};
     }
-    const char *type = magic_descriptor(magic_, descriptor);
-    const std::string result = type == nullptr ? std::string{} : std::string(type);
+    const size_t file_extent =
+        status.st_size < 0
+            ? magic_max_extent_
+            : std::min(magic_max_extent_, static_cast<size_t>(status.st_size));
+    std::vector<unsigned char> data(file_extent);
+    size_t bytes_read = 0;
+    while (bytes_read < data.size()) {
+      const ssize_t count =
+          read(descriptor, data.data() + bytes_read, data.size() - bytes_read);
+      if (count < 0 && errno == EINTR)
+        continue;
+      if (count <= 0)
+        break;
+      bytes_read += static_cast<size_t>(count);
+    }
     close(descriptor);
-    return result;
+    data.resize(bytes_read);
+
+    const MagicRule *best = nullptr;
+    for (const MagicRule &rule : magic_rules_) {
+      if (best != nullptr && rule.priority < best->priority)
+        continue;
+      if (!magic_rule_matches(rule, data))
+        continue;
+      if (best == nullptr || rule.priority > best->priority ||
+          (rule.priority == best->priority &&
+           rule.directory_rank > best->directory_rank))
+        best = &rule;
+    }
+    return best == nullptr ? std::string{} : canonical_type(best->type);
   }
 
   static std::string fallback_type(std::string_view path) {
@@ -385,7 +734,8 @@ private:
   std::vector<GlobRule> globs_;
   std::unordered_map<std::string, std::string> aliases_;
   std::unordered_map<std::string, std::vector<std::string>> parents_;
-  magic_t magic_ = nullptr;
+  std::vector<MagicRule> magic_rules_;
+  size_t magic_max_extent_ = 0;
 };
 
 MimeDatabase::MimeDatabase()

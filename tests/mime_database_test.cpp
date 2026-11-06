@@ -19,6 +19,32 @@ void write_text(const std::filesystem::path &path, const std::string &text) {
   assert(output.good());
 }
 
+void append_magic_section(std::string &magic, int priority,
+                          const std::string &type) {
+  magic += "[" + std::to_string(priority) + ":" + type + "]\n";
+}
+
+void append_magic_rule(std::string &magic, size_t indent, size_t offset,
+                       const std::string &value,
+                       const std::string &mask = {}, size_t word_size = 1,
+                       size_t range_length = 1) {
+  if (indent != 0U)
+    magic += std::to_string(indent);
+  magic += ">" + std::to_string(offset) + "=";
+  magic.push_back(static_cast<char>((value.size() >> 8U) & 0xffU));
+  magic.push_back(static_cast<char>(value.size() & 0xffU));
+  magic += value;
+  if (!mask.empty()) {
+    magic.push_back('&');
+    magic += mask;
+  }
+  if (word_size != 1U)
+    magic += "~" + std::to_string(word_size);
+  if (range_length != 1U)
+    magic += "+" + std::to_string(range_length);
+  magic.push_back('\n');
+}
+
 bool contains(const std::vector<std::string> &values,
               const std::string &value) {
   for (const std::string &candidate : values) {
@@ -91,14 +117,14 @@ int main() {
 
   const auto ambiguous_types =
       database.types_for_file(ambiguous_file.string(), "sample.amb");
-  assert(contains(ambiguous_types, "text/plain"));
-  assert(!contains(ambiguous_types, "application/x-ambiguous-one"));
+  assert(contains(ambiguous_types, "application/x-ambiguous-one"));
+  assert(!contains(ambiguous_types, "text/plain"));
   MimeDatabase sniffing_database({low.string(), high.string()}, true);
   if (sniffing_database.content_sniffing_available()) {
     const auto sniffed_ambiguous_types = sniffing_database.types_for_file(
         ambiguous_file.string(), "sample.amb");
-    assert(contains(sniffed_ambiguous_types, "text/plain"));
-    assert(!contains(sniffed_ambiguous_types, "application/x-ambiguous-one"));
+    assert(contains(sniffed_ambiguous_types, "application/x-ambiguous-one"));
+    assert(!contains(sniffed_ambiguous_types, "text/plain"));
   }
 
   const auto code_types =
@@ -135,6 +161,117 @@ int main() {
     assert(contains(image_types, "image/png"));
     assert(system_database.matches(image_types, "image/*"));
   }
+
+  const std::filesystem::path magic_low = root / "magic-low" / "mime";
+  const std::filesystem::path magic_high = root / "magic-high" / "mime";
+  std::filesystem::create_directories(magic_low);
+  std::filesystem::create_directories(magic_high);
+  write_text(magic_low / "globs2",
+             "50:audio/ogg:*.ogg\n"
+             "50:video/ogg:*.ogg\n"
+             "50:audio/x-vorbis+ogg:*.ogg\n"
+             "50:audio/x-flac+ogg:*.ogg\n");
+  write_text(magic_low / "subclasses",
+             "audio/x-vorbis+ogg audio/ogg\n");
+
+  std::string low_magic("MIME-Magic\0\n", 12);
+  append_magic_section(low_magic, 80, "application/x-signature");
+  append_magic_rule(low_magic, 0, 0, "SIG!");
+  append_magic_section(low_magic, 70, "application/x-nested");
+  append_magic_rule(low_magic, 0, 0, "ROOT");
+  append_magic_rule(low_magic, 1, 4, "GOOD");
+  append_magic_rule(low_magic, 0, 0, "ALTN");
+  append_magic_section(low_magic, 90, "application/x-masked");
+  append_magic_rule(low_magic, 0, 0, std::string(1, '\xa0'),
+                    std::string(1, '\xf0'));
+  append_magic_section(low_magic, 70, "application/x-ranged");
+  append_magic_rule(low_magic, 0, 0, "Z", {}, 1, 4);
+  append_magic_section(low_magic, 70, "application/x-host-word");
+  append_magic_rule(low_magic, 0, 0, std::string("\x01\x02\x03\x04", 4),
+                    {}, 4);
+  append_magic_section(low_magic, 30, "application/x-priority-low");
+  append_magic_rule(low_magic, 0, 0, "PRIO");
+  append_magic_section(low_magic, 90, "application/x-priority-high");
+  append_magic_rule(low_magic, 0, 0, "PRIO");
+  append_magic_section(low_magic, 80, "audio/x-vorbis+ogg");
+  append_magic_rule(low_magic, 0, 0, "CODEC");
+  append_magic_section(low_magic, 80, "application/x-overridden");
+  append_magic_rule(low_magic, 0, 0, "OLD");
+  write_text(magic_low / "magic", low_magic);
+
+  std::string high_magic("MIME-Magic\0\n", 12);
+  append_magic_section(high_magic, 80, "application/x-overridden");
+  append_magic_rule(high_magic, 0, 0, "__NOMAGIC__");
+  append_magic_rule(high_magic, 0, 0, "NEW");
+  write_text(magic_high / "magic", high_magic);
+
+  MimeDatabase xdg_magic_database({magic_low.string(), magic_high.string()});
+  assert(xdg_magic_database.content_sniffing_available());
+  const auto signature_file = root / "signature-data.unknown";
+  write_text(signature_file, "SIG!");
+  assert(contains(xdg_magic_database.types_for_file(
+                      signature_file.string(), signature_file.filename().string()),
+                  "application/x-signature"));
+
+  const auto nested_file = root / "nested.unknown";
+  write_text(nested_file, "ROOTGOOD");
+  auto nested_types = xdg_magic_database.types_for_file(
+      nested_file.string(), nested_file.filename().string());
+  assert(contains(nested_types, "application/x-nested"));
+  write_text(nested_file, "ROOTBAD!");
+  nested_types = xdg_magic_database.types_for_file(
+      nested_file.string(), nested_file.filename().string());
+  assert(!contains(nested_types, "application/x-nested"));
+  write_text(nested_file, "ALTN");
+  nested_types = xdg_magic_database.types_for_file(
+      nested_file.string(), nested_file.filename().string());
+  assert(contains(nested_types, "application/x-nested"));
+  write_text(nested_file, "ALTNGOOD");
+  nested_types = xdg_magic_database.types_for_file(
+      nested_file.string(), nested_file.filename().string());
+  assert(contains(nested_types, "application/x-nested"));
+
+  const auto masked_file = root / "masked.unknown";
+  write_text(masked_file, std::string(1, '\xaf'));
+  assert(contains(xdg_magic_database.types_for_file(
+                      masked_file.string(), masked_file.filename().string()),
+                  "application/x-masked"));
+  const auto ranged_file = root / "ranged.unknown";
+  write_text(ranged_file, "abcZ");
+  assert(contains(xdg_magic_database.types_for_file(
+                      ranged_file.string(), ranged_file.filename().string()),
+                  "application/x-ranged"));
+  const auto word_file = root / "word.unknown";
+  write_text(word_file, std::string("\x04\x03\x02\x01", 4));
+  assert(contains(xdg_magic_database.types_for_file(
+                      word_file.string(), word_file.filename().string()),
+                  "application/x-host-word"));
+
+  const auto priority_file = root / "priority.unknown";
+  write_text(priority_file, "PRIO");
+  const auto priority_types = xdg_magic_database.types_for_file(
+      priority_file.string(), priority_file.filename().string());
+  assert(contains(priority_types, "application/x-priority-high"));
+  assert(!contains(priority_types, "application/x-priority-low"));
+
+  const auto codec_file = root / "codec.ogg";
+  write_text(codec_file, "CODEC");
+  const auto codec_types =
+      xdg_magic_database.types_for_file(codec_file.string(), "codec.ogg");
+  assert(contains(codec_types, "audio/x-vorbis+ogg"));
+  assert(xdg_magic_database.matches(codec_types, "audio/x-vorbis+ogg"));
+  assert(xdg_magic_database.matches(codec_types, "audio/ogg"));
+
+  const auto old_magic_file = root / "old-magic.unknown";
+  write_text(old_magic_file, "OLD");
+  const auto old_magic_types = xdg_magic_database.types_for_file(
+      old_magic_file.string(), old_magic_file.filename().string());
+  assert(!contains(old_magic_types, "application/x-overridden"));
+  const auto new_magic_file = root / "new-magic.unknown";
+  write_text(new_magic_file, "NEW");
+  const auto new_magic_types = xdg_magic_database.types_for_file(
+      new_magic_file.string(), new_magic_file.filename().string());
+  assert(contains(new_magic_types, "application/x-overridden"));
 
   std::filesystem::remove_all(root);
   return 0;

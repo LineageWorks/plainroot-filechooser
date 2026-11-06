@@ -22,7 +22,6 @@ network_storage_dep = dependency(
 )
 image_dep = dependency('plainroot-image', version: '>= 0.4.0')
 glib_dep = dependency('glib-2.0', version: '>= 2.66')
-magic_dep = dependency('libmagic', version: '>= 5.39')
 threads_dep = dependency('threads')
 systemd_dep = dependency('libsystemd')
 
@@ -56,7 +55,6 @@ filechooser_common = static_library(
     network_storage_dep,
     image_dep,
     glib_dep,
-    magic_dep,
     threads_dep,
   ],
   install: false,
@@ -71,7 +69,6 @@ common_dependencies = [
   network_storage_dep,
   image_dep,
   glib_dep,
-  magic_dep,
   threads_dep,
 ]
 
@@ -218,7 +215,7 @@ mime_database_test = executable(
     'tests/mime_database_test.cpp',
     'src/mime_database.cpp',
   ],
-  dependencies: [glib_dep, magic_dep],
+  dependencies: [glib_dep],
   install: false,
 )
 test('FileChooser MIME database', mime_database_test)
@@ -342,7 +339,6 @@ directory_loader_symlink_test = executable(
     toolkit_dep,
     image_dep,
     glib_dep,
-    magic_dep,
     threads_dep,
   ],
   install: false,
