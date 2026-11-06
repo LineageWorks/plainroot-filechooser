@@ -517,6 +517,9 @@ public:
               ? "Malformed FileChooser.SaveFiles options"
               : (save_file_request ? "Malformed FileChooser.SaveFile options"
                                    : "Malformed FileChooser.OpenFile options"));
+    detail::trace("request-parent-modal parent-present=%d modal=%d",
+                  request->parent_window.empty() ? 0 : 1,
+                  request->modal ? 1 : 0);
     if (!select_initial_filter(*request))
       return reply_error(message, SD_BUS_ERROR_INVALID_ARGS,
                          "Too many file filters in request");
@@ -756,7 +759,9 @@ private:
   }
 
   void create_window(PortalRequest &request) {
-    detail::trace("window-create-begin");
+    detail::trace("window-create-begin parent-present=%d modal=%d",
+                  request.parent_window.empty() ? 0 : 1,
+                  request.modal ? 1 : 0);
     const char *language = plainroot_i18n_language_tag_v1();
     if (language == nullptr)
       language = "en";
