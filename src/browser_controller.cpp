@@ -225,8 +225,8 @@ public:
     auto *location_actions = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
         kLocationActionsHorizontalWidth, 8.0F, 0.0F);
-    auto *location_navigation_actions = plainroot_ui_box_create_v1(
-        context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
+    auto *location_navigation_actions = plainroot_ui_wrap_create_v1(
+        context_, 8.0F, 8.0F, 0.0F);
     auto *location_places_actions = plainroot_ui_box_create_v1(
         context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
     location_folder_actions_ = plainroot_ui_box_create_v1(

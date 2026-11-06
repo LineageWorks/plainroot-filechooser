@@ -201,6 +201,14 @@ browser_accessibility_test = executable(
   install: false,
 )
 test('FileChooser stable accessible input names', browser_accessibility_test)
+rtl_browser_test_env = environment()
+rtl_browser_test_env.set('LC_ALL', 'ar_EG.utf8')
+rtl_browser_test_env.set('LC_MESSAGES', 'ar_EG.utf8')
+rtl_browser_test_env.set('LANGUAGE', 'ar')
+rtl_browser_test_env.set('PLAINROOT_I18N_LOCALE_DIR',
+                         meson.current_build_dir() / 'po')
+test('FileChooser Arabic responsive layout', browser_accessibility_test,
+     args: ['--rtl-responsive'], env: rtl_browser_test_env)
 
 image_preview_test = executable(
   'filechooser-image-preview-test',

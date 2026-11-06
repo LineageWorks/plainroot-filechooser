@@ -203,9 +203,61 @@ bool is_expanded(const plainroot_ui_widget *widget) {
          (info.state & PLAINROOT_UI_WIDGET_STATE_EXPANDED) != 0;
 }
 
+int run_rtl_responsive_layout_test() {
+  TemporaryConfigHome temporary_config;
+  if (!require(temporary_config.ready(),
+               "isolated config home for RTL responsive layout"))
+    return 1;
+
+  std::unique_ptr<plainroot_ui_context, decltype(&plainroot_ui_context_destroy)>
+      context(plainroot::filechooser::make_ui_context("ar"),
+              &plainroot_ui_context_destroy);
+  if (!require(context != nullptr, "Arabic UI context creation"))
+    return 1;
+
+  plainroot::filechooser::BrowserController controller(nullptr, context.get());
+  if (!require(controller.ready(), "directory worker startup") ||
+      !require(controller.create_ui(), "Arabic browser UI creation"))
+    return 1;
+  controller.navigate(temporary_config.browse_directory().string());
+
+  struct Viewport {
+    float width;
+    float height;
+    const char *name;
+  };
+  constexpr std::array<Viewport, 5> viewports{{
+      {390.0F, 844.0F, "phone portrait"},
+      {844.0F, 390.0F, "phone landscape"},
+      {768.0F, 1024.0F, "tablet portrait"},
+      {1024.0F, 768.0F, "tablet landscape"},
+      {1366.0F, 768.0F, "laptop"},
+  }};
+
+  plainroot_ui_rect_v1 bounds{};
+  bounds.struct_size = sizeof(bounds);
+  for (const Viewport &viewport : viewports) {
+    controller.update_viewport(viewport.width, viewport.height);
+    bounds.width = viewport.width;
+    bounds.height = viewport.height;
+    const auto result = plainroot_ui_context_layout_v1(context.get(), &bounds);
+    if (result != PLAINROOT_UI_RESULT_OK) {
+      std::cerr << "Arabic responsive layout failed at " << viewport.name
+                << " (" << viewport.width << 'x' << viewport.height
+                << ", UI result " << static_cast<unsigned>(result) << ")\n";
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
 } // namespace
 
-int main() {
+int main(int argc, char **argv) {
+  if (argc == 2 && std::strcmp(argv[1], "--rtl-responsive") == 0)
+    return run_rtl_responsive_layout_test();
+
   TemporaryConfigHome temporary_config;
   if (!require(temporary_config.ready(),
                "isolated config home for bookmark actions"))
