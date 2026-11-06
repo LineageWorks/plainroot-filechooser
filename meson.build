@@ -196,6 +196,15 @@ storage_locations_view_test = executable(
 test('FileChooser keeps SFTP form open until connection succeeds',
      storage_locations_view_test)
 
+browser_accessibility_test = executable(
+  'filechooser-browser-accessibility-test',
+  'tests/browser_accessibility_test.cpp',
+  link_with: filechooser_common,
+  dependencies: common_dependencies,
+  install: false,
+)
+test('FileChooser stable accessible input names', browser_accessibility_test)
+
 image_preview_test = executable(
   'filechooser-image-preview-test',
   ['tests/image_preview_test.cpp', 'src/image_preview.cpp'],
