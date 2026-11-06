@@ -52,6 +52,7 @@ constexpr float kShortWindowHeight = 480.0F;
 constexpr float kCompactFilenameWidth = 640.0F;
 constexpr float kExpandedMetadataRowWidth = 840.0F;
 constexpr float kLocationActionsHorizontalWidth = 800.0F;
+constexpr float kLocationActionsInlineWidth = 1280.0F;
 constexpr float kLocationRowHorizontalWidth = 960.0F;
 /* Content panes use the wider breakpoint. Controls keep related fields in two
  * rows so phone landscape can show part of the file list without scrolling. */
@@ -2862,11 +2863,11 @@ private:
     last_window_height_ = height;
     const bool compact =
         width < kCompactWindowWidth || height < kShortWindowHeight;
-    /* In stacked layouts, keep folder management behind the overflow menu so
-     * the file list gets one more visible row without shrinking touch targets.
+    /* Keep folder management behind overflow until all three location-action
+     * groups fit inline, without shrinking their touch targets.
      */
     const bool compact_actions =
-        width < kLocationActionsHorizontalWidth || height < kShortWindowHeight;
+        width < kLocationActionsInlineWidth || height < kShortWindowHeight;
     if (title_ != nullptr)
       (void)plainroot_ui_widget_set_visible_v1(
           title_, height < kShortWindowHeight ? 0U : 1U);

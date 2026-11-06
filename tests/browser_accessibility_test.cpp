@@ -1,6 +1,7 @@
 #include "../src/browser_controller.hpp"
 #include "../src/ui_context_factory.hpp"
 
+#include <plainroot/i18n/i18n.h>
 #include <plainroot/ui/widgets.h>
 
 #include <array>
@@ -209,6 +210,20 @@ int run_rtl_responsive_layout_test() {
                "isolated config home for RTL responsive layout"))
     return 1;
 
+  std::array<char, 512> localization_error{};
+  plainroot_i18n_options_v1 localization_options{};
+  localization_options.struct_size = sizeof(localization_options);
+  localization_options.fallback_language_tag = "en";
+  if (!require(plainroot_i18n_initialize_v1(
+                   &localization_options, localization_error.data(),
+                   localization_error.size()) == PLAINROOT_I18N_RESULT_OK &&
+                   plainroot_i18n_bind_domain_v1(
+                       "plainroot-filechooser", nullptr,
+                       localization_error.data(),
+                       localization_error.size()) == PLAINROOT_I18N_RESULT_OK,
+               "Arabic FileChooser localization initialization"))
+    return 1;
+
   std::unique_ptr<plainroot_ui_context, decltype(&plainroot_ui_context_destroy)>
       context(plainroot::filechooser::make_ui_context("ar"),
               &plainroot_ui_context_destroy);
@@ -248,6 +263,157 @@ int run_rtl_responsive_layout_test() {
       return 1;
     }
   }
+
+  const auto layout_at = [&](float width, float height) {
+    controller.update_viewport(width, height);
+    bounds.width = width;
+    bounds.height = height;
+    return plainroot_ui_context_layout_v1(context.get(), &bounds) ==
+           PLAINROOT_UI_RESULT_OK;
+  };
+  const auto bookmark_is_present = [&] {
+    std::ifstream input(temporary_config.bookmarks_file());
+    const std::string contents{std::istreambuf_iterator<char>(input),
+                               std::istreambuf_iterator<char>()};
+    return contents.find(temporary_config.browse_directory().string()) !=
+           std::string::npos;
+  };
+  const plainroot_ui_widget *root = nullptr;
+  const auto open_folder_form = [&](const plainroot_ui_widget *action) {
+    if (action == nullptr || !dispatch_pointer_click(context.get(), action) ||
+        plainroot_ui_context_layout_v1(context.get(), &bounds) !=
+            PLAINROOT_UI_RESULT_OK)
+      return false;
+    const plainroot_ui_widget *root = nullptr;
+    return plainroot_ui_context_get_accessibility_root_v1(
+               context.get(), &root) == PLAINROOT_UI_RESULT_OK &&
+           find_widget(root, "اسم المجلد", PLAINROOT_UI_WIDGET_TEXT_FIELD) !=
+               nullptr;
+  };
+  const auto cancel_folder_form = [&] {
+    const auto *cancel = find_widget(root, "إلغاء", PLAINROOT_UI_WIDGET_BUTTON);
+    return cancel != nullptr && dispatch_pointer_click(context.get(), cancel) &&
+           plainroot_ui_context_layout_v1(context.get(), &bounds) ==
+               PLAINROOT_UI_RESULT_OK &&
+           find_widget(root, "اسم المجلد", PLAINROOT_UI_WIDGET_TEXT_FIELD) ==
+               nullptr;
+  };
+
+  if (!require(plainroot_ui_context_get_accessibility_root_v1(
+                   context.get(), &root) == PLAINROOT_UI_RESULT_OK,
+               "Arabic responsive accessibility root"))
+    return 1;
+
+  if (!require(layout_at(1024.0F, 768.0F),
+               "Arabic tablet landscape interaction layout"))
+    return 1;
+  const auto *places =
+      find_widget(root, "الأماكن", PLAINROOT_UI_WIDGET_DROPDOWN);
+  const auto *more_actions =
+      find_widget(root, "إجراءات أخرى", PLAINROOT_UI_WIDGET_BUTTON);
+  uint8_t more_visible = 0;
+  const auto places_bounds = widget_bounds(places);
+  const auto more_bounds = widget_bounds(more_actions);
+  const bool tablet_menu_in_rtl_order =
+      places != nullptr && more_actions != nullptr &&
+      plainroot_ui_widget_get_visible_v1(more_actions, &more_visible) ==
+          PLAINROOT_UI_RESULT_OK &&
+      more_visible != 0 && shares_row(places, more_actions) &&
+      more_bounds.x + more_bounds.width < places_bounds.x;
+  if (!tablet_menu_in_rtl_order) {
+    std::cerr << "Arabic tablet menu geometry: places=" << (places != nullptr)
+              << " more=" << (more_actions != nullptr)
+              << " visible=" << static_cast<unsigned>(more_visible)
+              << " places_bounds=" << places_bounds.x << ',' << places_bounds.y
+              << ' ' << places_bounds.width << 'x' << places_bounds.height
+              << " more_bounds=" << more_bounds.x << ',' << more_bounds.y << ' '
+              << more_bounds.width << 'x' << more_bounds.height << '\n';
+  }
+  if (!require(tablet_menu_in_rtl_order,
+               "Arabic tablet keeps More beside Places in RTL order") ||
+      !require(dispatch_pointer_click(context.get(), more_actions) &&
+                   plainroot_ui_context_layout_v1(context.get(), &bounds) ==
+                       PLAINROOT_UI_RESULT_OK &&
+                   is_expanded(more_actions),
+               "Arabic tablet More menu opens by pointer"))
+    return 1;
+
+  const auto ensure_menu_open = [&] {
+    if (!is_expanded(more_actions) &&
+        (!dispatch_pointer_click(context.get(), more_actions) ||
+         plainroot_ui_context_layout_v1(context.get(), &bounds) !=
+             PLAINROOT_UI_RESULT_OK))
+      return false;
+    return is_expanded(more_actions);
+  };
+  const auto ensure_menu_closed = [&] {
+    if (is_expanded(more_actions) &&
+        (!dispatch_pointer_click(context.get(), more_actions) ||
+         plainroot_ui_context_layout_v1(context.get(), &bounds) !=
+             PLAINROOT_UI_RESULT_OK))
+      return false;
+    return !is_expanded(more_actions);
+  };
+  const bool tablet_bookmark_saved =
+      ensure_menu_open() &&
+      dispatch_key(context.get(), PLAINROOT_UI_KEY_ENTER) &&
+      bookmark_is_present();
+  if (!require(tablet_bookmark_saved,
+               "Arabic tablet menu adds the current folder bookmark"))
+    return 1;
+
+  const bool tablet_bookmark_removed =
+      ensure_menu_closed() && ensure_menu_open() &&
+      dispatch_key(context.get(), PLAINROOT_UI_KEY_ENTER) &&
+      !bookmark_is_present();
+  if (!require(tablet_bookmark_removed,
+               "Arabic tablet menu removes the current folder bookmark"))
+    return 1;
+
+  const bool tablet_new_folder_opened =
+      ensure_menu_closed() && ensure_menu_open() &&
+      dispatch_key(context.get(), PLAINROOT_UI_KEY_DOWN) &&
+      dispatch_key(context.get(), PLAINROOT_UI_KEY_ENTER) &&
+      plainroot_ui_context_layout_v1(context.get(), &bounds) ==
+          PLAINROOT_UI_RESULT_OK &&
+      find_widget(root, "اسم المجلد", PLAINROOT_UI_WIDGET_TEXT_FIELD) !=
+          nullptr;
+  if (!require(tablet_new_folder_opened,
+               "Arabic tablet menu opens the New folder form") ||
+      !require(cancel_folder_form(),
+               "Arabic tablet cancels the New folder form by pointer"))
+    return 1;
+
+  if (!require(layout_at(1366.0F, 768.0F), "Arabic laptop interaction layout"))
+    return 1;
+  const auto *wide_bookmark = find_widget(
+      root, "إضافة المجلد إلى الإشارات المرجعية", PLAINROOT_UI_WIDGET_BUTTON);
+  if (!require(wide_bookmark != nullptr &&
+                   dispatch_pointer_click(context.get(), wide_bookmark) &&
+                   bookmark_is_present(),
+               "Arabic laptop inline action adds the current folder bookmark"))
+    return 1;
+  if (!require(layout_at(1366.0F, 768.0F),
+               "Arabic laptop layout after adding bookmark"))
+    return 1;
+  const auto *wide_remove_bookmark =
+      find_widget(root, "إزالة الإشارة المرجعية", PLAINROOT_UI_WIDGET_BUTTON);
+  if (!require(
+          wide_remove_bookmark != nullptr &&
+              dispatch_pointer_click(context.get(), wide_remove_bookmark) &&
+              !bookmark_is_present(),
+          "Arabic laptop inline action removes the current bookmark"))
+    return 1;
+  if (!require(layout_at(1366.0F, 768.0F),
+               "Arabic laptop layout before New folder"))
+    return 1;
+  const auto *wide_new_folder =
+      find_widget(root, "مجلد جديد", PLAINROOT_UI_WIDGET_BUTTON);
+  if (!require(open_folder_form(wide_new_folder),
+               "Arabic laptop inline action opens the New folder form") ||
+      !require(cancel_folder_form(),
+               "Arabic laptop cancels the New folder form by pointer"))
+    return 1;
 
   return 0;
 }
