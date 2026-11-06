@@ -49,13 +49,12 @@ constexpr float kPagePadding = 16.0F;
 constexpr float kContentSpacing = 16.0F;
 constexpr float kCompactWindowWidth = 600.0F;
 constexpr float kShortWindowHeight = 480.0F;
-constexpr float kCompactControlsWidth = 1000.0F;
 constexpr float kCompactFilenameWidth = 640.0F;
 constexpr float kExpandedMetadataRowWidth = 840.0F;
 constexpr float kLocationActionsHorizontalWidth = 800.0F;
 constexpr float kLocationRowHorizontalWidth = 960.0F;
-/* Content panes use the wider breakpoint; short action rows wrap earlier so
- * phone landscape retains room for the file list. */
+/* Content panes use the wider breakpoint. Controls keep related fields in two
+ * rows so phone landscape can show part of the file list without scrolling. */
 constexpr float kExpandedControlsWidth = 800.0F;
 constexpr float kPreviewWidth = 256.0F;
 constexpr float kPreviewHeight = 192.0F;
@@ -318,9 +317,14 @@ public:
       }
     }
 
-    auto *controls = plainroot_ui_adaptive_box_create_v1(
+    auto *controls = plainroot_ui_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_VERTICAL, 12.0F, 0.0F);
+    auto *search_sort_controls = plainroot_ui_adaptive_box_create_v1(
         context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
-        kCompactControlsWidth, 12.0F, 0.0F);
+        kExpandedControlsWidth, 12.0F, 0.0F);
+    auto *toggle_filter_controls = plainroot_ui_adaptive_box_create_v1(
+        context_, PLAINROOT_UI_AXIS_VERTICAL, PLAINROOT_UI_AXIS_HORIZONTAL,
+        kExpandedControlsWidth, 12.0F, 0.0F);
     const bool show_filename_entry = uses_filename_field();
     auto *filename_row = show_filename_entry
                              ? plainroot_ui_adaptive_box_create_v1(
@@ -496,6 +500,7 @@ public:
         details_switch_ == nullptr ||
         sort_dropdown_ == nullptr ||
         (filters_.size() > 1U && filter_dropdown_ == nullptr) ||
+        search_sort_controls == nullptr || toggle_filter_controls == nullptr ||
         browser_body_ == nullptr || list_scroll_ == nullptr ||
         entries_list_ == nullptr || preview_panel_ == nullptr ||
         preview_heading_ == nullptr || preview_image_ == nullptr ||
@@ -671,12 +676,16 @@ public:
         !add(new_folder_actions, new_folder_cancel_button_) ||
         (filename_before_browser && !add(page, filename_row)) ||
         !add(page, controls) ||
-        !add(controls, search_field_) || !add(controls, hidden_switch_) ||
-        !add(controls, details_switch_) ||
-        !add(controls, sort_dropdown_) ||
-        (filter_dropdown_ != nullptr && !add(controls, filter_dropdown_)) ||
+        !add(controls, search_sort_controls) ||
+        !add(search_sort_controls, search_field_) ||
+        !add(search_sort_controls, sort_dropdown_) ||
+        !add(controls, toggle_filter_controls) ||
+        !add(toggle_filter_controls, hidden_switch_) ||
+        !add(toggle_filter_controls, details_switch_) ||
+        !add(toggle_filter_controls, storage_toggle_button_) ||
+        (filter_dropdown_ != nullptr &&
+         !add(toggle_filter_controls, filter_dropdown_)) ||
         (choices_panel != nullptr && !add(page, choices_panel)) ||
-        !add(page, storage_toggle_button_) ||
         !add(page, storage_view_widget_) || !add(page, browser_body_) ||
         !add(browser_body_, list_scroll_) || !add(browser_body_, preview_panel_) ||
         !add(preview_panel_, preview_heading_) ||
