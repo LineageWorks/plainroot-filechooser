@@ -5,9 +5,10 @@ browser. Plainroot applications continue to call the toolkit's XDG portal
 client; the backend must not call that client from its own process. Portal
 registration is an explicit Meson opt-in (`-Dportal_registration=true`) and
 remains disabled by default until live broker behavior and GTK capability
-parity are accepted. When enabled, the build installs the FileChooser portal
-descriptor, D-Bus and systemd user activation, and a
-`plainrootde-portals.conf` that prefers Plainroot for FileChooser while
+coverage are accepted. GTK is a capability and behavior reference, not a visual
+template; Plainroot follows its own desktop design. When enabled, the build
+installs the FileChooser portal descriptor, D-Bus and systemd user activation,
+and the `plainrootde-portals.conf` that prefers Plainroot for FileChooser while
 keeping Hyprland and GTK as defaults for other interfaces. The PlainrootDE
 session must set `XDG_CURRENT_DESKTOP=PlainrootDE:Hyprland` for that
 desktop-specific configuration to take precedence. The current host's Hyprland
@@ -31,7 +32,7 @@ to verify Plainroot selection and GTK fallback, then checks that a plain
 `Hyprland` session still selects GTK with the Plainroot backend installed.
 Finally, it restores the build option and removes the staged files. It does not
 register Plainroot in the current desktop session or verify interactive GTK
-parity.
+capability behavior.
 
 For an interactive Editor check without changing the host portal setup, run
 `PLAINROOT_STAGE=0 just staged-filechooser-session`, then launch
@@ -152,8 +153,9 @@ filters, and enumerated choices. A live user-bus check also activated the
 staged backend through its user-systemd unit and stopped it cleanly. A staged
 interactive Editor check with an existing document confirmed that selecting a
 replacement file loads its contents and closes the Plainroot chooser normally.
-Installed desktop registration and GTK capability and visual parity remain
-open; keep registration opt-in until those checks pass.
+Installed desktop registration and remaining GTK capability acceptance remain
+open; keep registration opt-in until those checks pass. Visual acceptance is
+evaluated against Plainroot's own desktop design, not GTK appearance.
 
 Storaged's local-volume operation passed live systemd read/write mount and
 normal-unmount acceptance on `/dev/sdb1` on 2026-11-03, including a user
@@ -256,4 +258,4 @@ previous `portal_registration` option when it finishes.
   at smartphone, tablet, and laptop reference sizes.
 
 See the [FileChooser roadmap](../plainroot-docs/plainroot-filechooser-roadmap.md)
-for the staged delivery and parity requirements.
+for staged delivery and capability acceptance requirements.
