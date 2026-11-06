@@ -175,6 +175,34 @@ bool dispatch_key(plainroot_ui_context *context, uint32_t key) {
          PLAINROOT_UI_RESULT_OK;
 }
 
+bool dispatch_pointer_click(plainroot_ui_context *context,
+                            const plainroot_ui_widget *widget) {
+  const auto bounds = widget_bounds(widget);
+  if (bounds.width <= 0.0F || bounds.height <= 0.0F)
+    return false;
+
+  plainroot_ui_event_v1 event{};
+  event.struct_size = sizeof(event);
+  event.x = bounds.x + bounds.width * 0.5F;
+  event.y = bounds.y + bounds.height * 0.5F;
+  event.type = PLAINROOT_UI_EVENT_POINTER_DOWN;
+  if (plainroot_ui_context_handle_event_v1(context, &event) !=
+      PLAINROOT_UI_RESULT_OK)
+    return false;
+  event.type = PLAINROOT_UI_EVENT_POINTER_UP;
+  return plainroot_ui_context_handle_event_v1(context, &event) ==
+         PLAINROOT_UI_RESULT_OK;
+}
+
+bool is_expanded(const plainroot_ui_widget *widget) {
+  plainroot_ui_accessibility_info_v1 info{};
+  info.struct_size = sizeof(info);
+  return widget != nullptr &&
+         plainroot_ui_widget_accessibility_v1(widget, &info) ==
+             PLAINROOT_UI_RESULT_OK &&
+         (info.state & PLAINROOT_UI_WIDGET_STATE_EXPANDED) != 0;
+}
+
 } // namespace
 
 int main() {
@@ -300,19 +328,22 @@ int main() {
       find_widget(root, "Bookmark folder", PLAINROOT_UI_WIDGET_BUTTON) ==
           nullptr &&
       find_widget(root, "New folder", PLAINROOT_UI_WIDGET_BUTTON) == nullptr;
-  const bool overflow_opened =
+  const bool overflow_pointer_opened =
       overflow_button_visible &&
+      dispatch_pointer_click(context.get(), more_actions);
+  const bool overflow_pointer_expanded =
+      overflow_pointer_opened && is_expanded(more_actions);
+  const bool overflow_pointer_closed =
+      overflow_pointer_expanded &&
+      dispatch_pointer_click(context.get(), more_actions) &&
+      !is_expanded(more_actions);
+  const bool overflow_opened =
+      overflow_pointer_closed &&
       plainroot_ui_widget_accessibility_perform_action_v1(
           const_cast<plainroot_ui_widget *>(more_actions),
           PLAINROOT_UI_ACCESSIBILITY_ACTION_DEFAULT) == PLAINROOT_UI_RESULT_OK;
-  plainroot_ui_accessibility_info_v1 more_actions_info{};
-  more_actions_info.struct_size = sizeof(more_actions_info);
   const bool overflow_expanded =
-      overflow_opened &&
-      plainroot_ui_widget_accessibility_v1(more_actions,
-                                           &more_actions_info) ==
-          PLAINROOT_UI_RESULT_OK &&
-      (more_actions_info.state & PLAINROOT_UI_WIDGET_STATE_EXPANDED) != 0;
+      overflow_opened && is_expanded(more_actions);
 
   const bool bookmark_activated =
       overflow_expanded && dispatch_key(context.get(), PLAINROOT_UI_KEY_ENTER);
@@ -361,6 +392,10 @@ int main() {
               "More actions remains beside Places on phone") &&
       require(wide_actions_hidden,
               "phone layout moves folder actions out of the wide action row") &&
+      require(overflow_pointer_expanded,
+              "pointer click opens More actions on phone") &&
+      require(overflow_pointer_closed,
+              "pointer click closes the open More actions menu") &&
       require(overflow_expanded,
               "More actions opens from its accessibility action") &&
       require(bookmark_saved,
