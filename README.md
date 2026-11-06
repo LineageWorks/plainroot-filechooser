@@ -40,6 +40,9 @@ the staged Plainroot backend directly, routes FileChooser requests to it for
 `PlainrootDE:Hyprland`, keeps GTK as the fallback, and enables
 `PLAINROOT_FILECHOOSER_TRACE=1` for lifecycle diagnostics. The temporary
 activation files and portal preference are removed when the session exits.
+Alternatively, `PLAINROOT_STAGE=0 just staged-filechooser-editor` launches the
+staged Editor directly inside this private session, avoiding the generic
+`staged-session` portal configuration.
 
 On 2026-11-05, the installed-payload routing check passed: the private broker
 selected Plainroot for `PlainrootDE:Hyprland`, selected GTK for plain Hyprland,
