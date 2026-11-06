@@ -204,7 +204,17 @@ bool is_expanded(const plainroot_ui_widget *widget) {
          (info.state & PLAINROOT_UI_WIDGET_STATE_EXPANDED) != 0;
 }
 
-int run_rtl_responsive_layout_test() {
+int run_rtl_responsive_layout_test(const char *language_tag) {
+  const bool arabic = std::strcmp(language_tag, "ar") == 0;
+  const char *places_label = arabic ? "الأماكن" : "מקומות";
+  const char *more_actions_label = arabic ? "إجراءات أخرى" : "פעולות נוספות";
+  const char *folder_name_label = arabic ? "اسم المجلد" : "שם התיקייה";
+  const char *cancel_label = arabic ? "إلغاء" : "ביטול";
+  const char *bookmark_label =
+      arabic ? "إضافة المجلد إلى الإشارات المرجعية" : "הוספת התיקייה לסימניות";
+  const char *remove_bookmark_label =
+      arabic ? "إزالة الإشارة المرجعية" : "הסרת הסימנייה";
+  const char *new_folder_label = arabic ? "مجلد جديد" : "תיקייה חדשה";
   TemporaryConfigHome temporary_config;
   if (!require(temporary_config.ready(),
                "isolated config home for RTL responsive layout"))
@@ -221,18 +231,18 @@ int run_rtl_responsive_layout_test() {
                        "plainroot-filechooser", nullptr,
                        localization_error.data(),
                        localization_error.size()) == PLAINROOT_I18N_RESULT_OK,
-               "Arabic FileChooser localization initialization"))
+               "RTL FileChooser localization initialization"))
     return 1;
 
   std::unique_ptr<plainroot_ui_context, decltype(&plainroot_ui_context_destroy)>
-      context(plainroot::filechooser::make_ui_context("ar"),
+      context(plainroot::filechooser::make_ui_context(language_tag),
               &plainroot_ui_context_destroy);
-  if (!require(context != nullptr, "Arabic UI context creation"))
+  if (!require(context != nullptr, "RTL UI context creation"))
     return 1;
 
   plainroot::filechooser::BrowserController controller(nullptr, context.get());
   if (!require(controller.ready(), "directory worker startup") ||
-      !require(controller.create_ui(), "Arabic browser UI creation"))
+      !require(controller.create_ui(), "RTL browser UI creation"))
     return 1;
   controller.navigate(temporary_config.browse_directory().string());
 
@@ -257,9 +267,9 @@ int run_rtl_responsive_layout_test() {
     bounds.height = viewport.height;
     const auto result = plainroot_ui_context_layout_v1(context.get(), &bounds);
     if (result != PLAINROOT_UI_RESULT_OK) {
-      std::cerr << "Arabic responsive layout failed at " << viewport.name
-                << " (" << viewport.width << 'x' << viewport.height
-                << ", UI result " << static_cast<unsigned>(result) << ")\n";
+      std::cerr << "RTL responsive layout failed at " << viewport.name << " ("
+                << viewport.width << 'x' << viewport.height << ", UI result "
+                << static_cast<unsigned>(result) << ")\n";
       return 1;
     }
   }
@@ -287,30 +297,31 @@ int run_rtl_responsive_layout_test() {
     const plainroot_ui_widget *root = nullptr;
     return plainroot_ui_context_get_accessibility_root_v1(
                context.get(), &root) == PLAINROOT_UI_RESULT_OK &&
-           find_widget(root, "اسم المجلد", PLAINROOT_UI_WIDGET_TEXT_FIELD) !=
-               nullptr;
+           find_widget(root, folder_name_label,
+                       PLAINROOT_UI_WIDGET_TEXT_FIELD) != nullptr;
   };
   const auto cancel_folder_form = [&] {
-    const auto *cancel = find_widget(root, "إلغاء", PLAINROOT_UI_WIDGET_BUTTON);
+    const auto *cancel =
+        find_widget(root, cancel_label, PLAINROOT_UI_WIDGET_BUTTON);
     return cancel != nullptr && dispatch_pointer_click(context.get(), cancel) &&
            plainroot_ui_context_layout_v1(context.get(), &bounds) ==
                PLAINROOT_UI_RESULT_OK &&
-           find_widget(root, "اسم المجلد", PLAINROOT_UI_WIDGET_TEXT_FIELD) ==
-               nullptr;
+           find_widget(root, folder_name_label,
+                       PLAINROOT_UI_WIDGET_TEXT_FIELD) == nullptr;
   };
 
   if (!require(plainroot_ui_context_get_accessibility_root_v1(
                    context.get(), &root) == PLAINROOT_UI_RESULT_OK,
-               "Arabic responsive accessibility root"))
+               "RTL responsive accessibility root"))
     return 1;
 
   if (!require(layout_at(1024.0F, 768.0F),
-               "Arabic tablet landscape interaction layout"))
+               "RTL tablet landscape interaction layout"))
     return 1;
   const auto *places =
-      find_widget(root, "الأماكن", PLAINROOT_UI_WIDGET_DROPDOWN);
+      find_widget(root, places_label, PLAINROOT_UI_WIDGET_DROPDOWN);
   const auto *more_actions =
-      find_widget(root, "إجراءات أخرى", PLAINROOT_UI_WIDGET_BUTTON);
+      find_widget(root, more_actions_label, PLAINROOT_UI_WIDGET_BUTTON);
   uint8_t more_visible = 0;
   const auto places_bounds = widget_bounds(places);
   const auto more_bounds = widget_bounds(more_actions);
@@ -321,7 +332,7 @@ int run_rtl_responsive_layout_test() {
       more_visible != 0 && shares_row(places, more_actions) &&
       more_bounds.x + more_bounds.width < places_bounds.x;
   if (!tablet_menu_in_rtl_order) {
-    std::cerr << "Arabic tablet menu geometry: places=" << (places != nullptr)
+    std::cerr << "RTL tablet menu geometry: places=" << (places != nullptr)
               << " more=" << (more_actions != nullptr)
               << " visible=" << static_cast<unsigned>(more_visible)
               << " places_bounds=" << places_bounds.x << ',' << places_bounds.y
@@ -330,12 +341,12 @@ int run_rtl_responsive_layout_test() {
               << more_bounds.width << 'x' << more_bounds.height << '\n';
   }
   if (!require(tablet_menu_in_rtl_order,
-               "Arabic tablet keeps More beside Places in RTL order") ||
+               "RTL tablet keeps More beside Places in RTL order") ||
       !require(dispatch_pointer_click(context.get(), more_actions) &&
                    plainroot_ui_context_layout_v1(context.get(), &bounds) ==
                        PLAINROOT_UI_RESULT_OK &&
                    is_expanded(more_actions),
-               "Arabic tablet More menu opens by pointer"))
+               "RTL tablet More menu opens by pointer"))
     return 1;
 
   const auto ensure_menu_open = [&] {
@@ -359,7 +370,7 @@ int run_rtl_responsive_layout_test() {
       dispatch_key(context.get(), PLAINROOT_UI_KEY_ENTER) &&
       bookmark_is_present();
   if (!require(tablet_bookmark_saved,
-               "Arabic tablet menu adds the current folder bookmark"))
+               "RTL tablet menu adds the current folder bookmark"))
     return 1;
 
   const bool tablet_bookmark_removed =
@@ -367,7 +378,7 @@ int run_rtl_responsive_layout_test() {
       dispatch_key(context.get(), PLAINROOT_UI_KEY_ENTER) &&
       !bookmark_is_present();
   if (!require(tablet_bookmark_removed,
-               "Arabic tablet menu removes the current folder bookmark"))
+               "RTL tablet menu removes the current folder bookmark"))
     return 1;
 
   const bool tablet_new_folder_opened =
@@ -376,43 +387,43 @@ int run_rtl_responsive_layout_test() {
       dispatch_key(context.get(), PLAINROOT_UI_KEY_ENTER) &&
       plainroot_ui_context_layout_v1(context.get(), &bounds) ==
           PLAINROOT_UI_RESULT_OK &&
-      find_widget(root, "اسم المجلد", PLAINROOT_UI_WIDGET_TEXT_FIELD) !=
+      find_widget(root, folder_name_label, PLAINROOT_UI_WIDGET_TEXT_FIELD) !=
           nullptr;
   if (!require(tablet_new_folder_opened,
-               "Arabic tablet menu opens the New folder form") ||
+               "RTL tablet menu opens the New folder form") ||
       !require(cancel_folder_form(),
-               "Arabic tablet cancels the New folder form by pointer"))
+               "RTL tablet cancels the New folder form by pointer"))
     return 1;
 
-  if (!require(layout_at(1366.0F, 768.0F), "Arabic laptop interaction layout"))
+  if (!require(layout_at(1366.0F, 768.0F), "RTL laptop interaction layout"))
     return 1;
-  const auto *wide_bookmark = find_widget(
-      root, "إضافة المجلد إلى الإشارات المرجعية", PLAINROOT_UI_WIDGET_BUTTON);
+  const auto *wide_bookmark =
+      find_widget(root, bookmark_label, PLAINROOT_UI_WIDGET_BUTTON);
   if (!require(wide_bookmark != nullptr &&
                    dispatch_pointer_click(context.get(), wide_bookmark) &&
                    bookmark_is_present(),
-               "Arabic laptop inline action adds the current folder bookmark"))
+               "RTL laptop inline action adds the current folder bookmark"))
     return 1;
   if (!require(layout_at(1366.0F, 768.0F),
-               "Arabic laptop layout after adding bookmark"))
+               "RTL laptop layout after adding bookmark"))
     return 1;
   const auto *wide_remove_bookmark =
-      find_widget(root, "إزالة الإشارة المرجعية", PLAINROOT_UI_WIDGET_BUTTON);
+      find_widget(root, remove_bookmark_label, PLAINROOT_UI_WIDGET_BUTTON);
   if (!require(
           wide_remove_bookmark != nullptr &&
               dispatch_pointer_click(context.get(), wide_remove_bookmark) &&
               !bookmark_is_present(),
-          "Arabic laptop inline action removes the current bookmark"))
+          "RTL laptop inline action removes the current bookmark"))
     return 1;
   if (!require(layout_at(1366.0F, 768.0F),
-               "Arabic laptop layout before New folder"))
+               "RTL laptop layout before New folder"))
     return 1;
   const auto *wide_new_folder =
-      find_widget(root, "مجلد جديد", PLAINROOT_UI_WIDGET_BUTTON);
+      find_widget(root, new_folder_label, PLAINROOT_UI_WIDGET_BUTTON);
   if (!require(open_folder_form(wide_new_folder),
-               "Arabic laptop inline action opens the New folder form") ||
+               "RTL laptop inline action opens the New folder form") ||
       !require(cancel_folder_form(),
-               "Arabic laptop cancels the New folder form by pointer"))
+               "RTL laptop cancels the New folder form by pointer"))
     return 1;
 
   return 0;
@@ -422,7 +433,9 @@ int run_rtl_responsive_layout_test() {
 
 int main(int argc, char **argv) {
   if (argc == 2 && std::strcmp(argv[1], "--rtl-responsive") == 0)
-    return run_rtl_responsive_layout_test();
+    return run_rtl_responsive_layout_test("ar");
+  if (argc == 2 && std::strcmp(argv[1], "--rtl-responsive-he") == 0)
+    return run_rtl_responsive_layout_test("he");
 
   TemporaryConfigHome temporary_config;
   if (!require(temporary_config.ready(),

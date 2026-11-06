@@ -209,6 +209,14 @@ rtl_browser_test_env.set('PLAINROOT_I18N_LOCALE_DIR',
                          meson.current_build_dir() / 'po')
 test('FileChooser Arabic responsive layout', browser_accessibility_test,
      args: ['--rtl-responsive'], env: rtl_browser_test_env)
+rtl_browser_he_test_env = environment()
+rtl_browser_he_test_env.set('LC_ALL', 'he_IL.utf8')
+rtl_browser_he_test_env.set('LC_MESSAGES', 'he_IL.utf8')
+rtl_browser_he_test_env.set('LANGUAGE', 'he')
+rtl_browser_he_test_env.set('PLAINROOT_I18N_LOCALE_DIR',
+                             meson.current_build_dir() / 'po')
+test('FileChooser Hebrew responsive layout', browser_accessibility_test,
+     args: ['--rtl-responsive-he'], env: rtl_browser_he_test_env)
 
 image_preview_test = executable(
   'filechooser-image-preview-test',
