@@ -7,6 +7,7 @@
 #include "directory_sort.hpp"
 #include "location_path.hpp"
 #include "mime_database.hpp"
+#include "network_operation_error.hpp"
 #include "network_operation_tracker.hpp"
 #include "open_filename.hpp"
 #include "portal_accept_label.hpp"
@@ -2368,7 +2369,8 @@ private:
     } else if (update.state == PLAINROOT_STORAGE_NETWORK_OPERATION_FAILED) {
       storage_operation_pending_ = false;
       network_operation_tracker_.reset();
-      set_storage_status(tr(network_operation_error_message(update.error)));
+      set_storage_status(
+          tr(detail::network_operation_error_message(update.error)));
       if (storage_bridge_ != nullptr)
         (void)storage_bridge_->request_snapshot();
     } else if (update.state ==
@@ -2390,31 +2392,6 @@ private:
       set_storage_status(tr("Connecting to SFTP location…"));
     }
     request_redraw();
-  }
-
-  static const char *network_operation_error_message(uint32_t error) {
-    switch (error) {
-    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_INVALID_REQUEST:
-      return "Check the server address and try again.";
-    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_DEPENDENCY_UNAVAILABLE:
-      return "SFTP support is unavailable.";
-    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_MOUNTPOINT_UNAVAILABLE:
-      return "A mount location is unavailable.";
-    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_SYSTEMD_FAILED:
-      return "Unable to start the network mount service.";
-    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_CONNECTION_FAILED:
-      return "Could not connect to the SFTP server.";
-    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_MOUNT_FAILED:
-      return "The network location could not be mounted. Check the server, host key, login, and FUSE availability.";
-    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_UNMOUNT_FAILED:
-      return "Could not disconnect the network location.";
-    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_CANCELLED:
-      return "Network connection was cancelled.";
-    case PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_OUTCOME_UNKNOWN:
-      return "Network operation outcome is uncertain.";
-    default:
-      return "The network operation failed.";
-    }
   }
 
   void mount_volume(const std::string &id, bool read_only) {

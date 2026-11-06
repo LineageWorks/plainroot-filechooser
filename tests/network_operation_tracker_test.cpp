@@ -1,7 +1,10 @@
+#include "../src/network_operation_error.hpp"
 #include "../src/network_operation_tracker.hpp"
 
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
+#include <string_view>
 
 namespace {
 
@@ -18,6 +21,12 @@ namespace {
 
 int main() {
   using namespace plainroot::filechooser::detail;
+
+  CHECK(std::string_view(network_operation_error_message(
+            PLAINROOT_STORAGE_NETWORK_OPERATION_ERROR_BUSY)) ==
+        "Close files using this network location and try again.");
+  CHECK(std::string_view(network_operation_error_message(UINT32_MAX)) ==
+        "The network operation failed.");
 
   NetworkOperationTracker tracker;
   tracker.begin(17U, PLAINROOT_STORAGE_NETWORK_REQUEST_CONNECT);

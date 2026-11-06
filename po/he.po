@@ -442,6 +442,9 @@ msgstr "ההפעלה הזו אינה יכולה לעגן מיקומי FUSE. יש
 msgid "Could not disconnect the network location."
 msgstr "לא ניתן לנתק את מיקום הרשת."
 
+msgid "Close files using this network location and try again."
+msgstr "יש לסגור קבצים המשתמשים במיקום הרשת הזה ולנסות שוב."
+
 msgid "The network operation failed."
 msgstr "פעולת הרשת נכשלה."
 
