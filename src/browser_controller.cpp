@@ -242,6 +242,7 @@ public:
         context_, places_hint.c_str(),
         static_cast<uint32_t>(places_hint.size()), 0.0F, &Impl::place_changed,
         this);
+    set_accessible_name(places_dropdown_, places_hint);
     const std::string more_actions_label = tr("More actions");
     more_actions_button_ = plainroot_ui_icon_button_create_v1(
         context_, PLAINROOT_UI_ICON_MORE, more_actions_label.c_str(),
@@ -904,6 +905,10 @@ public:
       set_label(filename_field_, initial_filename_);
     }
     request_directory_load(false);
+  }
+
+  void update_viewport(float width, float height) {
+    update_storage_view_layout(width, height);
   }
 
 private:
@@ -2839,16 +2844,15 @@ private:
         (state->flags & PLAINROOT_TOOLKIT_WINDOW_CONFIGURED) == 0U)
       return;
     auto &self = *static_cast<Impl *>(user_data);
-    self.update_storage_view_layout(content_bounds->width,
-                                    static_cast<float>(state->height));
+    self.update_viewport(content_bounds->width,
+                         static_cast<float>(state->height));
   }
 
   static void storage_locations_activated(void *user_data,
                                           plainroot_ui_widget *) {
     auto &self = *static_cast<Impl *>(user_data);
     self.compact_storage_expanded_ = !self.compact_storage_expanded_;
-    self.update_storage_view_layout(self.last_window_width_,
-                                    self.last_window_height_);
+    self.update_viewport(self.last_window_width_, self.last_window_height_);
   }
 
   void update_storage_view_layout(float width, float height) {
@@ -3103,6 +3107,11 @@ void BrowserController::shutdown() {
 }
 
 bool BrowserController::create_ui() { return impl_ && impl_->create_ui(); }
+
+void BrowserController::update_viewport(float width, float height) {
+  if (impl_)
+    impl_->update_viewport(width, height);
+}
 
 void BrowserController::set_window(plainroot_toolkit_window *window) {
   if (impl_)

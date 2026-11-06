@@ -5,12 +5,77 @@
 
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <string>
+#include <vector>
+
+#include <unistd.h>
 
 namespace {
+
+class TemporaryConfigHome {
+public:
+  TemporaryConfigHome() {
+    if (const char *previous = std::getenv("XDG_CONFIG_HOME")) {
+      had_previous_ = true;
+      previous_ = previous;
+    }
+
+    std::string pattern = "/tmp/plainroot-filechooser-accessibility-XXXXXX";
+    std::vector<char> writable_pattern(pattern.begin(), pattern.end());
+    writable_pattern.push_back('\0');
+    char *created = ::mkdtemp(writable_pattern.data());
+    if (created == nullptr)
+      return;
+
+    root_ = created;
+    if (::setenv("XDG_CONFIG_HOME", root_.c_str(), 1) != 0)
+      return;
+
+    std::error_code error;
+    std::filesystem::create_directories(root_ / "gtk-3.0", error);
+    if (error)
+      return;
+    browse_directory_ = root_ / "browse";
+    std::filesystem::create_directories(browse_directory_, error);
+    ready_ = !error;
+  }
+
+  TemporaryConfigHome(const TemporaryConfigHome &) = delete;
+  TemporaryConfigHome &operator=(const TemporaryConfigHome &) = delete;
+
+  ~TemporaryConfigHome() {
+    if (had_previous_)
+      (void)::setenv("XDG_CONFIG_HOME", previous_.c_str(), 1);
+    else
+      (void)::unsetenv("XDG_CONFIG_HOME");
+
+    std::error_code ignored;
+    if (!root_.empty())
+      std::filesystem::remove_all(root_, ignored);
+  }
+
+  bool ready() const { return ready_; }
+  const std::filesystem::path &browse_directory() const {
+    return browse_directory_;
+  }
+  std::filesystem::path bookmarks_file() const {
+    return root_ / "gtk-3.0" / "bookmarks";
+  }
+
+private:
+  std::filesystem::path root_;
+  std::filesystem::path browse_directory_;
+  std::string previous_;
+  bool had_previous_ = false;
+  bool ready_ = false;
+};
 
 bool require(bool condition, const char *message) {
   if (condition)
@@ -97,9 +162,27 @@ bool stable_name_after_input(const plainroot_ui_widget *field,
          std::string(info.name_utf8, info.name_length) == name;
 }
 
+bool dispatch_key(plainroot_ui_context *context, uint32_t key) {
+  plainroot_ui_event_v1 event{};
+  event.struct_size = sizeof(event);
+  event.type = PLAINROOT_UI_EVENT_KEY_DOWN;
+  event.key = key;
+  if (plainroot_ui_context_handle_event_v1(context, &event) !=
+      PLAINROOT_UI_RESULT_OK)
+    return false;
+  event.type = PLAINROOT_UI_EVENT_KEY_UP;
+  return plainroot_ui_context_handle_event_v1(context, &event) ==
+         PLAINROOT_UI_RESULT_OK;
+}
+
 } // namespace
 
 int main() {
+  TemporaryConfigHome temporary_config;
+  if (!require(temporary_config.ready(),
+               "isolated config home for bookmark actions"))
+    return 1;
+
   std::unique_ptr<plainroot_ui_context, decltype(&plainroot_ui_context_destroy)>
       context(plainroot::filechooser::make_ui_context("en"),
               &plainroot_ui_context_destroy);
@@ -112,6 +195,7 @@ int main() {
   if (!require(controller.ready(), "directory worker startup") ||
       !require(controller.create_ui(), "browser UI creation"))
     return 1;
+  controller.navigate(temporary_config.browse_directory().string());
 
   plainroot_ui_rect_v1 bounds{};
   bounds.struct_size = sizeof(bounds);
@@ -132,8 +216,6 @@ int main() {
                                    PLAINROOT_UI_WIDGET_TEXT_FIELD);
   const auto *filename = find_widget(root, "File name",
                                      PLAINROOT_UI_WIDGET_TEXT_FIELD);
-  const auto *new_folder_button = find_widget(
-      root, "New folder", PLAINROOT_UI_WIDGET_BUTTON);
   const auto *sort = find_widget(
       root, "Sort files", PLAINROOT_UI_WIDGET_DROPDOWN);
   const auto *hidden = find_widget(root, "Show hidden files",
@@ -189,12 +271,83 @@ int main() {
       responsive_controls_passed = false;
     }
   }
-  const bool folder_form_opened =
-      new_folder_button != nullptr &&
+  const auto *bookmark_button = find_widget(
+      root, "Bookmark folder", PLAINROOT_UI_WIDGET_BUTTON);
+  const auto *new_folder_button = find_widget(
+      root, "New folder", PLAINROOT_UI_WIDGET_BUTTON);
+  const bool wide_actions_present = bookmark_button != nullptr &&
+                                    new_folder_button != nullptr;
+  controller.update_viewport(390.0F, 844.0F);
+  bounds.width = 390.0F;
+  bounds.height = 844.0F;
+  const bool phone_layout = wide_actions_present &&
+      plainroot_ui_context_layout_v1(context.get(), &bounds) ==
+          PLAINROOT_UI_RESULT_OK;
+  const auto *places = find_widget(root, "Places", PLAINROOT_UI_WIDGET_DROPDOWN);
+  const auto *more_actions = find_widget(
+      root, "More actions", PLAINROOT_UI_WIDGET_BUTTON);
+  uint8_t more_actions_visible = 0;
+  const bool overflow_button_visible =
+      phone_layout && more_actions != nullptr &&
+      plainroot_ui_widget_get_visible_v1(more_actions,
+                                         &more_actions_visible) ==
+          PLAINROOT_UI_RESULT_OK &&
+      more_actions_visible != 0;
+  const bool overflow_beside_places =
+      overflow_button_visible && places != nullptr &&
+      shares_row(places, more_actions);
+  const bool wide_actions_hidden =
+      find_widget(root, "Bookmark folder", PLAINROOT_UI_WIDGET_BUTTON) ==
+          nullptr &&
+      find_widget(root, "New folder", PLAINROOT_UI_WIDGET_BUTTON) == nullptr;
+  const bool overflow_opened =
+      overflow_button_visible &&
       plainroot_ui_widget_accessibility_perform_action_v1(
-          const_cast<plainroot_ui_widget *>(new_folder_button),
+          const_cast<plainroot_ui_widget *>(more_actions),
           PLAINROOT_UI_ACCESSIBILITY_ACTION_DEFAULT) == PLAINROOT_UI_RESULT_OK;
-  const auto *folder_name = folder_form_opened
+  plainroot_ui_accessibility_info_v1 more_actions_info{};
+  more_actions_info.struct_size = sizeof(more_actions_info);
+  const bool overflow_expanded =
+      overflow_opened &&
+      plainroot_ui_widget_accessibility_v1(more_actions,
+                                           &more_actions_info) ==
+          PLAINROOT_UI_RESULT_OK &&
+      (more_actions_info.state & PLAINROOT_UI_WIDGET_STATE_EXPANDED) != 0;
+
+  const bool bookmark_activated =
+      overflow_expanded && dispatch_key(context.get(), PLAINROOT_UI_KEY_ENTER);
+  std::ifstream bookmarks_input(temporary_config.bookmarks_file());
+  const std::string bookmark_contents{
+      std::istreambuf_iterator<char>(bookmarks_input),
+      std::istreambuf_iterator<char>()};
+  const bool bookmark_saved =
+      bookmark_activated &&
+      bookmark_contents.find(temporary_config.browse_directory().string()) !=
+          std::string::npos;
+  const bool remove_bookmark_activated =
+      bookmark_activated &&
+      plainroot_ui_widget_accessibility_perform_action_v1(
+          const_cast<plainroot_ui_widget *>(more_actions),
+          PLAINROOT_UI_ACCESSIBILITY_ACTION_DEFAULT) == PLAINROOT_UI_RESULT_OK &&
+      dispatch_key(context.get(), PLAINROOT_UI_KEY_ENTER);
+  std::ifstream removed_bookmarks_input(temporary_config.bookmarks_file());
+  const std::string removed_bookmark_contents{
+      std::istreambuf_iterator<char>(removed_bookmarks_input),
+      std::istreambuf_iterator<char>()};
+  const bool bookmark_removed =
+      remove_bookmark_activated &&
+      removed_bookmark_contents.find(
+          temporary_config.browse_directory().string()) == std::string::npos;
+  const bool overflow_reopened_for_folder =
+      remove_bookmark_activated &&
+      plainroot_ui_widget_accessibility_perform_action_v1(
+          const_cast<plainroot_ui_widget *>(more_actions),
+          PLAINROOT_UI_ACCESSIBILITY_ACTION_DEFAULT) == PLAINROOT_UI_RESULT_OK;
+  const bool new_folder_menu_action =
+      overflow_reopened_for_folder &&
+      dispatch_key(context.get(), PLAINROOT_UI_KEY_DOWN) &&
+      dispatch_key(context.get(), PLAINROOT_UI_KEY_ENTER);
+  const auto *folder_name = new_folder_menu_action
                                 ? find_widget(root, "Folder name",
                                               PLAINROOT_UI_WIDGET_TEXT_FIELD)
                                 : nullptr;
@@ -202,8 +355,20 @@ int main() {
       require(search != nullptr, "search field has a stable accessible name") &&
       require(filename != nullptr,
               "filename field has a stable accessible name") &&
-      require(folder_form_opened,
-              "New folder opens from the accessibility action") &&
+      require(overflow_button_visible,
+              "phone layout exposes the More actions button") &&
+      require(overflow_beside_places,
+              "More actions remains beside Places on phone") &&
+      require(wide_actions_hidden,
+              "phone layout moves folder actions out of the wide action row") &&
+      require(overflow_expanded,
+              "More actions opens from its accessibility action") &&
+      require(bookmark_saved,
+              "Bookmark menu action persists the current directory") &&
+      require(bookmark_removed,
+              "Bookmark menu action removes the current directory") &&
+      require(new_folder_menu_action,
+              "New folder menu action opens the folder form") &&
       require(folder_name != nullptr,
               "visible new-folder field has a stable accessible name") &&
       require(stable_sort_accessible_name,

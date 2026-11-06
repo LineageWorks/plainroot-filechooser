@@ -32,6 +32,8 @@ public:
   bool ready() const;
   void shutdown();
   bool create_ui();
+  // Applies compact-control visibility for the current logical viewport.
+  void update_viewport(float width, float height);
   void set_window(plainroot_toolkit_window *window);
   void set_title(std::string title);
   void set_recent_application_id(std::string application_id);
