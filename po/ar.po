@@ -191,6 +191,9 @@ msgstr "الصور"
 msgid "Videos"
 msgstr "مقاطع الفيديو"
 
+msgid "More actions"
+msgstr "إجراءات أخرى"
+
 msgid "Bookmark folder"
 msgstr "إضافة المجلد إلى الإشارات المرجعية"
 

@@ -190,6 +190,9 @@ msgstr "תמונות"
 msgid "Videos"
 msgstr "סרטונים"
 
+msgid "More actions"
+msgstr "פעולות נוספות"
+
 msgid "Bookmark folder"
 msgstr "הוספת התיקייה לסימניות"
 

@@ -191,6 +191,9 @@ msgstr "Изображения"
 msgid "Videos"
 msgstr "Видео"
 
+msgid "More actions"
+msgstr "Другие действия"
+
 msgid "Bookmark folder"
 msgstr "Добавить папку в закладки"
 

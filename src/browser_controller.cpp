@@ -229,7 +229,7 @@ public:
         context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
     auto *location_places_actions = plainroot_ui_box_create_v1(
         context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
-    auto *location_folder_actions = plainroot_ui_box_create_v1(
+    location_folder_actions_ = plainroot_ui_box_create_v1(
         context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 0.0F);
     location_path_row_ = plainroot_ui_box_create_v1(
         context_, PLAINROOT_UI_AXIS_HORIZONTAL, 8.0F, 1.0F);
@@ -240,12 +240,30 @@ public:
     const std::string places_hint = tr("Places");
     places_dropdown_ = plainroot_ui_dropdown_create_v1(
         context_, places_hint.c_str(),
-        static_cast<uint32_t>(places_hint.size()), 0.0F,
-        &Impl::place_changed, this);
+        static_cast<uint32_t>(places_hint.size()), 0.0F, &Impl::place_changed,
+        this);
+    const std::string more_actions_label = tr("More actions");
+    more_actions_button_ = plainroot_ui_icon_button_create_v1(
+        context_, PLAINROOT_UI_ICON_MORE, more_actions_label.c_str(),
+        static_cast<uint32_t>(more_actions_label.size()), 0.0F,
+        &Impl::more_actions_activated, this);
+    if (more_actions_button_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(more_actions_button_, 0U);
+    more_actions_menu_ =
+        plainroot_ui_menu_create_v1(context_, more_actions_button_, 0.0F);
+    const std::string bookmark_label = tr("Bookmark folder");
+    bookmark_menu_item_ = plainroot_ui_menu_item_create_v1(
+        context_, bookmark_label.c_str(),
+        static_cast<uint32_t>(bookmark_label.size()), 0.0F,
+        &Impl::bookmark_activated, this);
+    const std::string new_folder_label = tr("New folder");
+    new_folder_menu_item_ = plainroot_ui_menu_item_create_v1(
+        context_, new_folder_label.c_str(),
+        static_cast<uint32_t>(new_folder_label.size()), 0.0F,
+        &Impl::new_folder_activated, this);
     bookmark_button_ =
         make_button("Bookmark folder", &Impl::bookmark_activated);
-    new_folder_button_ =
-        make_button("New folder", &Impl::new_folder_activated);
+    new_folder_button_ = make_button("New folder", &Impl::new_folder_activated);
     set_text_button_style(up);
     set_text_button_style(home);
     set_text_button_style(location_button_);
@@ -479,35 +497,34 @@ public:
                                              PLAINROOT_UI_BUTTON_STYLE_FILLED);
 
     if (root == nullptr || outer == nullptr || padding == nullptr ||
-        page == nullptr || footer_padding == nullptr ||
-        title_ == nullptr || location_row == nullptr ||
-        location_actions == nullptr || location_navigation_actions == nullptr ||
-        location_places_actions == nullptr || location_folder_actions == nullptr ||
-        up == nullptr || home == nullptr ||
-        location_button_ == nullptr || location_path_row_ == nullptr ||
-        location_entry_row_ == nullptr || location_entry_actions_ == nullptr ||
-        location_field_ == nullptr || location_go_button_ == nullptr ||
-        location_cancel_button_ == nullptr ||
-        recent_button_ == nullptr ||
-        places_dropdown_ == nullptr || bookmark_button_ == nullptr ||
-        new_folder_button_ == nullptr || new_folder_form_ == nullptr ||
-        new_folder_actions == nullptr || new_folder_field_ == nullptr ||
-        new_folder_create_button_ == nullptr ||
+        page == nullptr || footer_padding == nullptr || title_ == nullptr ||
+        location_row == nullptr || location_actions == nullptr ||
+        location_navigation_actions == nullptr ||
+        location_places_actions == nullptr ||
+        location_folder_actions_ == nullptr || up == nullptr ||
+        home == nullptr || location_button_ == nullptr ||
+        location_path_row_ == nullptr || location_entry_row_ == nullptr ||
+        location_entry_actions_ == nullptr || location_field_ == nullptr ||
+        location_go_button_ == nullptr || location_cancel_button_ == nullptr ||
+        recent_button_ == nullptr || places_dropdown_ == nullptr ||
+        more_actions_button_ == nullptr || more_actions_menu_ == nullptr ||
+        bookmark_menu_item_ == nullptr || new_folder_menu_item_ == nullptr ||
+        bookmark_button_ == nullptr || new_folder_button_ == nullptr ||
+        new_folder_form_ == nullptr || new_folder_actions == nullptr ||
+        new_folder_field_ == nullptr || new_folder_create_button_ == nullptr ||
         new_folder_cancel_button_ == nullptr ||
         storage_view_widget_ == nullptr || storage_toggle_button_ == nullptr ||
-        breadcrumb_scroll_ == nullptr ||
-        breadcrumb_strip_ == nullptr || controls == nullptr ||
-        search_field_ == nullptr || hidden_switch_ == nullptr ||
-        details_switch_ == nullptr ||
+        breadcrumb_scroll_ == nullptr || breadcrumb_strip_ == nullptr ||
+        controls == nullptr || search_field_ == nullptr ||
+        hidden_switch_ == nullptr || details_switch_ == nullptr ||
         sort_dropdown_ == nullptr ||
         (filters_.size() > 1U && filter_dropdown_ == nullptr) ||
         search_sort_controls == nullptr || toggle_filter_controls == nullptr ||
         browser_body_ == nullptr || list_scroll_ == nullptr ||
         entries_list_ == nullptr || preview_panel_ == nullptr ||
         preview_heading_ == nullptr || preview_image_ == nullptr ||
-        preview_status_label_ == nullptr ||
-        status_label_ == nullptr || footer == nullptr ||
-        selected_label_ == nullptr || select == nullptr ||
+        preview_status_label_ == nullptr || status_label_ == nullptr ||
+        footer == nullptr || selected_label_ == nullptr || select == nullptr ||
         (!save_files_.empty() && save_files_panel == nullptr) ||
         (show_filename_entry &&
          (filename_row == nullptr || filename_label == nullptr ||
@@ -658,9 +675,12 @@ public:
         !add(location_navigation_actions, recent_button_) ||
         !add(location_actions, location_places_actions) ||
         !add(location_places_actions, places_dropdown_) ||
-        !add(location_actions, location_folder_actions) ||
-        !add(location_folder_actions, bookmark_button_) ||
-        !add(location_folder_actions, new_folder_button_) ||
+        !add(location_places_actions, more_actions_button_) ||
+        !add(more_actions_menu_, bookmark_menu_item_) ||
+        !add(more_actions_menu_, new_folder_menu_item_) ||
+        !add(location_actions, location_folder_actions_) ||
+        !add(location_folder_actions_, bookmark_button_) ||
+        !add(location_folder_actions_, new_folder_button_) ||
         !add(location_row, location_path_row_) ||
         !add(location_path_row_, location_button_) ||
         !add(location_path_row_, breadcrumb_scroll_) ||
@@ -676,8 +696,7 @@ public:
         !add(new_folder_actions, new_folder_create_button_) ||
         !add(new_folder_actions, new_folder_cancel_button_) ||
         (filename_before_browser && !add(page, filename_row)) ||
-        !add(page, controls) ||
-        !add(controls, search_sort_controls) ||
+        !add(page, controls) || !add(controls, search_sort_controls) ||
         !add(search_sort_controls, search_field_) ||
         !add(search_sort_controls, sort_dropdown_) ||
         !add(controls, toggle_filter_controls) ||
@@ -688,16 +707,16 @@ public:
          !add(toggle_filter_controls, filter_dropdown_)) ||
         (choices_panel != nullptr && !add(page, choices_panel)) ||
         !add(page, storage_view_widget_) || !add(page, browser_body_) ||
-        !add(browser_body_, list_scroll_) || !add(browser_body_, preview_panel_) ||
+        !add(browser_body_, list_scroll_) ||
+        !add(browser_body_, preview_panel_) ||
         !add(preview_panel_, preview_heading_) ||
         !add(preview_panel_, preview_image_) ||
         !add(preview_panel_, preview_status_label_) ||
         !add(list_scroll_, entries_list_) ||
         (show_filename_entry && !filename_before_browser &&
          !add(page, filename_row)) ||
-        !add(page, status_label_) ||
-        !add(footer_padding, footer) || !add(footer, selected_label_) ||
-        !add(footer, select) ||
+        !add(page, status_label_) || !add(footer_padding, footer) ||
+        !add(footer, selected_label_) || !add(footer, select) ||
         plainroot_ui_context_set_root_v1(context_, root) !=
             PLAINROOT_UI_RESULT_OK)
       return false;
@@ -949,12 +968,16 @@ private:
     const uint32_t value = enabled ? 1U : 0U;
     if (new_folder_button_ != nullptr)
       (void)plainroot_ui_widget_set_enabled_v1(new_folder_button_, value);
+    if (new_folder_menu_item_ != nullptr)
+      (void)plainroot_ui_widget_set_enabled_v1(new_folder_menu_item_, value);
     if (new_folder_field_ != nullptr)
       (void)plainroot_ui_widget_set_enabled_v1(new_folder_field_, value);
     if (new_folder_create_button_ != nullptr)
-      (void)plainroot_ui_widget_set_enabled_v1(new_folder_create_button_, value);
+      (void)plainroot_ui_widget_set_enabled_v1(new_folder_create_button_,
+                                               value);
     if (new_folder_cancel_button_ != nullptr)
-      (void)plainroot_ui_widget_set_enabled_v1(new_folder_cancel_button_, value);
+      (void)plainroot_ui_widget_set_enabled_v1(new_folder_cancel_button_,
+                                               value);
   }
 
   using ButtonCallback = void (*)(void *, plainroot_ui_widget *);
@@ -1298,17 +1321,32 @@ private:
   }
 
   void refresh_bookmark_button() {
-    if (bookmark_button_ == nullptr)
-      return;
     const bool bookmarked = current_path_is_bookmarked();
     const std::string label =
         tr(bookmarked ? "Remove bookmark" : "Bookmark folder");
-    set_label(bookmark_button_, label);
-    (void)plainroot_ui_widget_set_accessible_name_v1(
-        bookmark_button_, label.c_str(), static_cast<uint32_t>(label.size()));
     const bool enabled = bookmarks_available_ && !current_path_.empty();
-    (void)plainroot_ui_widget_set_enabled_v1(bookmark_button_,
-                                             enabled ? 1U : 0U);
+    const auto update_item = [&label, enabled](plainroot_ui_widget *item) {
+      if (item == nullptr)
+        return;
+      set_label(item, label);
+      (void)plainroot_ui_widget_set_accessible_name_v1(
+          item, label.c_str(), static_cast<uint32_t>(label.size()));
+      (void)plainroot_ui_widget_set_enabled_v1(item, enabled ? 1U : 0U);
+    };
+    update_item(bookmark_button_);
+    update_item(bookmark_menu_item_);
+  }
+
+  static void more_actions_activated(void *user_data, plainroot_ui_widget *) {
+    auto &self = *static_cast<Impl *>(user_data);
+    uint32_t open = 0U;
+    if (self.more_actions_menu_ != nullptr &&
+        plainroot_ui_menu_get_open_v1(self.more_actions_menu_, &open) ==
+            PLAINROOT_UI_RESULT_OK) {
+      (void)plainroot_ui_menu_set_open_v1(self.more_actions_menu_,
+                                          open == 0U ? 1U : 0U);
+      self.request_redraw();
+    }
   }
 
   static void bookmark_activated(void *user_data, plainroot_ui_widget *) {
@@ -2818,16 +2856,28 @@ private:
       return;
     last_window_width_ = width;
     last_window_height_ = height;
-    const bool compact = width < kCompactWindowWidth ||
-                         height < kShortWindowHeight;
+    const bool compact =
+        width < kCompactWindowWidth || height < kShortWindowHeight;
+    /* In stacked layouts, keep folder management behind the overflow menu so
+     * the file list gets one more visible row without shrinking touch targets.
+     */
+    const bool compact_actions =
+        width < kLocationActionsHorizontalWidth || height < kShortWindowHeight;
     if (title_ != nullptr)
       (void)plainroot_ui_widget_set_visible_v1(
           title_, height < kShortWindowHeight ? 0U : 1U);
     (void)plainroot_ui_widget_set_visible_v1(storage_toggle_button_,
                                              compact ? 1U : 0U);
     (void)plainroot_ui_widget_set_visible_v1(
-        storage_view_widget_,
-        !compact || compact_storage_expanded_ ? 1U : 0U);
+        storage_view_widget_, !compact || compact_storage_expanded_ ? 1U : 0U);
+    if (location_folder_actions_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(location_folder_actions_,
+                                               compact_actions ? 0U : 1U);
+    if (more_actions_button_ != nullptr)
+      (void)plainroot_ui_widget_set_visible_v1(more_actions_button_,
+                                               compact_actions ? 1U : 0U);
+    if (!compact_actions && more_actions_menu_ != nullptr)
+      (void)plainroot_ui_menu_set_open_v1(more_actions_menu_, 0U);
     if (compact)
       set_label(storage_toggle_button_,
                 tr(compact_storage_expanded_ ? "Hide storage locations"
@@ -2988,6 +3038,7 @@ private:
   plainroot_ui_widget *location_path_row_ = nullptr;
   plainroot_ui_widget *location_entry_row_ = nullptr;
   plainroot_ui_widget *location_entry_actions_ = nullptr;
+  plainroot_ui_widget *location_folder_actions_ = nullptr;
   plainroot_ui_widget *location_field_ = nullptr;
   plainroot_ui_widget *location_go_button_ = nullptr;
   plainroot_ui_widget *location_cancel_button_ = nullptr;
@@ -3003,6 +3054,10 @@ private:
   plainroot_ui_widget *places_dropdown_ = nullptr;
   plainroot_ui_widget *recent_button_ = nullptr;
   plainroot_ui_widget *bookmark_button_ = nullptr;
+  plainroot_ui_widget *more_actions_button_ = nullptr;
+  plainroot_ui_widget *more_actions_menu_ = nullptr;
+  plainroot_ui_widget *bookmark_menu_item_ = nullptr;
+  plainroot_ui_widget *new_folder_menu_item_ = nullptr;
   plainroot_ui_widget *storage_toggle_button_ = nullptr;
   plainroot_ui_widget *storage_view_widget_ = nullptr;
   plainroot_ui_widget *filter_dropdown_ = nullptr;

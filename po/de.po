@@ -190,6 +190,9 @@ msgstr "Bilder"
 msgid "Videos"
 msgstr "Videos"
 
+msgid "More actions"
+msgstr "Weitere Aktionen"
+
 msgid "Bookmark folder"
 msgstr "Ordner als Lesezeichen speichern"
 
