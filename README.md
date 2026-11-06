@@ -149,11 +149,11 @@ configuration. Private-broker checks have completed single-file and multiple
 file `OpenFile`, folder selection, `SaveFile` with both a suggested name and an
 existing `current_file`, overwrite confirmation, `SaveFiles`, glob and MIME
 filters, and enumerated choices. A live user-bus check also activated the
-staged backend through its user-systemd unit and stopped it cleanly. These
-checks do not yet establish installed desktop registration, visual parity
-with GTK, or Editor document replacement when a document is already open. Do
-not enable registration in a desktop session until the remaining parity gates
-pass.
+staged backend through its user-systemd unit and stopped it cleanly. A staged
+interactive Editor check with an existing document confirmed that selecting a
+replacement file loads its contents and closes the Plainroot chooser normally.
+Installed desktop registration and GTK capability and visual parity remain
+open; keep registration opt-in until those checks pass.
 
 Storaged's local-volume operation passed live systemd read/write mount and
 normal-unmount acceptance on `/dev/sdb1` on 2026-11-03, including a user
