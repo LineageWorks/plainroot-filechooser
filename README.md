@@ -198,11 +198,11 @@ service and chooser UI checks.
 Both the browser and portal backend support opt-in diagnostics with
 `PLAINROOT_FILECHOOSER_TRACE=1` in the process environment. They record portal
 request and response lifecycle, SFTP form visibility and submission, typed
-network request IDs and states, and the standalone browser event-loop result.
-They do not log the host, username, remote path, or selected filenames. When
-the backend is activated by D-Bus or systemd, set the variable in that
-backend's environment rather than only in the requesting application's
-environment.
+network request IDs and states, the Toolkit window-close request result, and
+the standalone browser event-loop result. They do not log the host, username,
+remote path, or selected filenames. When the backend is activated by D-Bus or
+systemd, set the variable in that backend's environment rather than only in the
+requesting application's environment.
 
 Storaged's physical-removal acceptance completed on 2026-11-04. The USB was
 removed during a bounded read from a mounted VFAT probe file, then reinserted;

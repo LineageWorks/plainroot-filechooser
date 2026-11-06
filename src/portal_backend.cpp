@@ -613,6 +613,14 @@ public:
     if (request.finished)
       return;
     detail::trace("finish-begin response=%u", response);
+    const auto request_window_close = [&] {
+      if (!close_window || request.window == nullptr)
+        return;
+      const auto result =
+          plainroot_toolkit_window_request_close(request.window);
+      detail::trace("window-close-request result=%u",
+                    static_cast<unsigned>(result));
+    };
     std::vector<std::string> save_paths;
     const std::vector<std::string> *result_paths = &native_paths;
     if (response == kResponseSuccess && request.save_files) {
@@ -661,16 +669,14 @@ public:
               *result_paths, request.save_file || request.save_files);
         request.finished = true;
         unregister_request(request);
-        if (close_window && request.window != nullptr)
-          (void)plainroot_toolkit_window_request_close(request.window);
+        request_window_close();
         return;
       }
     }
     send_reply(request, response, {}, nullptr, nullptr);
     request.finished = true;
     unregister_request(request);
-    if (close_window && request.window != nullptr)
-      (void)plainroot_toolkit_window_request_close(request.window);
+    request_window_close();
   }
 
   void bus_failed() {
