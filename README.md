@@ -157,19 +157,24 @@ filters, and enumerated choices. A live user-bus check also activated the
 staged backend through its user-systemd unit and stopped it cleanly. A staged
 interactive Editor check with an existing document confirmed that selecting a
 replacement file loads its contents and closes the Plainroot chooser normally.
-Installed desktop registration and remaining GTK capability acceptance remain
-open; keep registration opt-in until those checks pass. Visual acceptance is
-evaluated against Plainroot's own desktop design, not GTK appearance.
+Portal registration is enabled by default for PlainrootDE and remains limited
+to that desktop's portal configuration; plain Hyprland and broker fallback
+continue to use GTK. The installed-payload routing checks pass without changing
+host portal preferences. Acceptance of the installed package in a real
+PlainrootDE session, remaining supported GTK-baseline behavior checks, a
+Plainroot design review, fresh-boot `/dev/fuse` creation, and the persistent
+`fusermount3` privilege policy remain open. Visual acceptance follows
+Plainroot's own design rather than GTK appearance.
 
 Storaged's local-volume operation passed live systemd read/write mount and
 normal-unmount acceptance on `/dev/sdb1` on 2026-11-03, including a user
 write/read/delete check. On 2026-11-03, the user also confirmed that mounting,
 browsing, and unmounting the removable volume through this chooser UI
 succeeded. SSHFS is installed, and
-a strict-host-key SFTP handshake to the active localhost `sshd` succeeds. A
-direct host-session SSHFS mount failed at FUSE setup with `Operation not
-permitted`; `/dev/fuse` is present, but `fusermount3` is not setuid. The
-production `plainroot-networkd` service mounted `localhost:/etc`, read
+a strict-host-key SFTP handshake to the active localhost `sshd` succeeds. In
+an earlier host check, direct SSHFS mounting failed at FUSE setup with
+`Operation not permitted`; `/dev/fuse` was present, but `fusermount3` was not
+setuid. Production `plainroot-networkd` mounted `localhost:/etc`, read
 `/etc/os-release`, and disconnected cleanly in an isolated user and mount
 namespace using a fake user-systemd manager. On 2026-11-04, a live host
 user-systemd Networkd mount of `localhost:/etc` was browsed through the
@@ -179,12 +184,15 @@ temporary FUSE helper permission change was restored to mode `0755`. This
 confirms browser access to an existing managed SSHFS mount. Later on
 2026-11-04, the rebuilt chooser connected to `localhost:/etc`, displayed
 `os-release`, and disconnected the managed share with the helper temporarily
-set to root-owned mode `04755`; the helper was restored to `0755`. Persistent
-FUSE setup remains open. The USB was also physically removed during a Storaged
-mounted-filesystem read; the read returned an I/O error and complete catalog
-snapshots dropped the device and mount. After reinsertion, the probe checksum
-matched, the test file was removed, and the volume was normally unmounted. The
-USB is currently present and unmounted. A follow-up
+set to root-owned mode `04755`; the helper was restored to `0755`. The
+Storaged package now installs a tmpfiles rule for `/dev/fuse`; creation after a
+fresh boot remains unverified. Live SSHFS checks temporarily used root-owned
+`fusermount3` mode `04755`, which was restored to `0755`; its persistent OS
+policy remains open. The USB was also physically removed during a
+Storaged mounted-filesystem read; the read returned an I/O error, and complete
+catalog snapshots dropped the device and mount. After reinsertion, the probe
+checksum matched, the test file was removed, and the volume was normally
+unmounted. The USB is currently present and unmounted. A follow-up
 chooser-initiated SFTP attempt on 2026-11-04 reached
 the transient SSHFS unit's `Started` state and then a normal Networkd unmount
 about three seconds later. No mount or recent FileChooser core dump remained.
