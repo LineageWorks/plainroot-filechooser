@@ -315,6 +315,77 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
                "RTL responsive accessibility root"))
     return 1;
 
+  if (!require(layout_at(390.0F, 844.0F), "RTL phone interaction layout"))
+    return 1;
+  const auto *phone_places =
+      find_widget(root, places_label, PLAINROOT_UI_WIDGET_DROPDOWN);
+  const auto *phone_more_actions =
+      find_widget(root, more_actions_label, PLAINROOT_UI_WIDGET_BUTTON);
+  uint8_t phone_more_visible = 0;
+  const auto phone_places_bounds = widget_bounds(phone_places);
+  const auto phone_more_bounds = widget_bounds(phone_more_actions);
+  const bool phone_menu_in_rtl_order =
+      phone_places != nullptr && phone_more_actions != nullptr &&
+      plainroot_ui_widget_get_visible_v1(phone_more_actions,
+                                         &phone_more_visible) ==
+          PLAINROOT_UI_RESULT_OK &&
+      phone_more_visible != 0 && shares_row(phone_places, phone_more_actions) &&
+      phone_more_bounds.x + phone_more_bounds.width < phone_places_bounds.x;
+  if (!require(phone_menu_in_rtl_order,
+               "RTL phone keeps More beside Places in RTL order") ||
+      !require(dispatch_pointer_click(context.get(), phone_more_actions) &&
+                   plainroot_ui_context_layout_v1(context.get(), &bounds) ==
+                       PLAINROOT_UI_RESULT_OK &&
+                   is_expanded(phone_more_actions),
+               "RTL phone More menu opens by pointer"))
+    return 1;
+
+  const auto ensure_phone_menu_open = [&] {
+    if (!is_expanded(phone_more_actions) &&
+        (!dispatch_pointer_click(context.get(), phone_more_actions) ||
+         plainroot_ui_context_layout_v1(context.get(), &bounds) !=
+             PLAINROOT_UI_RESULT_OK))
+      return false;
+    return is_expanded(phone_more_actions);
+  };
+  const auto ensure_phone_menu_closed = [&] {
+    if (is_expanded(phone_more_actions) &&
+        (!dispatch_pointer_click(context.get(), phone_more_actions) ||
+         plainroot_ui_context_layout_v1(context.get(), &bounds) !=
+             PLAINROOT_UI_RESULT_OK))
+      return false;
+    return !is_expanded(phone_more_actions);
+  };
+  const bool phone_bookmark_saved =
+      ensure_phone_menu_open() &&
+      dispatch_key(context.get(), PLAINROOT_UI_KEY_ENTER) &&
+      bookmark_is_present();
+  if (!require(phone_bookmark_saved,
+               "RTL phone menu adds the current folder bookmark"))
+    return 1;
+
+  const bool phone_bookmark_removed =
+      ensure_phone_menu_closed() && ensure_phone_menu_open() &&
+      dispatch_key(context.get(), PLAINROOT_UI_KEY_ENTER) &&
+      !bookmark_is_present();
+  if (!require(phone_bookmark_removed,
+               "RTL phone menu removes the current folder bookmark"))
+    return 1;
+
+  const bool phone_new_folder_opened =
+      ensure_phone_menu_closed() && ensure_phone_menu_open() &&
+      dispatch_key(context.get(), PLAINROOT_UI_KEY_DOWN) &&
+      dispatch_key(context.get(), PLAINROOT_UI_KEY_ENTER) &&
+      plainroot_ui_context_layout_v1(context.get(), &bounds) ==
+          PLAINROOT_UI_RESULT_OK &&
+      find_widget(root, folder_name_label,
+                  PLAINROOT_UI_WIDGET_TEXT_FIELD) != nullptr;
+  if (!require(phone_new_folder_opened,
+               "RTL phone menu opens the New folder form") ||
+      !require(cancel_folder_form(),
+               "RTL phone cancels the New folder form by pointer"))
+    return 1;
+
   if (!require(layout_at(1024.0F, 768.0F),
                "RTL tablet landscape interaction layout"))
     return 1;
