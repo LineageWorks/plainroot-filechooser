@@ -193,6 +193,32 @@ storage_locations_view_test = executable(
 test('FileChooser storage view operation feedback',
      storage_locations_view_test)
 
+storage_operation_feedback_test = executable(
+  'filechooser-storage-operation-feedback-test',
+  'tests/storage_operation_feedback_test.cpp',
+  link_with: filechooser_common,
+  dependencies: common_dependencies,
+  install: false,
+)
+foreach locale_spec : [
+  ['English', 'en_US.utf8', 'en'],
+  ['German', 'de_DE.utf8', 'de'],
+  ['Russian', 'ru_RU.utf8', 'ru'],
+  ['Arabic', 'ar_EG.utf8', 'ar'],
+  ['Hebrew', 'he_IL.utf8', 'he'],
+]
+  storage_feedback_locale_env = environment()
+  storage_feedback_locale_env.set('LC_ALL', locale_spec[1])
+  storage_feedback_locale_env.set('LC_MESSAGES', locale_spec[1])
+  storage_feedback_locale_env.set('LANGUAGE', locale_spec[2])
+  storage_feedback_locale_env.set('PLAINROOT_I18N_LOCALE_DIR',
+                                  meson.current_build_dir() / 'po')
+  test('FileChooser ' + locale_spec[0] + ' storage operation feedback',
+       storage_operation_feedback_test,
+       args: [locale_spec[2]],
+       env: storage_feedback_locale_env)
+endforeach
+
 browser_accessibility_test = executable(
   'filechooser-browser-accessibility-test',
   'tests/browser_accessibility_test.cpp',
