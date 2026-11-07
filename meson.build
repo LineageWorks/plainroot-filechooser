@@ -190,7 +190,7 @@ storage_locations_view_test = executable(
   dependencies: common_dependencies,
   install: false,
 )
-test('FileChooser keeps SFTP form open until connection succeeds',
+test('FileChooser storage view operation feedback',
      storage_locations_view_test)
 
 browser_accessibility_test = executable(

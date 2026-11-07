@@ -6,6 +6,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <utility>
 
 namespace {
 
@@ -300,6 +301,34 @@ int main() {
       std::cerr << "Failed disconnected-share viewport: " << viewport.name
                 << '\n';
       return 1;
+    }
+  }
+
+  constexpr const char *busy_unmount_message =
+      "The storage location is busy. Close files using it and try again.";
+  constexpr const char *busy_network_message =
+      "Close files using this network location and try again.";
+  for (const auto &[message, description] :
+       std::array<std::pair<const char *, const char *>, 2>{{
+           {busy_unmount_message, "busy local unmount status"},
+           {busy_network_message, "busy network disconnect status"},
+       }}) {
+    view.set_status(message);
+    for (const Viewport &viewport : viewports) {
+      const auto *status = find_widget(root, message);
+      if (!require(layout(context.get(), viewport.width, viewport.height),
+                   "layout busy operation status at device viewport") ||
+          !require(status != nullptr,
+                   "busy operation feedback is exposed to accessibility") ||
+          !require(fits_width(status, viewport.width),
+                   "busy operation feedback stays within viewport width") ||
+          !require(widget_bounds(const_cast<plainroot_ui_widget *>(status))
+                           .height > 0.0F,
+                   description)) {
+        std::cerr << "Failed " << description << " at " << viewport.name
+                  << '\n';
+        return 1;
+      }
     }
   }
 
