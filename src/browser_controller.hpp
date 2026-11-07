@@ -5,6 +5,7 @@
 
 #include "browser_choice.hpp"
 #include "browser_filter.hpp"
+#include "task_dispatcher.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -24,7 +25,8 @@ public:
   BrowserController(plainroot_toolkit_application *application,
                     plainroot_ui_context *context,
                     CompletionFn completion = nullptr,
-                    void *completion_user_data = nullptr);
+                    void *completion_user_data = nullptr,
+                    detail::TaskPoster task_poster = {});
   BrowserController(const BrowserController &) = delete;
   BrowserController &operator=(const BrowserController &) = delete;
   ~BrowserController();

@@ -5,15 +5,20 @@
 #include <plainroot/ui/widgets.h>
 
 #include <array>
+#include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <iterator>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <unistd.h>
@@ -195,6 +200,84 @@ bool dispatch_pointer_click(plainroot_ui_context *context,
          PLAINROOT_UI_RESULT_OK;
 }
 
+class ApplicationTaskQueue {
+public:
+  plainroot_toolkit_result_v1 post(
+      plainroot_toolkit_application_task_fn callback, void *user_data,
+      plainroot_toolkit_application_task_destroy_fn destroy) {
+    if (callback == nullptr)
+      return PLAINROOT_TOOLKIT_RESULT_INVALID_ARGUMENT;
+    {
+      std::lock_guard lock(mutex_);
+      tasks_.push_back({callback, user_data, destroy});
+    }
+    changed_.notify_one();
+    return PLAINROOT_TOOLKIT_RESULT_OK;
+  }
+
+  bool dispatch_one(std::chrono::milliseconds timeout) {
+    Task task{};
+    {
+      std::unique_lock lock(mutex_);
+      if (!changed_.wait_for(lock, timeout,
+                             [&] { return !tasks_.empty(); }))
+        return false;
+      task = tasks_.front();
+      tasks_.pop_front();
+    }
+    if (task.callback != nullptr)
+      task.callback(task.user_data);
+    if (task.destroy != nullptr)
+      task.destroy(task.user_data);
+    return true;
+  }
+
+  void dispatch_ready() {
+    while (dispatch_one(std::chrono::milliseconds(0))) {
+    }
+  }
+
+  ~ApplicationTaskQueue() {
+    std::deque<Task> remaining;
+    {
+      std::lock_guard lock(mutex_);
+      remaining.swap(tasks_);
+    }
+    for (const Task &task : remaining) {
+      if (task.destroy != nullptr)
+        task.destroy(task.user_data);
+    }
+  }
+
+private:
+  struct Task {
+    plainroot_toolkit_application_task_fn callback = nullptr;
+    void *user_data = nullptr;
+    plainroot_toolkit_application_task_destroy_fn destroy = nullptr;
+  };
+
+  std::mutex mutex_;
+  std::condition_variable changed_;
+  std::deque<Task> tasks_;
+};
+
+struct SelectionResult {
+  bool called = false;
+  bool accepted = false;
+  std::vector<std::string> paths;
+};
+
+void selection_completed(
+    void *user_data, bool accepted, bool,
+    const std::vector<std::string> &native_paths,
+    const plainroot::filechooser::BrowserFilter *,
+    const std::vector<plainroot::filechooser::BrowserChoiceSelection> &) {
+  auto &result = *static_cast<SelectionResult *>(user_data);
+  result.called = true;
+  result.accepted = accepted;
+  result.paths = native_paths;
+}
+
 bool is_expanded(const plainroot_ui_widget *widget) {
   plainroot_ui_accessibility_info_v1 info{};
   info.struct_size = sizeof(info);
@@ -238,6 +321,24 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
   const std::string filter_hint =
       translated_filter_hint == nullptr ? "Filter files"
                                         : translated_filter_hint;
+  const char *translated_accept =
+      plainroot_i18n_gettext_v1("plainroot-filechooser", "Select");
+  const std::string accept_label =
+      translated_accept == nullptr ? "Select" : translated_accept;
+
+  const std::filesystem::path text_file =
+      temporary_config.browse_directory() / "notes.txt";
+  const std::filesystem::path image_file =
+      temporary_config.browse_directory() / "picture.png";
+  {
+    std::ofstream text_output(text_file);
+    std::ofstream image_output(image_file, std::ios::binary);
+    if (!require(text_output.good() && image_output.good(),
+                 "RTL directory fixture creation"))
+      return 1;
+    text_output << "Plainroot RTL browser fixture\n";
+    image_output << "not a decodable image; only the filename filter is tested\n";
+  }
 
   std::unique_ptr<plainroot_ui_context, decltype(&plainroot_ui_context_destroy)>
       context(plainroot::filechooser::make_ui_context(language_tag),
@@ -245,7 +346,15 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
   if (!require(context != nullptr, "RTL UI context creation"))
     return 1;
 
-  plainroot::filechooser::BrowserController controller(nullptr, context.get());
+  ApplicationTaskQueue task_queue;
+  SelectionResult selection;
+  plainroot::filechooser::BrowserController controller(
+      nullptr, context.get(), &selection_completed, &selection,
+      [&task_queue](plainroot_toolkit_application_task_fn callback,
+                    void *user_data,
+                    plainroot_toolkit_application_task_destroy_fn destroy) {
+        return task_queue.post(callback, user_data, destroy);
+      });
   controller.set_filters(
       {{"Text files", {{0U, "*.txt"}}},
        {"Image files", {{0U, "*.png"}}}},
@@ -290,6 +399,21 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
     return plainroot_ui_context_layout_v1(context.get(), &bounds) ==
            PLAINROOT_UI_RESULT_OK;
   };
+  const auto pump_until = [&](const auto &predicate) {
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::seconds(5);
+    while (!predicate()) {
+      const auto now = std::chrono::steady_clock::now();
+      if (now >= deadline)
+        return false;
+      const auto remaining = std::chrono::duration_cast<
+          std::chrono::milliseconds>(deadline - now);
+      (void)task_queue.dispatch_one(remaining);
+      if (!layout_at(390.0F, 844.0F))
+        return false;
+    }
+    return true;
+  };
   const auto bookmark_is_present = [&] {
     std::ifstream input(temporary_config.bookmarks_file());
     const std::string contents{std::istreambuf_iterator<char>(input),
@@ -322,6 +446,16 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
   if (!require(plainroot_ui_context_get_accessibility_root_v1(
                    context.get(), &root) == PLAINROOT_UI_RESULT_OK,
                "RTL responsive accessibility root"))
+    return 1;
+
+  const bool initial_text_listing = pump_until([&] {
+    return find_widget(root, "notes.txt", PLAINROOT_UI_WIDGET_BUTTON) != nullptr;
+  });
+  const bool initial_filter_results =
+      initial_text_listing &&
+      find_widget(root, "picture.png", PLAINROOT_UI_WIDGET_BUTTON) == nullptr;
+  if (!require(initial_filter_results,
+               "RTL text filter renders matching file rows and hides other files"))
     return 1;
 
   if (!require(layout_at(390.0F, 844.0F), "RTL phone interaction layout"))
@@ -361,6 +495,14 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
                "RTL phone filter control fits and exposes its initial value") ||
       !require(filter_selection_changed,
                "RTL phone filter menu selects its next option by keyboard"))
+    return 1;
+  task_queue.dispatch_ready();
+  const bool image_filter_results =
+      layout_at(390.0F, 844.0F) &&
+      find_widget(root, "picture.png", PLAINROOT_UI_WIDGET_BUTTON) != nullptr &&
+      find_widget(root, "notes.txt", PLAINROOT_UI_WIDGET_BUTTON) == nullptr;
+  if (!require(image_filter_results,
+               "RTL image filter rerenders matching file rows"))
     return 1;
 
   const auto *phone_places =
@@ -556,6 +698,58 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
                "RTL laptop cancels the New folder form by pointer"))
     return 1;
 
+  const bool text_filter_restored =
+      layout_at(390.0F, 844.0F) &&
+      plainroot_ui_dropdown_set_value_v1(
+          const_cast<plainroot_ui_widget *>(phone_filter), 0) ==
+          PLAINROOT_UI_RESULT_OK;
+  task_queue.dispatch_ready();
+  const bool can_select_filtered_file =
+      text_filter_restored && layout_at(390.0F, 844.0F) &&
+      find_widget(root, "notes.txt", PLAINROOT_UI_WIDGET_BUTTON) != nullptr &&
+      find_widget(root, "picture.png", PLAINROOT_UI_WIDGET_BUTTON) == nullptr;
+  const auto *text_row =
+      find_widget(root, "notes.txt", PLAINROOT_UI_WIDGET_BUTTON);
+  const bool file_selected = can_select_filtered_file &&
+                             text_row != nullptr &&
+                             plainroot_ui_widget_accessibility_perform_action_v1(
+                                 const_cast<plainroot_ui_widget *>(text_row),
+                                 PLAINROOT_UI_ACCESSIBILITY_ACTION_DEFAULT) ==
+                                 PLAINROOT_UI_RESULT_OK;
+  const auto *open_button =
+      find_widget(root, accept_label, PLAINROOT_UI_WIDGET_BUTTON);
+  const bool file_returned =
+      file_selected && open_button != nullptr &&
+      plainroot_ui_widget_accessibility_perform_action_v1(
+          const_cast<plainroot_ui_widget *>(open_button),
+          PLAINROOT_UI_ACCESSIBILITY_ACTION_DEFAULT) == PLAINROOT_UI_RESULT_OK &&
+      selection.called &&
+      selection.accepted && selection.paths.size() == 1U &&
+      selection.paths.front() == text_file.string();
+  if (!file_returned) {
+    std::cerr << "RTL selection diagnostic: restored=" << text_filter_restored
+              << " rows=" << can_select_filtered_file
+              << " row=" << (text_row != nullptr)
+              << " selected=" << file_selected << " accept-label=["
+              << accept_label << "] button=" << (open_button != nullptr);
+    if (open_button != nullptr) {
+      const auto b = widget_bounds(open_button);
+      uint8_t visible = 0;
+      (void)plainroot_ui_widget_get_visible_v1(open_button, &visible);
+      std::cerr << " visible=" << static_cast<unsigned>(visible)
+                << " bounds=" << b.x << ',' << b.y << ' ' << b.width << 'x'
+                << b.height;
+    }
+    std::cerr << " callback=" << selection.called
+              << " accepted=" << selection.accepted
+              << " paths=" << selection.paths.size() << '\n';
+  }
+  if (!require(file_returned,
+               "RTL selection returns the selected filtered file path"))
+    return 1;
+
+  controller.shutdown();
+  task_queue.dispatch_ready();
   return 0;
 }
 

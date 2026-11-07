@@ -127,12 +127,13 @@ class BrowserController::Impl {
 public:
   Impl(plainroot_toolkit_application *application,
        plainroot_ui_context *context, CompletionFn completion,
-       void *completion_user_data)
+       void *completion_user_data, detail::TaskPoster task_poster)
       : application_(application), context_(context), completion_(completion),
         completion_user_data_(completion_user_data),
+        task_poster_(std::move(task_poster)),
         loader_(application, [this](detail::DirectoryResult result) {
           apply_directory_result(std::move(result));
-        }) {}
+        }, task_poster_) {}
 
   ~Impl() { shutdown(); }
 
@@ -2119,8 +2120,8 @@ private:
   void schedule_render() {
     if (!ui_ready_)
       return;
-    if (plainroot_toolkit_application_post_v1(application_, &Impl::render_task,
-                                              this, nullptr) !=
+    if (detail::post_application_task(application_, task_poster_,
+                                      &Impl::render_task, this, nullptr) !=
         PLAINROOT_TOOLKIT_RESULT_OK)
       return;
   }
@@ -2972,6 +2973,7 @@ private:
   plainroot_toolkit_window *window_ = nullptr;
   CompletionFn completion_ = nullptr;
   void *completion_user_data_ = nullptr;
+  detail::TaskPoster task_poster_;
   std::string requested_title_;
   std::string recent_application_id_ = "Plainroot FileChooser";
   std::string accept_label_;
@@ -3095,9 +3097,11 @@ private:
 BrowserController::BrowserController(plainroot_toolkit_application *application,
                                      plainroot_ui_context *context,
                                      CompletionFn completion,
-                                     void *completion_user_data)
+                                     void *completion_user_data,
+                                     detail::TaskPoster task_poster)
     : impl_(std::make_unique<Impl>(application, context, completion,
-                                  completion_user_data)) {}
+                                  completion_user_data,
+                                  std::move(task_poster))) {}
 
 BrowserController::~BrowserController() = default;
 

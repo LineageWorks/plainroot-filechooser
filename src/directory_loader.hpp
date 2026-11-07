@@ -4,6 +4,7 @@
 #include <plainroot/toolkit/toolkit.h>
 
 #include "image_preview.hpp"
+#include "task_dispatcher.hpp"
 
 #include <cstdint>
 #include <functional>
@@ -58,7 +59,8 @@ public:
   using ResultHandler = std::function<void(DirectoryResult)>;
 
   DirectoryLoader(plainroot_toolkit_application *application,
-                  ResultHandler result_handler);
+                  ResultHandler result_handler,
+                  TaskPoster task_poster = {});
   DirectoryLoader(const DirectoryLoader &) = delete;
   DirectoryLoader &operator=(const DirectoryLoader &) = delete;
   ~DirectoryLoader();

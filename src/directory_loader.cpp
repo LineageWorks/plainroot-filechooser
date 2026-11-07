@@ -24,8 +24,10 @@ class DirectoryLoader::Impl {
 public:
   using ResultHandler = std::function<void(DirectoryResult)>;
 
-  Impl(plainroot_toolkit_application *application, ResultHandler result_handler)
+  Impl(plainroot_toolkit_application *application, ResultHandler result_handler,
+       TaskPoster task_poster)
       : application_(application), result_handler_(std::move(result_handler)),
+        task_poster_(std::move(task_poster)),
         notification_fd_(eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK)) {
     if (notification_fd_ >= 0)
       worker_ = std::thread([this] { run(); });
@@ -271,8 +273,9 @@ private:
         new (std::nothrow) Delivery{result_handler_, std::move(result)};
     if (delivery == nullptr)
       return;
-    const auto posted = plainroot_toolkit_application_post_v1(
-        application_, &Impl::apply_delivery, delivery, &Impl::destroy_delivery);
+    const auto posted = post_application_task(
+        application_, task_poster_, &Impl::apply_delivery, delivery,
+        &Impl::destroy_delivery);
     if (posted != PLAINROOT_TOOLKIT_RESULT_OK)
       delete delivery;
   }
@@ -613,6 +616,7 @@ private:
 
   plainroot_toolkit_application *application_ = nullptr;
   ResultHandler result_handler_;
+  TaskPoster task_poster_;
   int notification_fd_ = -1;
   std::thread worker_;
   std::mutex mutex_;
@@ -624,8 +628,10 @@ private:
 };
 
 DirectoryLoader::DirectoryLoader(plainroot_toolkit_application *application,
-                                 ResultHandler result_handler)
-    : impl_(std::make_unique<Impl>(application, std::move(result_handler))) {}
+                                 ResultHandler result_handler,
+                                 TaskPoster task_poster)
+    : impl_(std::make_unique<Impl>(application, std::move(result_handler),
+                                   std::move(task_poster))) {}
 
 DirectoryLoader::~DirectoryLoader() = default;
 
