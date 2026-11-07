@@ -233,6 +233,11 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
                        localization_error.size()) == PLAINROOT_I18N_RESULT_OK,
                "RTL FileChooser localization initialization"))
     return 1;
+  const char *translated_filter_hint = plainroot_i18n_gettext_v1(
+      "plainroot-filechooser", "Filter files");
+  const std::string filter_hint =
+      translated_filter_hint == nullptr ? "Filter files"
+                                        : translated_filter_hint;
 
   std::unique_ptr<plainroot_ui_context, decltype(&plainroot_ui_context_destroy)>
       context(plainroot::filechooser::make_ui_context(language_tag),
@@ -241,6 +246,10 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
     return 1;
 
   plainroot::filechooser::BrowserController controller(nullptr, context.get());
+  controller.set_filters(
+      {{"Text files", {{0U, "*.txt"}}},
+       {"Image files", {{0U, "*.png"}}}},
+      0);
   if (!require(controller.ready(), "directory worker startup") ||
       !require(controller.create_ui(), "RTL browser UI creation"))
     return 1;
@@ -317,6 +326,43 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
 
   if (!require(layout_at(390.0F, 844.0F), "RTL phone interaction layout"))
     return 1;
+  const auto *phone_filter =
+      find_widget(root, filter_hint, PLAINROOT_UI_WIDGET_DROPDOWN);
+  int32_t initial_filter = -1;
+  uint32_t has_initial_filter = 0;
+  const bool filter_ready_on_phone =
+      phone_filter != nullptr && fits_width(phone_filter, 390.0F) &&
+      plainroot_ui_dropdown_get_value_v1(phone_filter, &initial_filter,
+                                         &has_initial_filter) ==
+          PLAINROOT_UI_RESULT_OK &&
+      has_initial_filter != 0U && initial_filter == 0;
+  const bool filter_menu_opened =
+      filter_ready_on_phone &&
+      dispatch_pointer_click(context.get(), phone_filter) &&
+      plainroot_ui_context_layout_v1(context.get(), &bounds) ==
+          PLAINROOT_UI_RESULT_OK &&
+      is_expanded(phone_filter);
+  const bool second_filter_selected =
+      filter_menu_opened && dispatch_key(context.get(), PLAINROOT_UI_KEY_DOWN) &&
+      dispatch_key(context.get(), PLAINROOT_UI_KEY_DOWN) &&
+      dispatch_key(context.get(), PLAINROOT_UI_KEY_ENTER);
+  int32_t selected_filter = -1;
+  uint32_t has_selected_filter = 0;
+  const auto *filter_after_selection =
+      find_widget(root, filter_hint, PLAINROOT_UI_WIDGET_DROPDOWN);
+  const bool filter_selection_changed =
+      second_filter_selected &&
+      filter_after_selection == phone_filter &&
+      plainroot_ui_dropdown_get_value_v1(phone_filter, &selected_filter,
+                                         &has_selected_filter) ==
+          PLAINROOT_UI_RESULT_OK &&
+      has_selected_filter != 0U && selected_filter == 1;
+  if (!require(filter_ready_on_phone,
+               "RTL phone filter control fits and exposes its initial value") ||
+      !require(filter_selection_changed,
+               "RTL phone filter menu selects its next option by keyboard"))
+    return 1;
+
   const auto *phone_places =
       find_widget(root, places_label, PLAINROOT_UI_WIDGET_DROPDOWN);
   const auto *phone_more_actions =
@@ -468,6 +514,19 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
 
   if (!require(layout_at(1366.0F, 768.0F), "RTL laptop interaction layout"))
     return 1;
+  const auto *wide_filter =
+      find_widget(root, filter_hint, PLAINROOT_UI_WIDGET_DROPDOWN);
+  const auto *wide_hidden = find_widget(
+      root, arabic ? "إظهار الملفات المخفية" : "הצגת קבצים מוסתרים",
+      PLAINROOT_UI_WIDGET_SWITCH);
+  const auto wide_filter_bounds = widget_bounds(wide_filter);
+  const auto wide_hidden_bounds = widget_bounds(wide_hidden);
+  if (!require(wide_filter != nullptr && wide_hidden != nullptr &&
+                   shares_row(wide_filter, wide_hidden) &&
+                   wide_filter_bounds.x < wide_hidden_bounds.x,
+               "RTL laptop filter control follows the switches in RTL order"))
+    return 1;
+
   const auto *wide_bookmark =
       find_widget(root, bookmark_label, PLAINROOT_UI_WIDGET_BUTTON);
   if (!require(wide_bookmark != nullptr &&

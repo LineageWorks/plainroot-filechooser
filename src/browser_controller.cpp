@@ -377,6 +377,7 @@ public:
           context_, filter_hint.c_str(),
           static_cast<uint32_t>(filter_hint.size()), 1.0F,
           &Impl::filter_changed, this);
+      set_accessible_name(filter_dropdown_, filter_hint);
     }
     const std::string sort_hint = tr("Sort files");
     sort_dropdown_ = plainroot_ui_dropdown_create_v1(
