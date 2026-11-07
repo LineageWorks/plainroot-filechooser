@@ -227,6 +227,8 @@ browser_accessibility_test = executable(
   install: false,
 )
 test('FileChooser stable accessible input names', browser_accessibility_test)
+test('FileChooser OpenFile read-only selection', browser_accessibility_test,
+     args: ['--read-only-selection'])
 rtl_browser_test_env = environment()
 rtl_browser_test_env.set('LC_ALL', 'ar_EG.utf8')
 rtl_browser_test_env.set('LC_MESSAGES', 'ar_EG.utf8')

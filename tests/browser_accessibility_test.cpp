@@ -273,17 +273,19 @@ private:
 struct SelectionResult {
   bool called = false;
   bool accepted = false;
+  bool writable = true;
   std::vector<std::string> paths;
 };
 
 void selection_completed(
-    void *user_data, bool accepted, bool,
+    void *user_data, bool accepted, bool writable,
     const std::vector<std::string> &native_paths,
     const plainroot::filechooser::BrowserFilter *,
     const std::vector<plainroot::filechooser::BrowserChoiceSelection> &) {
   auto &result = *static_cast<SelectionResult *>(user_data);
   result.called = true;
   result.accepted = accepted;
+  result.writable = writable;
   result.paths = native_paths;
 }
 
@@ -866,6 +868,123 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
   return 0;
 }
 
+int run_read_only_selection_test() {
+  TemporaryConfigHome temporary_config;
+  if (!require(temporary_config.ready(),
+               "isolated config home for read-only selection"))
+    return 1;
+  const auto text_file = temporary_config.browse_directory() / "notes.txt";
+  {
+    std::ofstream output(text_file);
+    if (!require(output.good(), "read-only selection fixture creation"))
+      return 1;
+    output << "Read-only portal selection fixture\n";
+  }
+
+  std::unique_ptr<plainroot_ui_context, decltype(&plainroot_ui_context_destroy)>
+      context(plainroot::filechooser::make_ui_context("en"),
+              &plainroot_ui_context_destroy);
+  if (!require(context != nullptr, "read-only selection UI context"))
+    return 1;
+
+  ApplicationTaskQueue task_queue;
+  SelectionResult selection;
+  plainroot::filechooser::BrowserController controller(
+      nullptr, context.get(), &selection_completed, &selection,
+      [&task_queue](plainroot_toolkit_application_task_fn callback,
+                    void *user_data,
+                    plainroot_toolkit_application_task_destroy_fn destroy) {
+        return task_queue.post(callback, user_data, destroy);
+      });
+  controller.set_allow_read_only(true);
+  if (!require(controller.ready(), "read-only directory worker startup") ||
+      !require(controller.create_ui(), "read-only chooser UI creation"))
+    return 1;
+  controller.navigate(temporary_config.browse_directory().string());
+  controller.update_viewport(1000.0F, 720.0F);
+
+  plainroot_ui_rect_v1 bounds{};
+  bounds.struct_size = sizeof(bounds);
+  bounds.width = 1000.0F;
+  bounds.height = 720.0F;
+  const auto layout = [&] {
+    return plainroot_ui_context_layout_v1(context.get(), &bounds) ==
+           PLAINROOT_UI_RESULT_OK;
+  };
+  const auto pump_until = [&](const auto &predicate) {
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::seconds(5);
+    while (!predicate()) {
+      const auto now = std::chrono::steady_clock::now();
+      if (now >= deadline) return false;
+      const auto remaining = std::chrono::duration_cast<
+          std::chrono::milliseconds>(deadline - now);
+      (void)task_queue.dispatch_one(remaining);
+      if (!layout()) return false;
+    }
+    return true;
+  };
+  const plainroot_ui_widget *root = nullptr;
+  if (!require(layout(), "read-only chooser initial layout") ||
+      !require(plainroot_ui_context_get_accessibility_root_v1(
+                   context.get(), &root) == PLAINROOT_UI_RESULT_OK,
+               "read-only chooser accessibility root"))
+    return 1;
+  if (!require(pump_until([&] {
+                 return find_widget(root, "notes.txt",
+                                    PLAINROOT_UI_WIDGET_BUTTON) != nullptr;
+               }),
+               "read-only chooser loads its file"))
+    return 1;
+  auto *read_only = const_cast<plainroot_ui_widget *>(find_widget(
+      root, "Open files read-only", PLAINROOT_UI_WIDGET_CHECKBOX));
+  auto *text_row = const_cast<plainroot_ui_widget *>(find_widget(
+      root, "notes.txt", PLAINROOT_UI_WIDGET_BUTTON));
+  uint32_t initially_checked = 1U;
+  const bool default_is_writable =
+      read_only != nullptr &&
+      plainroot_ui_checkbox_get_checked_v1(read_only, &initially_checked) ==
+          PLAINROOT_UI_RESULT_OK &&
+      initially_checked == 0U;
+  const bool read_only_selected =
+      default_is_writable && dispatch_pointer_click(context.get(), read_only);
+  uint32_t selected_checked = 0U;
+  const bool checkbox_updated =
+      read_only_selected &&
+      plainroot_ui_checkbox_get_checked_v1(read_only, &selected_checked) ==
+          PLAINROOT_UI_RESULT_OK &&
+      selected_checked == 1U;
+
+  const char *accept_translation =
+      plainroot_i18n_gettext_v1("plainroot-filechooser", "Select");
+  const std::string accept_label = accept_translation == nullptr
+                                       ? "Select"
+                                       : accept_translation;
+  auto *accept = const_cast<plainroot_ui_widget *>(find_widget(
+      root, accept_label, PLAINROOT_UI_WIDGET_BUTTON));
+  const bool file_returned =
+      checkbox_updated && text_row != nullptr && accept != nullptr &&
+      plainroot_ui_widget_accessibility_perform_action_v1(
+          text_row, PLAINROOT_UI_ACCESSIBILITY_ACTION_DEFAULT) ==
+          PLAINROOT_UI_RESULT_OK &&
+      plainroot_ui_widget_accessibility_perform_action_v1(
+          accept, PLAINROOT_UI_ACCESSIBILITY_ACTION_DEFAULT) ==
+          PLAINROOT_UI_RESULT_OK &&
+      selection.called && selection.accepted && !selection.writable &&
+      selection.paths.size() == 1U &&
+      selection.paths.front() == text_file.string();
+  controller.shutdown();
+  task_queue.dispatch_ready();
+  return require(default_is_writable,
+                 "OpenFile read-only option defaults to writable") &&
+                 require(checkbox_updated,
+                         "read-only checkbox changes state from a pointer event") &&
+                 require(file_returned,
+                         "read-only selection returns writable=false with the file URI")
+             ? 0
+             : 1;
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
@@ -873,6 +992,8 @@ int main(int argc, char **argv) {
     return run_rtl_responsive_layout_test("ar");
   if (argc == 2 && std::strcmp(argv[1], "--rtl-responsive-he") == 0)
     return run_rtl_responsive_layout_test("he");
+  if (argc == 2 && std::strcmp(argv[1], "--read-only-selection") == 0)
+    return run_read_only_selection_test();
 
   TemporaryConfigHome temporary_config;
   if (!require(temporary_config.ready(),

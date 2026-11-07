@@ -167,11 +167,13 @@ replacement file loads its contents and closes the Plainroot chooser normally.
 Portal registration is enabled by default for PlainrootDE and remains limited
 to that desktop's portal configuration; plain Hyprland and broker fallback
 continue to use GTK. The installed-payload routing checks pass without changing
-host portal preferences. Acceptance of the installed package in a real
-PlainrootDE session, remaining supported GTK-baseline behavior checks, a
-Plainroot design review, fresh-boot `/dev/fuse` creation, and the persistent
-`fusermount3` privilege policy remain open. Visual acceptance follows
-Plainroot's own design rather than GTK appearance.
+host portal preferences. The supported GTK-baseline request options, Arabic and
+Hebrew interaction coverage, and live Hyprland modal-parent lifecycle have
+capability coverage. Remaining deployment checks are installing the registered
+backend in a complete PlainrootDE image and verifying that image's FUSE
+provisioning policy. The chooser's visual reimplementation is a separate pass
+and does not block this capability work. See the canonical FileChooser roadmap
+for the current acceptance record.
 
 Storaged's local-volume operation passed live systemd read/write mount and
 normal-unmount acceptance on `/dev/sdb1` on 2026-11-03, including a user
