@@ -298,6 +298,8 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
   const char *remove_bookmark_label =
       arabic ? "إزالة الإشارة المرجعية" : "הסרת הסימנייה";
   const char *new_folder_label = arabic ? "مجلد جديد" : "תיקייה חדשה";
+  const char *hidden_files_label =
+      arabic ? "إظهار الملفات المخفية" : "הצגת קבצים מוסתרים";
   TemporaryConfigHome temporary_config;
   if (!require(temporary_config.ready(),
                "isolated config home for RTL responsive layout"))
@@ -328,15 +330,20 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
 
   const std::filesystem::path text_file =
       temporary_config.browse_directory() / "notes.txt";
+  const std::filesystem::path hidden_text_file =
+      temporary_config.browse_directory() / ".draft.txt";
   const std::filesystem::path image_file =
       temporary_config.browse_directory() / "picture.png";
   {
     std::ofstream text_output(text_file);
+    std::ofstream hidden_text_output(hidden_text_file);
     std::ofstream image_output(image_file, std::ios::binary);
-    if (!require(text_output.good() && image_output.good(),
+    if (!require(text_output.good() && hidden_text_output.good() &&
+                     image_output.good(),
                  "RTL directory fixture creation"))
       return 1;
     text_output << "Plainroot RTL browser fixture\n";
+    hidden_text_output << "Hidden Plainroot RTL browser fixture\n";
     image_output << "not a decodable image; only the filename filter is tested\n";
   }
 
@@ -456,6 +463,46 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
       find_widget(root, "picture.png", PLAINROOT_UI_WIDGET_BUTTON) == nullptr;
   if (!require(initial_filter_results,
                "RTL text filter renders matching file rows and hides other files"))
+    return 1;
+
+  if (!require(layout_at(390.0F, 844.0F), "RTL phone hidden-file layout"))
+    return 1;
+  const auto *phone_hidden_files =
+      find_widget(root, hidden_files_label, PLAINROOT_UI_WIDGET_SWITCH);
+  uint32_t hidden_files_initial = 1U;
+  const bool hidden_files_start_disabled =
+      phone_hidden_files != nullptr &&
+      plainroot_ui_switch_get_checked_v1(phone_hidden_files,
+                                          &hidden_files_initial) ==
+          PLAINROOT_UI_RESULT_OK &&
+      hidden_files_initial == 0U &&
+      find_widget(root, ".draft.txt", PLAINROOT_UI_WIDGET_BUTTON) == nullptr;
+  const bool hidden_files_enabled =
+      hidden_files_start_disabled &&
+      plainroot_ui_switch_set_checked_v1(
+          const_cast<plainroot_ui_widget *>(phone_hidden_files), 1U) ==
+          PLAINROOT_UI_RESULT_OK;
+  const bool hidden_file_revealed =
+      hidden_files_enabled && pump_until([&] {
+        return find_widget(root, ".draft.txt", PLAINROOT_UI_WIDGET_BUTTON) !=
+               nullptr;
+      });
+  const bool hidden_files_disabled =
+      hidden_file_revealed &&
+      plainroot_ui_switch_set_checked_v1(
+          const_cast<plainroot_ui_widget *>(phone_hidden_files), 0U) ==
+          PLAINROOT_UI_RESULT_OK;
+  const bool hidden_file_hidden_again =
+      hidden_files_disabled && pump_until([&] {
+        return find_widget(root, ".draft.txt", PLAINROOT_UI_WIDGET_BUTTON) ==
+               nullptr;
+      });
+  if (!require(hidden_files_start_disabled,
+               "RTL phone hides dotfiles when Show hidden files is off") ||
+      !require(hidden_file_revealed,
+               "RTL phone switch reveals a matching hidden file") ||
+      !require(hidden_file_hidden_again,
+               "RTL phone switch hides the matching dotfile again"))
     return 1;
 
   if (!require(layout_at(390.0F, 844.0F), "RTL phone interaction layout"))
@@ -659,8 +706,7 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
   const auto *wide_filter =
       find_widget(root, filter_hint, PLAINROOT_UI_WIDGET_DROPDOWN);
   const auto *wide_hidden = find_widget(
-      root, arabic ? "إظهار الملفات المخفية" : "הצגת קבצים מוסתרים",
-      PLAINROOT_UI_WIDGET_SWITCH);
+      root, hidden_files_label, PLAINROOT_UI_WIDGET_SWITCH);
   const auto wide_filter_bounds = widget_bounds(wide_filter);
   const auto wide_hidden_bounds = widget_bounds(wide_hidden);
   if (!require(wide_filter != nullptr && wide_hidden != nullptr &&
