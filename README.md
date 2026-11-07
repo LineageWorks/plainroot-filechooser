@@ -150,10 +150,11 @@ or handle invalidation now routes through the toolkit's normal window-close
 callback and cancels the portal request. When a Wayland parent identifier is
 provided with a modal request, toolkit window creation now fails if the parent
 cannot be imported or `xdg-dialog-v1` is unavailable, rather than silently
-opening an unparented chooser. This still cannot guarantee that every
-compositor blocks parent input. Trace output records whether a parent
-identifier was present without logging the identifier itself. X11 parent
-identifiers are ignored.
+opening an unparented chooser. Modal enforcement remains compositor-defined.
+A staged Hyprland acceptance confirmed that the parent stayed non-interactive
+while the chooser was open. Trace output records whether a parent identifier
+was present without logging the identifier itself. X11 parent identifiers are
+ignored.
 With portal registration enabled, the staged backend is discoverable when the
 portal broker starts with the staged data directory and `PlainrootDE` desktop
 configuration. Private-broker checks have completed single-file and multiple
