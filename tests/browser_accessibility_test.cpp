@@ -137,6 +137,15 @@ bool fits_width(const plainroot_ui_widget *widget, float width) {
          bounds.x + bounds.width <= width + 0.5F;
 }
 
+bool fits_viewport(const plainroot_ui_widget *widget, float width,
+                   float height) {
+  const auto bounds = widget_bounds(widget);
+  return bounds.width > 0.0F && bounds.height > 0.0F &&
+         bounds.x >= -0.5F && bounds.y >= -0.5F &&
+         bounds.x + bounds.width <= width + 0.5F &&
+         bounds.y + bounds.height <= height + 0.5F;
+}
+
 bool shares_row(const plainroot_ui_widget *first,
                 const plainroot_ui_widget *second) {
   const auto first_bounds = widget_bounds(first);
@@ -327,6 +336,14 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
       plainroot_i18n_gettext_v1("plainroot-filechooser", "Select");
   const std::string accept_label =
       translated_accept == nullptr ? "Select" : translated_accept;
+  const auto localized = [](const char *source) {
+    const char *translated =
+        plainroot_i18n_gettext_v1("plainroot-filechooser", source);
+    return std::string(translated == nullptr ? source : translated);
+  };
+  const std::string preview_heading = localized("Preview");
+  const std::string unavailable_preview =
+      localized("No image preview available.");
 
   const std::filesystem::path text_file =
       temporary_config.browse_directory() / "notes.txt";
@@ -550,6 +567,56 @@ int run_rtl_responsive_layout_test(const char *language_tag) {
       find_widget(root, "notes.txt", PLAINROOT_UI_WIDGET_BUTTON) == nullptr;
   if (!require(image_filter_results,
                "RTL image filter rerenders matching file rows"))
+    return 1;
+
+  const auto *image_row =
+      find_widget(root, "picture.png", PLAINROOT_UI_WIDGET_BUTTON);
+  const bool image_selected =
+      image_row != nullptr &&
+      plainroot_ui_widget_accessibility_perform_action_v1(
+          const_cast<plainroot_ui_widget *>(image_row),
+          PLAINROOT_UI_ACCESSIBILITY_ACTION_DEFAULT) == PLAINROOT_UI_RESULT_OK;
+  const bool preview_state_loaded = image_selected && pump_until([&] {
+    return find_widget(root, unavailable_preview,
+                       PLAINROOT_UI_WIDGET_LABEL) != nullptr;
+  });
+  const auto *preview_title =
+      find_widget(root, preview_heading, PLAINROOT_UI_WIDGET_LABEL);
+  const auto *preview_status =
+      find_widget(root, unavailable_preview, PLAINROOT_UI_WIDGET_LABEL);
+  if (!require(preview_state_loaded,
+               "RTL image selection reaches the preview status") ||
+      !require(preview_title != nullptr && preview_status != nullptr,
+               "RTL preview exposes its heading and status"))
+    return 1;
+
+  bool preview_fits_all_viewports = true;
+  for (const Viewport &viewport : viewports) {
+    const bool laid_out = layout_at(viewport.width, viewport.height);
+    const bool fits_horizontally =
+        laid_out && fits_width(preview_title, viewport.width) &&
+        fits_width(preview_status, viewport.width);
+    // Compact layouts place the preview below the file list in the outer
+    // scroll area, so vertical overflow there is intentional. At expanded
+    // tablet-landscape and laptop widths the side-by-side preview should stay
+    // within the visible window.
+    const bool expanded = viewport.width >= 1024.0F;
+    const bool fits_height =
+        !expanded ||
+        (fits_viewport(preview_title, viewport.width, viewport.height) &&
+         fits_viewport(preview_status, viewport.width, viewport.height));
+    const bool fits = fits_horizontally && fits_height;
+    if (!fits) {
+      std::cerr << "RTL preview does not fit " << viewport.name << " ("
+                << viewport.width << 'x' << viewport.height << ")\n";
+      preview_fits_all_viewports = false;
+    }
+  }
+  if (!require(preview_fits_all_viewports,
+               "RTL preview heading and status fit phone, tablet, and laptop layouts"))
+    return 1;
+  if (!require(layout_at(390.0F, 844.0F),
+               "RTL phone layout after preview viewport checks"))
     return 1;
 
   const auto *phone_places =
